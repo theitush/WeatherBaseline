@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Temperature History</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .controls h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .year-range-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .year-range-control label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .year-range-control select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .year-range-control select:hover {
+            border-color: #1976d2;
+        }
+        
+        .year-range-control select:focus {
+            outline: none;
+            border-color: #1976d2;
+            box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+        }
+        
+        .year-info {
+            margin-left: 15px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .charts-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            height: 450px;
+            width: 1150px;
+        }
+        
+        .main-chart {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .histogram-chart {
+            position: absolute;
+            left: 800px;
+            top: 0;
+        }
+        
+        .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .axis {
+            font-size: 12px;
+        }
+        
+        .grid line {
+            stroke: #e0e0e0;
+            stroke-dasharray: 2,2;
+        }
+        
+        .grid path {
+            stroke-width: 0;
+        }
+        
+        .data-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1976d2;
+        }
+        
+        .percentile-band {
+            fill-opacity: 0.2;
+        }
+        
+        .trend-line {
+            stroke-width: 2;
+            fill: none;
+        }
+        
+        .current-temp-line {
+            stroke: #333;
+            stroke-width: 2;
+            stroke-dasharray: 5,5;
+        }
+        
+        .current-temp-point {
+            fill: #333;
+            stroke: white;
+            stroke-width: 2;
+        }
+        
+        .data-point {
+            transition: all 0.3s ease;
+        }
+        
+        .bar {
+            transition: all 0.5s ease;
+        }
+        
+        .percentile-band {
+            transition: all 0.5s ease;
+        }
+        
+        .trend-line {
+            transition: all 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Temperature History</h1>
+        
+        <div class="controls">
+            <h3>Select Starting Year</h3>
+            <div class="year-range-control">
+                <label for="start-year">From:</label>
+                <select id="start-year">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <div class="year-info" id="year-info">
+                    <!-- Year range info will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="charts-container">
+            <div class="main-chart">
+                <div class="chart-title">Temperature Over Time</div>
+                <svg id="main-svg" width="800" height="400"></svg>
+            </div>
+            <div class="histogram-chart">
+                <div class="chart-title">Distribution</div>
+                <svg id="histogram-svg" width="300" height="400"></svg>
+            </div>
+        </div>
+        
+        <div class="data-info" id="data-info">
+            <!-- Data information will be populated by JavaScript -->
+        </div>
+        
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let fullData = [];
+        let filteredData = [];
+        let yearlyAggregates = [];
+        let startYear = 2015;
+        let endYear = 2025;
+        let availableYears = [];
+        let currentDate = '2025-08-12'; // This would be dynamically set in real implementation
+        let currentMetric = 'max_temperature';
+        
+        // Chart dimensions
+        const mainMargin = {top: 20, right: 30, bottom: 40, left: 50};
+        const mainWidth = 800 - mainMargin.left - mainMargin.right;
+        const mainHeight = 400 - mainMargin.top - mainMargin.bottom;
+        
+        const histMargin = {top: 20, right: 100, bottom: 40, left: 0};
+        const histWidth = 300 - histMargin.left - histMargin.right;
+        const histHeight = 400 - histMargin.top - histMargin.bottom;
+        
+        // SVG elements
+        const mainSvg = d3.select("#main-svg");
+        const histSvg = d3.select("#histogram-svg");
+        const tooltip = d3.select("#tooltip");
+        
+        // Create chart groups
+        const mainG = mainSvg.append("g")
+            .attr("transform", `translate(${mainMargin.left},${mainMargin.top})`);
+            
+        const histG = histSvg.append("g")
+            .attr("transform", `translate(${histMargin.left},${histMargin.top})`);
+        
+        // Scales
+        const xScale = d3.scaleTime().range([0, mainWidth]);
+        const yScale = d3.scaleLinear().range([mainHeight, 0]);
+        const histXScale = d3.scaleLinear().range([0, histWidth]);
+        const histYScale = d3.scaleLinear().range([histHeight, 0]);
+        const colorScale = d3.scaleSequential(d3.interpolateViridis);
+        
+        // Line generator
+        const line = d3.line()
+            .x(d => xScale(d.date))
+            .y(d => yScale(d.value))
+            .curve(d3.curveMonotoneX);
+        
+        // Load CSV data
+        async function loadCSVData() {
+            try {
+                const response = await fetch('example_data.csv');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                console.log('CSV loaded, length:', csvText.length);
+                
+                const data = d3.csvParse(csvText, d => ({
+                    date: new Date(d.date),
+                    year: +d.year,
+                    max_temperature: +d.max_temperature,
+                    min_temperature: +d.min_temperature,
+                    data_type: d.data_type
+                }));
+                
+                console.log('Parsed data rows:', data.length);
+                console.log('First few rows:', data.slice(0, 3));
+                return data;
+            } catch (error) {
+                console.error('Error loading CSV data:', error);
+                return [];
+            }
+        }
+        
+        // Calculate yearly aggregates
+        function calculateYearlyAggregates(data) {
+            if (!data || data.length === 0) {
+                console.log('No data provided to calculateYearlyAggregates');
+                return [];
+            }
+            
+            const yearGroups = d3.group(data, d => d.year);
+            console.log('Year groups:', yearGroups.size);
+            const aggregates = [];
+            
+            yearGroups.forEach((values, year) => {
+                const temps = values.map(d => d[currentMetric]).sort(d3.ascending);
+                const targetDate = new Date(year, new Date(currentDate).getMonth(), new Date(currentDate).getDate());
+                
+                aggregates.push({
+                    year: year,
+                    date: targetDate,
+                    p10: d3.quantile(temps, 0.10),
+                    p25: d3.quantile(temps, 0.25),
+                    p50: d3.quantile(temps, 0.50),
+                    p75: d3.quantile(temps, 0.75),
+                    p90: d3.quantile(temps, 0.90)
+                });
+            });
+            
+            // Calculate moving averages (5-year window)
+            aggregates.sort((a, b) => a.year - b.year);
+            const windowSize = 5;
+            
+            aggregates.forEach((d, i) => {
+                const start = Math.max(0, i - Math.floor(windowSize / 2));
+                const end = Math.min(aggregates.length, start + windowSize);
+                const window = aggregates.slice(start, end);
+                
+                d.movingMedian = d3.median(window, d => d.p50);
+                d.moving10 = d3.median(window, d => d.p10);
+                d.moving25 = d3.median(window, d => d.p25);
+                d.moving75 = d3.median(window, d => d.p75);
+                d.moving90 = d3.median(window, d => d.p90);
+            });
+            
+            return aggregates;
+        }
+        
+        // Initialize year range controls
+        function initializeYearControls() {
+            availableYears = [...new Set(fullData.map(d => d.year))].sort();
+            
+            const startSelect = d3.select("#start-year");
+            
+            // Populate start year dropdown
+            startSelect.selectAll("option")
+                .data(availableYears)
+                .enter()
+                .append("option")
+                .attr("value", d => d)
+                .text(d => d);
+            
+            // Set default values - end year is always the latest, start from first year
+            endYear = availableYears[availableYears.length - 1];
+            startYear = availableYears[0];
+            
+            startSelect.property("value", startYear);
+            
+            // Add event listener
+            startSelect.on("change", function() {
+                startYear = +this.value;
+                updateCharts();
+                updateYearInfo();
+            });
+            
+            updateYearInfo();
+        }
+        
+        // Update year range information
+        function updateYearInfo() {
+            const yearCount = endYear - startYear + 1;
+            const dataPointCount = fullData.filter(d => d.year >= startYear && d.year <= endYear).length;
+            
+            d3.select("#year-info")
+                .text(`${yearCount} years, ${dataPointCount} data points`);
+        }
+        
+        // Filter data based on selected year range
+        function filterData() {
+            filteredData = fullData.filter(d => d.year >= startYear && d.year <= endYear);
+            console.log(`Filtered data: ${filteredData.length} rows for years ${startYear}-${endYear}`);
+            yearlyAggregates = calculateYearlyAggregates(filteredData);
+            console.log(`Yearly aggregates: ${yearlyAggregates ? yearlyAggregates.length : 'undefined'} items`);
+        }
+        
+        // Update chart domains
+        function updateDomains() {
+            if (filteredData.length === 0) return;
+            
+            const dateExtent = d3.extent(filteredData, d => d.date);
+            const tempExtent = d3.extent(filteredData, d => d[currentMetric]);
+            
+            xScale.domain(dateExtent);
+            yScale.domain([tempExtent[0] - 2, tempExtent[1] + 2]);
+            histYScale.domain(yScale.domain());
+            colorScale.domain([startYear, endYear]);
+            
+            // Update histogram x scale
+            const bins = d3.histogram()
+                .domain(yScale.domain())
+                .thresholds(30)
+                (filteredData.map(d => d[currentMetric]));
+            
+            histXScale.domain([0, d3.max(bins, d => d.length)]);
+        }
+        
+        // Draw main chart with animations
+        function drawMainChart() {
+            if (filteredData.length === 0) {
+                mainG.selectAll("*").remove();
+                return;
+            }
+            
+            // Clear non-data elements first (but keep percentile bands and trend lines)
+            mainG.selectAll(".grid").remove();
+            mainG.selectAll(".axis").remove();
+            mainG.selectAll(".current-temp-line").remove();
+            mainG.selectAll(".current-temp-point").remove();
+            mainG.selectAll("text").remove();
+            
+            // Add grid
+            const xAxis = d3.axisBottom(xScale).tickFormat(d3.timeFormat("%Y"));
+            const yAxis = d3.axisLeft(yScale);
+            
+            mainG.append("g")
+                .attr("class", "grid")
+                .attr("transform", `translate(0,${mainHeight})`)
+                .call(d3.axisBottom(xScale)
+                    .tickSize(-mainHeight)
+                    .tickFormat("")
+                );
+            
+            mainG.append("g")
+                .attr("class", "grid")
+                .call(d3.axisLeft(yScale)
+                    .tickSize(-mainWidth)
+                    .tickFormat("")
+                );
+            
+            // Draw percentile bands with animation
+            if (yearlyAggregates && yearlyAggregates.length > 0) {
+                console.log('Drawing percentile bands for', yearlyAggregates.length, 'years');
+                
+                const area90 = d3.area()
+                    .x(d => xScale(d.date))
+                    .y0(d => yScale(d.p10 || d.moving10))
+                    .y1(d => yScale(d.p90 || d.moving90))
+                    .curve(d3.curveMonotoneX);
+                
+                const area75 = d3.area()
+                    .x(d => xScale(d.date))
+                    .y0(d => yScale(d.p25 || d.moving25))
+                    .y1(d => yScale(d.p75 || d.moving75))
+                    .curve(d3.curveMonotoneX);
+                
+                // Draw percentile bands with smooth zoom animation
+                // Create or update 90th percentile band
+                let band90 = mainG.select(".percentile-band-90");
+                if (band90.empty()) {
+                    band90 = mainG.append("path")
+                        .attr("class", "percentile-band percentile-band-90")
+                        .attr("fill", "#999")
+                        .style("opacity", 0.4);
+                }
+                
+                try {
+                    // Smooth fade transition for shading
+                    band90.datum(yearlyAggregates)
+                        .transition()
+                        .duration(250)
+                        .style("opacity", 0.1)
+                        .transition()
+                        .duration(0)
+                        .attr("d", area90)
+                        .attr("fill", "#999")
+                        .transition()
+                        .duration(250)
+                        .style("opacity", 0.4);
+                } catch (e) {
+                    console.error('Error drawing 90th percentile band:', e);
+                }
+                
+                // Create or update 75th percentile band  
+                let band75 = mainG.select(".percentile-band-75");
+                if (band75.empty()) {
+                    band75 = mainG.append("path")
+                        .attr("class", "percentile-band percentile-band-75")
+                        .attr("fill", "#999")
+                        .style("opacity", 0.6);
+                }
+                
+                try {
+                    // Smooth fade transition for shading
+                    band75.datum(yearlyAggregates)
+                        .transition()
+                        .duration(250)
+                        .style("opacity", 0.2)
+                        .transition()
+                        .duration(0)
+                        .attr("d", area75)
+                        .attr("fill", "#999")
+                        .transition()
+                        .duration(250)
+                        .style("opacity", 0.6);
+                } catch (e) {
+                    console.error('Error drawing 75th percentile band:', e);
+                }
+                
+                // Draw median trend line with smooth animation
+                let trendLine = mainG.select(".trend-line");
+                if (trendLine.empty()) {
+                    trendLine = mainG.append("path")
+                        .attr("class", "trend-line")
+                        .attr("stroke", "#333")
+                        .attr("stroke-width", 2)
+                        .attr("fill", "none");
+                }
+                
+                try {
+                    // Fade out, set new path, fade in - no morphing
+                    trendLine.datum(yearlyAggregates)
+                        .transition()
+                        .duration(200)
+                        .style("opacity", 0)
+                        .transition()
+                        .duration(0)
+                        .attr("d", line.y(d => yScale(d.movingMedian || d.p50)))
+                        .transition()
+                        .duration(300)
+                        .style("opacity", 1);
+                } catch (e) {
+                    console.error('Error drawing trend line:', e);
+                }
+            }
+            
+            // Draw scatter points with proper zoom/stretch animation
+            const circles = mainG.selectAll(".data-point")
+                .data(filteredData, d => `${d.date.getTime()}_${d.year}`);
+                
+            // Remove points that are no longer in range
+            circles.exit()
+                .transition()
+                .duration(500)
+                .attr("opacity", 0)
+                .remove();
+            
+            // Update existing points - animate to new positions (stretch/zoom effect)
+            circles.transition()
+                .duration(500)
+                .attr("cx", d => xScale(d.date))
+                .attr("cy", d => yScale(d[currentMetric]));
+                
+            // Add new points that came into view
+            circles.enter()
+                .append("circle")
+                .attr("class", "data-point")
+                .attr("cx", d => xScale(d.date))
+                .attr("cy", d => yScale(d[currentMetric]))
+                .attr("r", 2)
+                .attr("fill", "#999")
+                .attr("opacity", 0)
+                .attr("stroke", "white")
+                .attr("stroke-width", 0.5)
+                .transition()
+                .duration(500)
+                .attr("opacity", 0.6);
+            
+            // Add tooltips to all points (both new and updated)
+            mainG.selectAll(".data-point")
+                .on("mouseover", function(event, d) {
+                    tooltip.style("opacity", 1)
+                        .html(`Date: ${d.date.toDateString()}<br/>
+                               Temperature: ${d[currentMetric]}°C`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.style("opacity", 0);
+                });
+            
+            // Highlight current date if it exists in data
+            const currentDateData = filteredData.filter(d => 
+                d.date.toDateString() === new Date(currentDate).toDateString()
+            );
+            
+            if (currentDateData.length > 0) {
+                const currentTemp = currentDateData[0][currentMetric];
+                
+                // Current temperature line
+                mainG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", 0)
+                    .attr("x2", mainWidth)
+                    .attr("y1", yScale(currentTemp))
+                    .attr("y2", yScale(currentTemp));
+                
+                // Current temperature point
+                mainG.selectAll(".current-temp-point")
+                    .data(currentDateData)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "current-temp-point")
+                    .attr("cx", d => xScale(d.date))
+                    .attr("cy", d => yScale(d[currentMetric]))
+                    .attr("r", 4);
+            }
+            
+            // Add axes
+            mainG.append("g")
+                .attr("class", "axis")
+                .attr("transform", `translate(0,${mainHeight})`)
+                .call(xAxis);
+            
+            mainG.append("g")
+                .attr("class", "axis")
+                .call(yAxis);
+            
+            // Add axis labels
+            mainG.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - mainMargin.left)
+                .attr("x", 0 - (mainHeight / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("Temperature (°C)");
+            
+            mainG.append("text")
+                .attr("transform", `translate(${mainWidth / 2}, ${mainHeight + mainMargin.bottom - 5})`)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("Year");
+        }
+        
+        // Draw histogram with animations
+        function drawHistogram() {
+            if (filteredData.length === 0) {
+                histG.selectAll("*").remove();
+                return;
+            }
+            
+            // Clear non-data elements first - be more thorough with bracket removal
+            histG.selectAll(".axis").remove();
+            histG.selectAll(".current-temp-line").remove();
+            histG.selectAll(".upper-bracket").remove();
+            histG.selectAll(".lower-bracket").remove();
+            histG.selectAll("text").remove();
+            // Remove any orphaned bracket groups and text elements
+            histG.selectAll("g.upper-bracket").remove();
+            histG.selectAll("g.lower-bracket").remove();
+            histG.selectAll("g").selectAll("text").remove();
+            // Extra thorough cleanup
+            histG.selectAll("*:not(.bar)").remove();
+            
+            // Create histogram data
+            const bins = d3.histogram()
+                .domain(yScale.domain())
+                .thresholds(30)
+                (filteredData.map(d => d[currentMetric]));
+            
+            // Update bars with smooth animation
+            const bars = histG.selectAll(".bar")
+                .data(bins, (d, i) => `bin_${i}`);
+                
+            // Remove bars that are no longer needed
+            bars.exit()
+                .transition()
+                .duration(500)
+                .attr("width", 0)
+                .attr("opacity", 0)
+                .remove();
+            
+            // Update existing bars - animate width changes
+            bars.transition()
+                .duration(500)
+                .attr("y", d => histYScale(d.x1))
+                .attr("width", d => histXScale(d.length))
+                .attr("height", d => histYScale(d.x0) - histYScale(d.x1));
+                
+            // Add new bars
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", 0)
+                .attr("y", d => histYScale(d.x1))
+                .attr("width", 0)
+                .attr("height", d => histYScale(d.x0) - histYScale(d.x1))
+                .attr("fill", "#999")
+                .attr("opacity", 0.7)
+                .transition()
+                .duration(500)
+                .attr("width", d => histXScale(d.length));
+            
+            // Current temperature line in histogram
+            const currentDateData = fullData.filter(d => 
+                d.date.toDateString() === new Date(currentDate).toDateString()
+            );
+            
+            if (currentDateData.length > 0 && filteredData.length > 0) {
+                const currentTemp = currentDateData[0][currentMetric];
+                
+                histG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", 0)
+                    .attr("x2", histWidth)
+                    .attr("y1", histYScale(currentTemp))
+                    .attr("y2", histYScale(currentTemp));
+                
+                // Calculate percentiles based on filtered data
+                const higherCount = filteredData.filter(d => d[currentMetric] > currentTemp).length;
+                const totalCount = filteredData.length;
+                const percentHigher = (higherCount / totalCount * 100).toFixed(1);
+                const percentLower = (100 - parseFloat(percentHigher)).toFixed(1);
+                
+                console.log(`Current temp: ${currentTemp}, Higher count: ${higherCount}, Total: ${totalCount}, % Higher: ${percentHigher}%, % Lower: ${percentLower}%`);
+                console.log('percentHigher type:', typeof percentHigher, 'value:', percentHigher);
+                console.log('percentLower type:', typeof percentLower, 'value:', percentLower);
+                
+                // Add larger, clearer curly brackets and percentage labels
+                const rightX = histWidth + 10;
+                const bracketWidth = 15;
+                const yMid = histYScale(currentTemp);
+                const yTop = 20;
+                const yBottom = histHeight - 20;
+                
+                // Upper bracket (for higher percentage)
+                const upperBracketGroup = histG.append("g").attr("class", "upper-bracket");
+                
+                // Upper bracket path - larger and clearer
+                upperBracketGroup.append("path")
+                    .attr("d", `M ${rightX} ${yTop} 
+                               L ${rightX + bracketWidth * 0.4} ${yTop}
+                               Q ${rightX + bracketWidth * 0.7} ${yTop + 8} ${rightX + bracketWidth * 0.4} ${yTop + 16}
+                               L ${rightX + bracketWidth * 0.4} ${yMid - 16}
+                               Q ${rightX + bracketWidth * 0.7} ${yMid - 8} ${rightX + bracketWidth * 0.4} ${yMid}`)
+                    .attr("stroke", "#333")
+                    .attr("stroke-width", 2)
+                    .attr("fill", "none");
+                
+                // Upper bracket label with background
+                const upperTextValue = percentHigher + '%';
+                console.log('Creating upper bracket text with:', upperTextValue);
+                
+                const upperText = upperBracketGroup.append("text")
+                    .attr("x", rightX + bracketWidth + 12)
+                    .attr("y", (yTop + yMid) / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", "start")
+                    .style("font-size", "14px")
+                    .style("font-weight", "normal")
+                    .style("fill", "#333")
+                    .text(upperTextValue);
+                console.log('Upper text element created with text:', upperText.text());
+                console.log('Upper text node value:', upperText.node().textContent);
+                
+                // Lower bracket (for lower percentage)
+                const lowerBracketGroup = histG.append("g").attr("class", "lower-bracket");
+                
+                // Lower bracket path - larger and clearer
+                lowerBracketGroup.append("path")
+                    .attr("d", `M ${rightX + bracketWidth * 0.4} ${yMid}
+                               Q ${rightX + bracketWidth * 0.7} ${yMid + 8} ${rightX + bracketWidth * 0.4} ${yMid + 16}
+                               L ${rightX + bracketWidth * 0.4} ${yBottom - 16}
+                               Q ${rightX + bracketWidth * 0.7} ${yBottom - 8} ${rightX + bracketWidth * 0.4} ${yBottom}
+                               L ${rightX} ${yBottom}`)
+                    .attr("stroke", "#333")
+                    .attr("stroke-width", 2)
+                    .attr("fill", "none");
+                
+                // Lower bracket label with background
+                const lowerTextValue = percentLower + '%';
+                console.log('Creating lower bracket text with:', lowerTextValue);
+                
+                const lowerText = lowerBracketGroup.append("text")
+                    .attr("x", rightX + bracketWidth + 12)
+                    .attr("y", (yMid + yBottom) / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", "start")
+                    .style("font-size", "14px")
+                    .style("font-weight", "normal")
+                    .style("fill", "#333")
+                    .text(lowerTextValue);
+                console.log('Lower text element created with text:', lowerText.text());
+                console.log('Lower text node value:', lowerText.node().textContent);
+            }
+            
+            // No y-axis for histogram to avoid interfering with brackets
+            
+            // Add x-axis label
+            histG.append("text")
+                .attr("transform", `translate(${histWidth / 2}, ${histHeight + 30})`)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("Count");
+        }
+        
+        // Update data info
+        function updateDataInfo() {
+            const yearRange = `${startYear}-${endYear}`;
+            const totalPoints = filteredData.length;
+            
+            const currentDateData = filteredData.filter(d => 
+                d.date.toDateString() === new Date(currentDate).toDateString()
+            );
+            
+            let infoText = `Showing data from ${yearRange} (${totalPoints} data points)`;
+            
+            if (currentDateData.length > 0) {
+                const currentTemp = currentDateData[0][currentMetric];
+                const percentHigher = (filteredData.filter(d => d[currentMetric] > currentTemp).length / filteredData.length * 100).toFixed(1);
+                infoText += `<br/>Current temperature (${currentDate}): ${currentTemp}°C (${percentHigher}th percentile)`;
+            }
+            
+            d3.select("#data-info").html(infoText);
+        }
+        
+        // Main update function
+        function updateCharts() {
+            filterData();
+            updateDomains();
+            drawMainChart();
+            drawHistogram();
+            updateDataInfo();
+        }
+        
+        // Initialize the visualization
+        async function init() {
+            try {
+                fullData = await loadCSVData();
+                if (fullData.length === 0) {
+                    d3.select("#data-info").html("Error: Could not load data from example_data.csv");
+                    return;
+                }
+                initializeYearControls();
+                updateCharts();
+            } catch (error) {
+                console.error('Error initializing visualization:', error);
+                d3.select("#data-info").html("Error: Could not load data from example_data.csv");
+            }
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
