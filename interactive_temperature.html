@@ -212,6 +212,7 @@
         let yearlyAggregates = [];
         let startYear = 2015;
         let endYear = 2025;
+        let previousYearRange = 0;
         let availableYears = [];
         let currentDate = '2025-08-12'; // This would be dynamically set in real implementation
         let currentMetric = 'max_temperature';
@@ -390,6 +391,14 @@
                 (filteredData.map(d => d[currentMetric]));
             
             histXScale.domain([0, d3.max(bins, d => d.length)]);
+            
+            // Track year range change for animation direction
+            const currentYearRange = endYear - startYear + 1;
+            const isAddingYears = currentYearRange > previousYearRange;
+            previousYearRange = currentYearRange;
+            
+            // Store animation direction globally
+            window.isAddingYears = isAddingYears;
         }
         
         // Draw main chart with animations
@@ -452,11 +461,11 @@
                 }
                 
                 try {
-                    // Smooth fade transition for shading
+                    // Simple fade out and fade in
                     band90.datum(yearlyAggregates)
                         .transition()
                         .duration(250)
-                        .style("opacity", 0.1)
+                        .style("opacity", 0)
                         .transition()
                         .duration(0)
                         .attr("d", area90)
@@ -478,11 +487,11 @@
                 }
                 
                 try {
-                    // Smooth fade transition for shading
+                    // Simple fade out and fade in
                     band75.datum(yearlyAggregates)
                         .transition()
                         .duration(250)
-                        .style("opacity", 0.2)
+                        .style("opacity", 0)
                         .transition()
                         .duration(0)
                         .attr("d", area75)
@@ -705,24 +714,24 @@
                 console.log('percentLower type:', typeof percentLower, 'value:', percentLower);
                 
                 // Add larger, clearer curly brackets and percentage labels
-                const rightX = histWidth + 10;
-                const bracketWidth = 15;
+                const rightX = histWidth + 15;
+                const bracketWidth = 18;
                 const yMid = histYScale(currentTemp);
-                const yTop = 20;
-                const yBottom = histHeight - 20;
+                const yTop = 15;
+                const yBottom = histHeight - 15;
                 
                 // Upper bracket (for higher percentage)
                 const upperBracketGroup = histG.append("g").attr("class", "upper-bracket");
                 
-                // Upper bracket path - larger and clearer
+                // Upper bracket path - larger and clearer with better spacing
                 upperBracketGroup.append("path")
                     .attr("d", `M ${rightX} ${yTop} 
-                               L ${rightX + bracketWidth * 0.4} ${yTop}
-                               Q ${rightX + bracketWidth * 0.7} ${yTop + 8} ${rightX + bracketWidth * 0.4} ${yTop + 16}
-                               L ${rightX + bracketWidth * 0.4} ${yMid - 16}
-                               Q ${rightX + bracketWidth * 0.7} ${yMid - 8} ${rightX + bracketWidth * 0.4} ${yMid}`)
-                    .attr("stroke", "#333")
-                    .attr("stroke-width", 2)
+                               L ${rightX + bracketWidth * 0.5} ${yTop}
+                               Q ${rightX + bracketWidth * 0.8} ${yTop + 10} ${rightX + bracketWidth * 0.5} ${yTop + 20}
+                               L ${rightX + bracketWidth * 0.5} ${yMid - 25}
+                               Q ${rightX + bracketWidth * 0.8} ${yMid - 15} ${rightX + bracketWidth * 0.5} ${yMid - 5}`)
+                    .attr("stroke", "#666")
+                    .attr("stroke-width", 1.5)
                     .attr("fill", "none");
                 
                 // Upper bracket label with background
@@ -730,13 +739,13 @@
                 console.log('Creating upper bracket text with:', upperTextValue);
                 
                 const upperText = upperBracketGroup.append("text")
-                    .attr("x", rightX + bracketWidth + 12)
-                    .attr("y", (yTop + yMid) / 2)
+                    .attr("x", rightX + bracketWidth + 8)
+                    .attr("y", (yTop + yMid - 10) / 2)
                     .attr("dy", "0.35em")
                     .attr("text-anchor", "start")
-                    .style("font-size", "14px")
+                    .style("font-size", "13px")
                     .style("font-weight", "normal")
-                    .style("fill", "#333")
+                    .style("fill", "#555")
                     .text(upperTextValue);
                 console.log('Upper text element created with text:', upperText.text());
                 console.log('Upper text node value:', upperText.node().textContent);
@@ -744,15 +753,15 @@
                 // Lower bracket (for lower percentage)
                 const lowerBracketGroup = histG.append("g").attr("class", "lower-bracket");
                 
-                // Lower bracket path - larger and clearer
+                // Lower bracket path - larger and clearer with better spacing
                 lowerBracketGroup.append("path")
-                    .attr("d", `M ${rightX + bracketWidth * 0.4} ${yMid}
-                               Q ${rightX + bracketWidth * 0.7} ${yMid + 8} ${rightX + bracketWidth * 0.4} ${yMid + 16}
-                               L ${rightX + bracketWidth * 0.4} ${yBottom - 16}
-                               Q ${rightX + bracketWidth * 0.7} ${yBottom - 8} ${rightX + bracketWidth * 0.4} ${yBottom}
+                    .attr("d", `M ${rightX + bracketWidth * 0.5} ${yMid + 5}
+                               Q ${rightX + bracketWidth * 0.8} ${yMid + 15} ${rightX + bracketWidth * 0.5} ${yMid + 25}
+                               L ${rightX + bracketWidth * 0.5} ${yBottom - 20}
+                               Q ${rightX + bracketWidth * 0.8} ${yBottom - 10} ${rightX + bracketWidth * 0.5} ${yBottom}
                                L ${rightX} ${yBottom}`)
-                    .attr("stroke", "#333")
-                    .attr("stroke-width", 2)
+                    .attr("stroke", "#666")
+                    .attr("stroke-width", 1.5)
                     .attr("fill", "none");
                 
                 // Lower bracket label with background
@@ -760,13 +769,13 @@
                 console.log('Creating lower bracket text with:', lowerTextValue);
                 
                 const lowerText = lowerBracketGroup.append("text")
-                    .attr("x", rightX + bracketWidth + 12)
-                    .attr("y", (yMid + yBottom) / 2)
+                    .attr("x", rightX + bracketWidth + 8)
+                    .attr("y", (yMid + 10 + yBottom) / 2)
                     .attr("dy", "0.35em")
                     .attr("text-anchor", "start")
-                    .style("font-size", "14px")
+                    .style("font-size", "13px")
                     .style("font-weight", "normal")
-                    .style("fill", "#333")
+                    .style("fill", "#555")
                     .text(lowerTextValue);
                 console.log('Lower text element created with text:', lowerText.text());
                 console.log('Lower text node value:', lowerText.node().textContent);
