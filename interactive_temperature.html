@@ -175,7 +175,7 @@
         <h1>Interactive Temperature History</h1>
         
         <div class="controls">
-            <h3>Select Starting Year</h3>
+            <h3>Chart Settings</h3>
             <div class="year-range-control">
                 <label for="start-year">From:</label>
                 <select id="start-year">
@@ -184,6 +184,13 @@
                 <div class="year-info" id="year-info">
                     <!-- Year range info will be populated by JavaScript -->
                 </div>
+            </div>
+            <div class="year-range-control">
+                <label for="metric-select">Metric:</label>
+                <select id="metric-select">
+                    <option value="max_temperature">Maximum Temperature</option>
+                    <option value="min_temperature">Minimum Temperature</option>
+                </select>
             </div>
         </div>
         
@@ -216,6 +223,22 @@
         let availableYears = [];
         let currentDate = '2025-08-12'; // This would be dynamically set in real implementation
         let currentMetric = 'max_temperature';
+        
+        // Color schemes for different metrics
+        const colorSchemes = {
+            max_temperature: {
+                primary: '#FFB366',    // Pastel orange for 75th percentile
+                secondary: '#CC6600',  // Darker orange for median line
+                points: '#FFCC99',     // Lighter orange for data points
+                bands: '#FFD4B3'       // Light orange for 90th percentile (made darker)
+            },
+            min_temperature: {
+                primary: '#87CEEB',    // Light blue for 75th percentile
+                secondary: '#2E86AB',  // Darker blue for median line
+                points: '#B3D9FF',     // Lighter blue for data points
+                bands: '#C6E2FF'       // Light blue for 90th percentile (made darker)
+            }
+        };
         
         // Chart dimensions
         const mainMargin = {top: 20, right: 30, bottom: 40, left: 50};
@@ -352,6 +375,12 @@
                 updateYearInfo();
             });
             
+            // Add metric selector event listener
+            d3.select("#metric-select").on("change", function() {
+                currentMetric = this.value;
+                updateCharts();
+            });
+            
             updateYearInfo();
         }
         
@@ -408,6 +437,9 @@
                 return;
             }
             
+            // Get current color scheme at the beginning
+            const colors = colorSchemes[currentMetric];
+            
             // Clear non-data elements first (but keep percentile bands and trend lines)
             mainG.selectAll(".grid").remove();
             mainG.selectAll(".axis").remove();
@@ -456,12 +488,12 @@
                 if (band90.empty()) {
                     band90 = mainG.append("path")
                         .attr("class", "percentile-band percentile-band-90")
-                        .attr("fill", "#999")
-                        .style("opacity", 0.4);
+                        .attr("fill", colors.bands)  // ← 90th percentile COLOR (10-90% range)
+                        .style("opacity", 0.6);      // ← 90th percentile OPACITY (10-90% range)
                 }
                 
                 try {
-                    // Simple fade out and fade in
+                    // Simple fade out and fade in with color change
                     band90.datum(yearlyAggregates)
                         .transition()
                         .duration(250)
@@ -469,10 +501,10 @@
                         .transition()
                         .duration(0)
                         .attr("d", area90)
-                        .attr("fill", "#999")
+                        .attr("fill", colors.bands)
                         .transition()
                         .duration(250)
-                        .style("opacity", 0.4);
+                        .style("opacity", 0.9);
                 } catch (e) {
                     console.error('Error drawing 90th percentile band:', e);
                 }
@@ -482,12 +514,12 @@
                 if (band75.empty()) {
                     band75 = mainG.append("path")
                         .attr("class", "percentile-band percentile-band-75")
-                        .attr("fill", "#999")
-                        .style("opacity", 0.6);
+                        .attr("fill", colors.primary)  // ← 75th percentile COLOR (25-75% range)
+                        .style("opacity", 0.8);        // ← 75th percentile OPACITY (25-75% range)
                 }
                 
                 try {
-                    // Simple fade out and fade in
+                    // Simple fade out and fade in with color change
                     band75.datum(yearlyAggregates)
                         .transition()
                         .duration(250)
@@ -495,10 +527,10 @@
                         .transition()
                         .duration(0)
                         .attr("d", area75)
-                        .attr("fill", "#999")
+                        .attr("fill", colors.primary)
                         .transition()
                         .duration(250)
-                        .style("opacity", 0.6);
+                        .style("opacity", 0.8);
                 } catch (e) {
                     console.error('Error drawing 75th percentile band:', e);
                 }
@@ -508,8 +540,8 @@
                 if (trendLine.empty()) {
                     trendLine = mainG.append("path")
                         .attr("class", "trend-line")
-                        .attr("stroke", "#333")
-                        .attr("stroke-width", 2)
+                        .attr("stroke", colors.secondary)
+                        .attr("stroke-width", 3)
                         .attr("fill", "none");
                 }
                 
@@ -522,6 +554,7 @@
                         .transition()
                         .duration(0)
                         .attr("d", line.y(d => yScale(d.movingMedian || d.p50)))
+                        .attr("stroke", colors.secondary)
                         .transition()
                         .duration(300)
                         .style("opacity", 1);
@@ -541,11 +574,12 @@
                 .attr("opacity", 0)
                 .remove();
             
-            // Update existing points - animate to new positions (stretch/zoom effect)
+            // Update existing points - animate to new positions and colors
             circles.transition()
                 .duration(500)
                 .attr("cx", d => xScale(d.date))
-                .attr("cy", d => yScale(d[currentMetric]));
+                .attr("cy", d => yScale(d[currentMetric]))
+                .attr("fill", colors.points);
                 
             // Add new points that came into view
             circles.enter()
@@ -554,13 +588,13 @@
                 .attr("cx", d => xScale(d.date))
                 .attr("cy", d => yScale(d[currentMetric]))
                 .attr("r", 2)
-                .attr("fill", "#999")
+                .attr("fill", colors.points)
                 .attr("opacity", 0)
                 .attr("stroke", "white")
                 .attr("stroke-width", 0.5)
                 .transition()
                 .duration(500)
-                .attr("opacity", 0.6);
+                .attr("opacity", 0.4); // ← Data points opacity
             
             // Add tooltips to all points (both new and updated)
             mainG.selectAll(".data-point")
@@ -636,6 +670,9 @@
                 return;
             }
             
+            // Get current color scheme at the beginning
+            const colors = colorSchemes[currentMetric];
+            
             // Clear non-data elements first - be more thorough with bracket removal
             histG.selectAll(".axis").remove();
             histG.selectAll(".current-temp-line").remove();
@@ -674,6 +711,14 @@
                 .attr("width", d => histXScale(d.length))
                 .attr("height", d => histYScale(d.x0) - histYScale(d.x1));
                 
+            // Update existing bars with new colors
+            bars.transition()
+                .duration(500)
+                .attr("y", d => histYScale(d.x1))
+                .attr("width", d => histXScale(d.length))
+                .attr("height", d => histYScale(d.x0) - histYScale(d.x1))
+                .attr("fill", colors.primary);
+            
             // Add new bars
             bars.enter()
                 .append("rect")
@@ -682,7 +727,7 @@
                 .attr("y", d => histYScale(d.x1))
                 .attr("width", 0)
                 .attr("height", d => histYScale(d.x0) - histYScale(d.x1))
-                .attr("fill", "#999")
+                .attr("fill", colors.primary)
                 .attr("opacity", 0.7)
                 .transition()
                 .duration(500)
