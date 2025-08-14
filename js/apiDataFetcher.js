@@ -40,12 +40,8 @@ class ApiDataFetcher {
             throw new Error(`${targetDate} should be within 3 days of today!`);
         }
 
-        // Calculate the overall date range for historical data (excluding current year)
-        const overallStartDate = this.addDays(
-            new Date(startYear, targetDt.getMonth(), targetDt.getDate()),
-            -daysRange
-        );
-        const overallStartStr = this.formatDate(overallStartDate);
+        // Always fetch complete historical data from 1940-01-01
+        const overallStartStr = '1940-01-01';
         const yesterdayStr = this.formatDate(yesterday);
 
         console.log(`Making historical API call for date range: ${overallStartStr} to ${yesterdayStr}`);
