@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Temperature History</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -56,10 +56,34 @@
             border-color: #1976d2;
         }
         
-        .year-range-control select:focus {
+        .year-range-control select:focus,
+        .year-range-control input:focus {
             outline: none;
             border-color: #1976d2;
             box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+        }
+        
+        .year-range-control input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+            margin-right: 15px;
+        }
+        
+        .year-range-control input:hover {
+            border-color: #1976d2;
+        }
+        
+        .year-range-control button:hover {
+            background: #1565c0;
+        }
+        
+        .year-range-control button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
         .year-info {
@@ -168,6 +192,64 @@
         .trend-line {
             transition: all 0.5s ease;
         }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        .loading-text {
+            display: flex;
+            align-items: center;
+            color: #1976d2;
+            font-weight: bold;
+        }
+        
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        .city-suggestion {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .city-suggestion:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .city-suggestion:last-child {
+            border-bottom: none;
+        }
+        
+        .city-suggestion .city-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .city-suggestion .city-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -175,9 +257,34 @@
         <h1>Interactive Temperature History</h1>
         
         <div class="controls">
-            <h3>Chart Settings</h3>
+            <h3>Location & Date Settings</h3>
             <div class="year-range-control">
-                <label for="start-year">From:</label>
+                <label for="city-search">City:</label>
+                <div style="position: relative; display: inline-block;">
+                    <input type="text" id="city-search" placeholder="Search for any city worldwide..." 
+                           style="width: 300px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;">
+                    <div id="city-suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; display: none; z-index: 1000;"></div>
+                </div>
+                
+                <div style="display: inline-block; margin-left: 15px;">
+                    <label for="latitude">Lat:</label>
+                    <input type="number" id="latitude" step="0.0001" value="32.0853" min="-90" max="90" style="width: 80px;">
+                    
+                    <label for="longitude" style="margin-left: 8px;">Lng:</label>
+                    <input type="number" id="longitude" step="0.0001" value="34.7818" min="-180" max="180" style="width: 80px;">
+                </div>
+                
+                <label for="target-date">Target Date:</label>
+                <input type="date" id="target-date">
+                
+                <button id="fetch-data-btn" style="padding: 8px 16px; margin-left: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
+            </div>
+            
+            
+            
+            <h3>Chart Display</h3>
+            <div class="year-range-control">
+                <label for="start-year">Display From:</label>
                 <select id="start-year">
                     <!-- Options will be populated by JavaScript -->
                 </select>
@@ -188,8 +295,10 @@
             <div class="year-range-control">
                 <label for="metric-select">Metric:</label>
                 <select id="metric-select">
-                    <option value="max_temperature">Maximum Temperature</option>
-                    <option value="min_temperature">Minimum Temperature</option>
+                    <option value="max_temperature" selected>Maximum Apparent Temperature</option>
+                    <option value="min_temperature">Minimum Apparent Temperature</option>
+                    <option value="precipitation_sum">Precipitation Sum</option>
+                    <option value="wind_speed_10m_max">Maximum Wind Speed</option>
                 </select>
             </div>
         </div>
@@ -214,6 +323,7 @@
 
     <!-- Load modules -->
     <script src="js/config.js"></script>
+    <script src="js/apiDataFetcher.js"></script>
     <script src="js/dataProcessor.js"></script>
     <script src="js/chartRenderer.js"></script>
     <script src="js/uiController.js"></script>
@@ -223,33 +333,358 @@
         let dataProcessor;
         let chartRenderer;
         let uiController;
+        let apiDataFetcher;
+
+        // Set today's date as default and configure date picker limits
+        function setDefaultDate() {
+            const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+            
+            // Set max date to 3 days from today
+            const maxDate = new Date(today);
+            maxDate.setDate(maxDate.getDate() + 3);
+            const maxDateStr = maxDate.toISOString().split('T')[0];
+            
+            const datePicker = document.getElementById('target-date');
+            datePicker.value = dateStr;
+            datePicker.max = maxDateStr;
+            
+            // Set min date to a reasonable historical date (1940 is default start)
+            datePicker.min = '1940-01-01';
+        }
+
+        // Get current coordinates from lat/lng inputs
+        function getCurrentCoordinates() {
+            return {
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value)
+            };
+        }
+
+        // City search with debounce
+        let searchTimeout;
+        let currentSuggestions = [];
+
+        // Initialize city search with API
+        function initializeCitySearch() {
+            const cityInput = document.getElementById('city-search');
+            const suggestionsDiv = document.getElementById('city-suggestions');
+            
+            // Set default city
+            cityInput.value = 'Tel Aviv, Israel';
+            
+            cityInput.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                
+                if (query.length < 2) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                // Debounce the search
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => searchCities(query), 300);
+            });
+            
+            // Handle keyboard navigation
+            cityInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+                    handleKeyboardNavigation(e);
+                }
+            });
+            
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.year-range-control')) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+        }
+        
+        // Search cities using geocoding API
+        async function searchCities(query) {
+            const suggestionsDiv = document.getElementById('city-suggestions');
+            
+            try {
+                // Using Nominatim (OpenStreetMap) API - free and no API key required
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(query)}&countrycodes=&featuretype=city`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+                
+                const results = await response.json();
+                
+                // Filter for cities, towns, villages
+                const cities = results.filter(result => {
+                    const type = result.type || result.class;
+                    return type === 'city' || type === 'town' || type === 'village' || 
+                           result.addresstype === 'city' || result.addresstype === 'town' || 
+                           result.addresstype === 'village';
+                });
+                
+                displaySuggestions(cities.slice(0, 6)); // Show max 6 suggestions
+                
+            } catch (error) {
+                console.error('City search error:', error);
+                // Fallback to a simple hardcoded search
+                const hardcodedCities = [
+                    {display_name: "Tel Aviv, Israel", lat: "32.0853", lon: "34.7818"},
+                    {display_name: "New York, United States", lat: "40.7128", lon: "-74.0060"},
+                    {display_name: "London, United Kingdom", lat: "51.5074", lon: "-0.1278"},
+                    {display_name: "Paris, France", lat: "48.8566", lon: "2.3522"},
+                    {display_name: "Tokyo, Japan", lat: "35.6762", lon: "139.6503"}
+                ];
+                
+                const filtered = hardcodedCities.filter(city => 
+                    city.display_name.toLowerCase().includes(query.toLowerCase())
+                );
+                
+                if (filtered.length > 0) {
+                    displaySuggestions(filtered);
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            }
+        }
+        
+        // Display city suggestions
+        function displaySuggestions(cities) {
+            const suggestionsDiv = document.getElementById('city-suggestions');
+            currentSuggestions = cities;
+            
+            if (cities.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = cities.map((city, index) => {
+                const name = city.display_name.split(',')[0]; // Get city name
+                const country = city.display_name.split(',').slice(-1)[0].trim(); // Get country
+                const details = city.display_name.replace(name + ', ', '').replace(', ' + country, '');
+                
+                return `
+                    <div class="city-suggestion" data-index="${index}" onclick="selectCity(${index})">
+                        <div class="city-name">${name}</div>
+                        <div class="city-details">${details}, ${country}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            suggestionsDiv.style.display = 'block';
+        }
+        
+        // Select a city from suggestions
+        function selectCity(index) {
+            const city = currentSuggestions[index];
+            const cityInput = document.getElementById('city-search');
+            const suggestionsDiv = document.getElementById('city-suggestions');
+            
+            cityInput.value = city.display_name;
+            document.getElementById('latitude').value = parseFloat(city.lat).toFixed(4);
+            document.getElementById('longitude').value = parseFloat(city.lon).toFixed(4);
+            
+            suggestionsDiv.style.display = 'none';
+        }
+        
+        // Handle keyboard navigation in suggestions
+        function handleKeyboardNavigation(e) {
+            const suggestionsDiv = document.getElementById('city-suggestions');
+            const suggestions = suggestionsDiv.querySelectorAll('.city-suggestion');
+            
+            if (suggestions.length === 0) return;
+            
+            let selectedIndex = Array.from(suggestions).findIndex(s => s.classList.contains('selected'));
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = selectedIndex < suggestions.length - 1 ? selectedIndex + 1 : 0;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : suggestions.length - 1;
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0) {
+                    selectCity(selectedIndex);
+                }
+                return;
+            }
+            
+            // Update selection
+            suggestions.forEach((s, i) => {
+                s.classList.toggle('selected', i === selectedIndex);
+                if (i === selectedIndex) {
+                    s.style.backgroundColor = '#e3f2fd';
+                } else {
+                    s.style.backgroundColor = '';
+                }
+            });
+        }
+
+        // Show comprehensive error popup and update display
+        function showError(errorMessage, errorDetails = {}) {
+            // Build comprehensive error message
+            let popupMessage = `🚨 ERROR FETCHING WEATHER DATA\n\n`;
+            popupMessage += `ERROR MESSAGE:\n${errorMessage}\n\n`;
+            
+            // Add technical details if available
+            if (errorDetails.status) {
+                popupMessage += `HTTP STATUS: ${errorDetails.status}\n`;
+            }
+            if (errorDetails.url) {
+                popupMessage += `FAILED URL: ${errorDetails.url}\n`;
+            }
+            if (errorDetails.technical) {
+                popupMessage += `TECHNICAL DETAILS:\n${errorDetails.technical}\n`;
+            }
+            if (errorDetails.timestamp) {
+                popupMessage += `TIME: ${errorDetails.timestamp}\n`;
+            }
+            if (errorDetails.location) {
+                popupMessage += `LOCATION: ${errorDetails.location}\n`;
+            }
+            if (errorDetails.dateRange) {
+                popupMessage += `DATE RANGE: ${errorDetails.dateRange}\n`;
+            }
+            
+            popupMessage += `\n💡 SUGGESTIONS:\n`;
+            popupMessage += `• Try a different location\n`;
+            popupMessage += `• Check your internet connection\n`;
+            popupMessage += `• Wait a moment and try again\n`;
+            popupMessage += `• Try a more recent date if using historical data`;
+            
+            // Always show popup alert with all details
+            alert(popupMessage);
+            
+            // Also update the info display with shortened message
+            d3.select("#data-info")
+                .attr("class", null)
+                .html(`❌ Error: ${errorMessage}`);
+        }
+
+        // Fetch data from API
+        async function fetchApiData() {
+            let coords, targetDate;
+            
+            try {
+                coords = getCurrentCoordinates();
+                targetDate = document.getElementById('target-date').value;
+                
+                if (!coords.latitude || !coords.longitude || !targetDate) {
+                    showError('Please select a location and date');
+                    return;
+                }
+
+            } catch (error) {
+                showError(`Input validation error: ${error.message}`);
+                return;
+            }
+
+            try {
+                // Show loading state with spinner
+                d3.select("#data-info")
+                    .attr("class", "loading-text")
+                    .html('<div class="loading-spinner"></div><span class="loading-dots">Fetching weather data from Open-Meteo API</span>');
+                
+                document.getElementById('fetch-data-btn').disabled = true;
+                document.getElementById('fetch-data-btn').innerHTML = '<div class="loading-spinner" style="border-color: rgba(255,255,255,0.3); border-top-color: #fff;"></div>Loading...';
+                
+                // Load API data from 1940 (default)
+                const data = await dataProcessor.loadApiData(coords.latitude, coords.longitude, targetDate);
+                
+                if (data.length === 0) {
+                    d3.select("#data-info")
+                        .attr("class", null)
+                        .html("❌ Could not fetch data. Please check your location coordinates and date.");
+                    return;
+                }
+
+                // Update UI with new data
+                uiController.initializeYearControls();
+                uiController.updateCharts();
+                
+                // Get location name for display
+                const cityInput = document.getElementById('city-search');
+                const locationName = cityInput.value.trim() 
+                    ? cityInput.value
+                    : `${coords.latitude}, ${coords.longitude}`;
+                    
+                d3.select("#data-info")
+                    .attr("class", null)
+                    .html(
+                        `✅ Successfully loaded ${data.length} weather records for ${locationName} around ${targetDate} (data from 1940)`
+                    );
+                
+            } catch (error) {
+                console.error('Error fetching API data:', error);
+                
+                // Build error details object
+                const errorDetails = {
+                    timestamp: new Date().toISOString(),
+                    location: coords ? `${coords.latitude}, ${coords.longitude}` : 'Unknown',
+                    dateRange: targetDate ? `${targetDate} (from 1940)` : 'Unknown',
+                    technical: error.stack || error.toString()
+                };
+                
+                // Add enhanced error information if available
+                if (error.httpStatus) {
+                    errorDetails.status = error.httpStatus;
+                }
+                if (error.url) {
+                    errorDetails.url = error.url;
+                }
+                if (error.serverDetails) {
+                    errorDetails.technical = error.serverDetails + '\n\n' + errorDetails.technical;
+                }
+                
+                showError(error.message || 'Unknown error occurred', errorDetails);
+            } finally {
+                document.getElementById('fetch-data-btn').disabled = false;
+                document.getElementById('fetch-data-btn').textContent = 'Fetch Data';
+            }
+        }
 
         // Initialize the application
         async function init() {
             try {
-                // Initialize data processor
-                dataProcessor = new DataProcessor();
+                // Set default date
+                setDefaultDate();
+
+                // Initialize API data fetcher
+                apiDataFetcher = new ApiDataFetcher();
                 
-                // Load data
-                const data = await dataProcessor.loadCSVData();
-                if (data.length === 0) {
-                    d3.select("#data-info").html("Error: Could not load data from example_data.csv");
-                    return;
-                }
+                // Initialize data processor with API fetcher
+                dataProcessor = new DataProcessor(apiDataFetcher);
                 
-                // Initialize chart renderer with config
+                // Initialize with empty state
                 chartRenderer = new ChartRenderer(dataProcessor, CONFIG);
-                
-                // Initialize UI controller
                 uiController = new UIController(dataProcessor, chartRenderer);
                 
-                // Set up controls and initial render
+                // Initialize UI controls even before data is loaded
                 uiController.initializeYearControls();
-                uiController.updateCharts();
+                
+                d3.select("#data-info").html("🌍 Select a location and date above to fetch weather data from Open-Meteo API.");
+                
+                // Initialize city search selector
+                initializeCitySearch();
+                
+                // Add event listeners
+                document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
+                
+                // Add enter key support for inputs
+                ['latitude', 'longitude', 'target-date', 'city-search'].forEach(id => {
+                    document.getElementById(id).addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            fetchApiData();
+                        }
+                    });
+                });
                 
             } catch (error) {
                 console.error('Error initializing visualization:', error);
-                d3.select("#data-info").html("Error: Could not load data from example_data.csv");
+                d3.select("#data-info").html("❌ Error initializing application. Check console for details.");
             }
         }
 

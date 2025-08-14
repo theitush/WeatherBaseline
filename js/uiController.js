@@ -3,7 +3,7 @@ class UIController {
     constructor(dataProcessor, chartRenderer) {
         this.dataProcessor = dataProcessor;
         this.chartRenderer = chartRenderer;
-        this.startYear = 2015;
+        this.startYear = 1940; // Default to 1940 to show all available historical data
         this.endYear = 2025;
     }
 
@@ -12,17 +12,26 @@ class UIController {
         const availableYears = this.dataProcessor.getAvailableYears();
         const startSelect = d3.select("#start-year");
         
+        // Clear existing options first
+        startSelect.selectAll("option").remove();
+        
         // Populate start year dropdown
         startSelect.selectAll("option")
-            .data(availableYears)
+            .data(availableYears.length > 0 ? availableYears : [1940])
             .enter()
             .append("option")
             .attr("value", d => d)
             .text(d => d);
         
         // Set default values
-        this.endYear = availableYears[availableYears.length - 1];
-        this.startYear = availableYears[0];
+        if (availableYears.length > 0) {
+            this.endYear = availableYears[availableYears.length - 1];
+            this.startYear = Math.min(availableYears[0], 1940); // Use 1940 or earliest available year
+        } else {
+            // Before data is loaded, set defaults
+            this.endYear = 2025;
+            this.startYear = 1940;
+        }
         
         startSelect.property("value", this.startYear);
         
@@ -33,9 +42,12 @@ class UIController {
             this.updateYearInfo();
         });
         
-        // Add metric selector event listener
-        d3.select("#metric-select").on("change", () => {
-            const newMetric = d3.select("#metric-select").property("value");
+        // Set metric selector to match DataProcessor's default and add event listener
+        const metricSelect = d3.select("#metric-select");
+        metricSelect.property("value", this.dataProcessor.currentMetric);
+        
+        metricSelect.on("change", () => {
+            const newMetric = metricSelect.property("value");
             this.dataProcessor.setCurrentMetric(newMetric);
             this.updateCharts(); // This will recalculate domains and update everything
         });
@@ -45,8 +57,16 @@ class UIController {
 
     // Update year range information
     updateYearInfo() {
+        const fullData = this.dataProcessor.getFullData();
+        
+        // Only show info if we have data loaded
+        if (!fullData || fullData.length === 0) {
+            d3.select("#year-info").text("");
+            return;
+        }
+        
         const yearCount = this.endYear - this.startYear + 1;
-        const dataPointCount = this.dataProcessor.getFullData()
+        const dataPointCount = fullData
             .filter(d => d.year >= this.startYear && d.year <= this.endYear).length;
         
         d3.select("#year-info")

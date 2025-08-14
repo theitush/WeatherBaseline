@@ -22,6 +22,18 @@ const CONFIG = {
             secondary: '#4A90E2',  // Same blue - median line (opacity = 1.0)
             points: '#4A90E2',     // Same blue - data points (opacity = 0.4)
             bands: '#4A90E2'       // Same blue - 90th percentile (opacity = 0.3)
+        },
+        precipitation_sum: {
+            primary: '#B19CD9',    // Pastel purple - used for all elements
+            secondary: '#B19CD9',  // Same pastel purple - median line (opacity = 1.0)
+            points: '#B19CD9',     // Same pastel purple - data points (opacity = 0.4)
+            bands: '#B19CD9'       // Same pastel purple - 90th percentile (opacity = 0.3)
+        },
+        wind_speed_10m_max: {
+            primary: '#A8D8A8',    // Pastel green - used for all elements
+            secondary: '#A8D8A8',  // Same pastel green - median line (opacity = 1.0)
+            points: '#A8D8A8',     // Same pastel green - data points (opacity = 0.4)
+            bands: '#A8D8A8'       // Same pastel green - 90th percentile (opacity = 0.3)
         }
     },
     

@@ -39,6 +39,36 @@ class ChartRenderer {
             .curve(d3.curveMonotoneX);
     }
 
+    // Get y-axis label based on current metric
+    getYAxisLabel(metric) {
+        const labels = {
+            'max_temperature': 'Maximum Apparent Temperature (°C)',
+            'min_temperature': 'Minimum Apparent Temperature (°C)',
+            'precipitation_sum': 'Precipitation Sum (mm)',
+            'wind_speed_10m_max': 'Maximum Wind Speed (km/h)'
+        };
+        return labels[metric] || 'Value';
+    }
+
+    // Format tooltip value based on current metric
+    formatTooltipValue(metric, value) {
+        const units = {
+            'max_temperature': '°C',
+            'min_temperature': '°C',
+            'precipitation_sum': 'mm',
+            'wind_speed_10m_max': 'km/h'
+        };
+        const labels = {
+            'max_temperature': 'Max Apparent Temp',
+            'min_temperature': 'Min Apparent Temp',
+            'precipitation_sum': 'Precipitation',
+            'wind_speed_10m_max': 'Max Wind Speed'
+        };
+        const unit = units[metric] || '';
+        const label = labels[metric] || 'Value';
+        return `${label}: ${value.toFixed(1)}${unit}`;
+    }
+
     // Update chart domains
     updateDomains(startYear, endYear) {
         const extents = this.dataProcessor.getDataExtents();
@@ -155,6 +185,9 @@ class ChartRenderer {
         
         if (!yearlyAggregates || yearlyAggregates.length === 0) return;
 
+        // Filter to only include years with valid moving medians
+        const validMovingMedianData = yearlyAggregates.filter(d => d.movingMedian !== null);
+
         let trendLine = this.mainG.select(".trend-line");
         if (trendLine.empty()) {
             trendLine = this.mainG.append("path")
@@ -165,11 +198,16 @@ class ChartRenderer {
         }
         
         try {
-            this.createFadeTransition(
-                trendLine.datum(yearlyAggregates),
-                { d: this.line.y(d => this.yScale(d.movingMedian || d.p50)) },
-                { stroke: colors.secondary }
-            );
+            if (validMovingMedianData.length > 0) {
+                this.createFadeTransition(
+                    trendLine.datum(validMovingMedianData),
+                    { d: this.line.y(d => this.yScale(d.movingMedian)) },
+                    { stroke: colors.secondary }
+                );
+            } else {
+                // Hide trend line if no valid data
+                trendLine.style("opacity", 0);
+            }
         } catch (e) {
             console.error('Error drawing trend line:', e);
         }
@@ -217,7 +255,7 @@ class ChartRenderer {
             .on("mouseover", (event, d) => {
                 this.tooltip.style("opacity", 1)
                     .html(`Date: ${d.date.toDateString()}<br/>
-                           Temperature: ${d[this.dataProcessor.currentMetric]}°C`)
+                           ${this.formatTooltipValue(this.dataProcessor.currentMetric, d[this.dataProcessor.currentMetric])}`)
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 10) + "px");
             })
@@ -292,7 +330,7 @@ class ChartRenderer {
             .attr("dy", "1em")
             .style("text-anchor", "middle")
             .style("font-size", "12px")
-            .text("Temperature (°C)");
+            .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
         
         this.mainG.append("text")
             .attr("transform", `translate(${this.config.mainWidth / 2}, ${this.config.mainHeight + this.config.mainMargin.bottom - 5})`)
