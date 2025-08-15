@@ -241,8 +241,6 @@ class ChartRenderer {
             .attr("r", 2)
             .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'dataPoints'))
             .attr("opacity", 0)
-            .attr("stroke", "white")
-            .attr("stroke-width", 0.5)
             .transition()
             .duration(500)
             .attr("opacity", 1);
