@@ -9,32 +9,63 @@ const CONFIG = {
     get histWidth() { return 300 - this.histMargin.left - this.histMargin.right; },
     get histHeight() { return 400 - this.histMargin.top - this.histMargin.bottom; },
     
-    // Color schemes for different metrics
-    colorSchemes: {
+    // Base colors for different metrics
+    metricColors: {
         max_temperature: {
-            primary: '#FF8C42',    // Base orange - used for all elements
-            secondary: '#FF8C42',  // Same orange - median line (opacity = 1.0)
-            points: '#FF8C42',     // Same orange - data points (opacity = 0.4)
-            bands: '#FF8C42'       // Same orange - 90th percentile (opacity = 0.3)
+            base: '#FF8C42',
+            name: 'Orange'
         },
         min_temperature: {
-            primary: '#4A90E2',    // Base blue - used for all elements
-            secondary: '#4A90E2',  // Same blue - median line (opacity = 1.0)
-            points: '#4A90E2',     // Same blue - data points (opacity = 0.4)
-            bands: '#4A90E2'       // Same blue - 90th percentile (opacity = 0.3)
+            base: '#4A90E2', 
+            name: 'Blue'
         },
         precipitation_sum: {
-            primary: '#B19CD9',    // Pastel purple - used for all elements
-            secondary: '#B19CD9',  // Same pastel purple - median line (opacity = 1.0)
-            points: '#B19CD9',     // Same pastel purple - data points (opacity = 0.4)
-            bands: '#B19CD9'       // Same pastel purple - 90th percentile (opacity = 0.3)
+            base: '#B19CD9',
+            name: 'Pastel Purple'
         },
         wind_speed_10m_max: {
-            primary: '#A8D8A8',    // Pastel green - used for all elements
-            secondary: '#A8D8A8',  // Same pastel green - median line (opacity = 1.0)
-            points: '#A8D8A8',     // Same pastel green - data points (opacity = 0.4)
-            bands: '#A8D8A8'       // Same pastel green - 90th percentile (opacity = 0.3)
+            base: '#A8D8A8',
+            name: 'Pastel Green'
         }
+    },
+    
+    // Opacity levels for different chart elements
+    opacityLevels: {
+        trendLine: 1.0,
+        percentileBand90: 0.5,
+        percentileBand75: 0.7,
+        dataPoints: 0.2,
+        histogramBars: 0.7
+    },
+    
+    // Utility function to get color with opacity for a specific element
+    getColorForElement(metric, elementType) {
+        const baseColor = this.metricColors[metric]?.base;
+        const opacity = this.opacityLevels[elementType];
+        
+        if (!baseColor || opacity === undefined) {
+            console.warn(`Invalid metric "${metric}" or element type "${elementType}"`);
+            return baseColor || '#000000';
+        }
+        
+        if (opacity === 1.0) {
+            return baseColor;
+        }
+        
+        return this.hexToRgba(baseColor, opacity);
+    },
+    
+    // Utility function to convert hex color to rgba
+    hexToRgba(hex, opacity) {
+        // Remove # if present
+        hex = hex.replace('#', '');
+        
+        // Parse hex values
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     },
     
     // Animation settings

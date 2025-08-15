@@ -121,7 +121,6 @@ class ChartRenderer {
     // Draw percentile bands
     drawPercentileBands() {
         const yearlyAggregates = this.dataProcessor.getYearlyAggregates();
-        const colors = this.config.colorSchemes[this.dataProcessor.currentMetric];
         
         if (!yearlyAggregates || yearlyAggregates.length === 0) return;
 
@@ -144,15 +143,15 @@ class ChartRenderer {
         if (band90.empty()) {
             band90 = this.mainG.append("path")
                 .attr("class", "percentile-band percentile-band-90")
-                .attr("fill", colors.bands)
-                .style("opacity", 0.5);
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand90'))
+                .style("opacity", 1);
         }
         
         try {
             this.createFadeTransition(
                 band90.datum(yearlyAggregates),
-                { d: area90, opacity: 0.5 },
-                { fill: colors.bands }
+                { d: area90, opacity: 1 },
+                { fill: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand90') }
             );
         } catch (e) {
             console.error('Error drawing 90th percentile band:', e);
@@ -163,15 +162,15 @@ class ChartRenderer {
         if (band75.empty()) {
             band75 = this.mainG.append("path")
                 .attr("class", "percentile-band percentile-band-75")
-                .attr("fill", colors.primary)
-                .style("opacity", 0.7);
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand75'))
+                .style("opacity", 1);
         }
         
         try {
             this.createFadeTransition(
                 band75.datum(yearlyAggregates),
-                { d: area75, opacity: 0.7 },
-                { fill: colors.primary }
+                { d: area75, opacity: 1 },
+                { fill: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand75') }
             );
         } catch (e) {
             console.error('Error drawing 75th percentile band:', e);
@@ -181,7 +180,6 @@ class ChartRenderer {
     // Draw trend line
     drawTrendLine() {
         const yearlyAggregates = this.dataProcessor.getYearlyAggregates();
-        const colors = this.config.colorSchemes[this.dataProcessor.currentMetric];
         
         if (!yearlyAggregates || yearlyAggregates.length === 0) return;
 
@@ -192,7 +190,7 @@ class ChartRenderer {
         if (trendLine.empty()) {
             trendLine = this.mainG.append("path")
                 .attr("class", "trend-line")
-                .attr("stroke", colors.secondary)
+                .attr("stroke", this.config.getColorForElement(this.dataProcessor.currentMetric, 'trendLine'))
                 .attr("stroke-width", 3)
                 .attr("fill", "none");
         }
@@ -202,7 +200,7 @@ class ChartRenderer {
                 this.createFadeTransition(
                     trendLine.datum(validMovingMedianData),
                     { d: this.line.y(d => this.yScale(d.movingMedian)) },
-                    { stroke: colors.secondary }
+                    { stroke: this.config.getColorForElement(this.dataProcessor.currentMetric, 'trendLine') }
                 );
             } else {
                 // Hide trend line if no valid data
@@ -216,7 +214,6 @@ class ChartRenderer {
     // Draw scatter points
     drawScatterPoints() {
         const filteredData = this.dataProcessor.getFilteredData();
-        const colors = this.config.colorSchemes[this.dataProcessor.currentMetric];
         
         const circles = this.mainG.selectAll(".data-point")
             .data(filteredData, d => `${d.date.getTime()}_${d.year}`);
@@ -233,7 +230,7 @@ class ChartRenderer {
             .duration(500)
             .attr("cx", d => this.xScale(d.date))
             .attr("cy", d => this.yScale(d[this.dataProcessor.currentMetric]))
-            .attr("fill", colors.points);
+            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'dataPoints'));
             
         // Add new points
         circles.enter()
@@ -242,13 +239,13 @@ class ChartRenderer {
             .attr("cx", d => this.xScale(d.date))
             .attr("cy", d => this.yScale(d[this.dataProcessor.currentMetric]))
             .attr("r", 2)
-            .attr("fill", colors.points)
+            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'dataPoints'))
             .attr("opacity", 0)
             .attr("stroke", "white")
             .attr("stroke-width", 0.5)
             .transition()
             .duration(500)
-            .attr("opacity", 0.2);
+            .attr("opacity", 1);
         
         // Add tooltips to all points
         this.mainG.selectAll(".data-point")
@@ -364,7 +361,6 @@ class ChartRenderer {
 
     // Draw histogram bars
     drawHistogramBars(bins) {
-        const colors = this.config.colorSchemes[this.dataProcessor.currentMetric];
         
         const bars = this.histG.selectAll(".bar")
             .data(bins, (d, i) => `bin_${i}`);
@@ -383,7 +379,7 @@ class ChartRenderer {
             .attr("y", d => this.histYScale(d.x1))
             .attr("width", d => this.histXScale(d.length))
             .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", colors.primary);
+            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
         
         // Add new bars
         bars.enter()
@@ -393,8 +389,8 @@ class ChartRenderer {
             .attr("y", d => this.histYScale(d.x1))
             .attr("width", 0)
             .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", colors.primary)
-            .attr("opacity", 0.7)
+            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
+            .attr("opacity", 1)
             .transition()
             .duration(500)
             .attr("width", d => this.histXScale(d.length));
