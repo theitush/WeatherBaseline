@@ -1,5 +1,17 @@
 // Configuration and constants
 const CONFIG = {
+    // ==========================================
+    // 🎛️ EASY METRIC TOGGLE - CHANGE HERE ONLY!
+    // ==========================================
+    // Set to true/false to enable/disable metrics
+    // This controls what data is downloaded and displayed
+    ACTIVE_METRICS: {
+        max_temperature: true,      // ✅ Maximum temperature
+        min_temperature: true,      // ✅ Minimum temperature  
+        precipitation_sum: false,   // ❌ Precipitation (commented out)
+        wind_speed_10m_max: false   // ❌ Wind speed (commented out)
+    },
+    
     // Chart dimensions
     mainMargin: {top: 20, right: 30, bottom: 40, left: 50},
     histMargin: {top: 20, right: 100, bottom: 40, left: 0},
@@ -9,7 +21,7 @@ const CONFIG = {
     get histWidth() { return 300 - this.histMargin.left - this.histMargin.right; },
     get histHeight() { return 400 - this.histMargin.top - this.histMargin.bottom; },
     
-    // Base colors for different metrics
+    // Base colors for different metrics (all available, only active ones used)
     metricColors: {
         max_temperature: {
             base: '#FF8C42',
@@ -19,6 +31,7 @@ const CONFIG = {
             base: '#4A90E2', 
             name: 'Blue'
         },
+        // Keeping these for easy re-enabling
         precipitation_sum: {
             base: '#B19CD9',
             name: 'Pastel Purple'
@@ -80,5 +93,33 @@ const CONFIG = {
         windowSize: 5, // Moving average window
         histogramThresholds: 30,
         tempMargin: 2 // Temperature scale margin
+    },
+
+    // ==========================================
+    // 🔧 HELPER FUNCTIONS FOR DYNAMIC METRICS
+    // ==========================================
+    
+    // Get list of active metric names
+    getActiveMetrics() {
+        return Object.keys(this.ACTIVE_METRICS).filter(metric => this.ACTIVE_METRICS[metric]);
+    },
+    
+    // Get API parameter string for active metrics
+    getActiveMetricsApiString() {
+        const metricMap = {
+            max_temperature: 'apparent_temperature_max',
+            min_temperature: 'apparent_temperature_min',
+            precipitation_sum: 'precipitation_sum',
+            wind_speed_10m_max: 'wind_speed_10m_max'
+        };
+        
+        return this.getActiveMetrics()
+            .map(metric => metricMap[metric])
+            .join(',');
+    },
+    
+    // Check if a metric is active
+    isMetricActive(metric) {
+        return this.ACTIVE_METRICS[metric] === true;
     }
 };

@@ -23,15 +23,29 @@ class DataProcessor {
             const csvText = await response.text();
             console.log('CSV loaded, length:', csvText.length);
             
-            const data = d3.csvParse(csvText, d => ({
-                date: new Date(d.date),
-                year: +d.year,
-                max_temperature: +d.max_temperature,
-                min_temperature: +d.min_temperature,
-                precipitation_sum: +d.precipitation_sum || 0,
-                wind_speed_10m_max: +d.wind_speed_10m_max || 0,
-                data_type: d.data_type
-            }));
+            const data = d3.csvParse(csvText, d => {
+                const row = {
+                    date: new Date(d.date),
+                    year: +d.year,
+                    data_type: d.data_type
+                };
+                
+                // 🎛️ Only parse active metrics from CSV
+                if (CONFIG.isMetricActive('max_temperature')) {
+                    row.max_temperature = +d.max_temperature;
+                }
+                if (CONFIG.isMetricActive('min_temperature')) {
+                    row.min_temperature = +d.min_temperature;
+                }
+                if (CONFIG.isMetricActive('precipitation_sum')) {
+                    row.precipitation_sum = +d.precipitation_sum || 0;
+                }
+                if (CONFIG.isMetricActive('wind_speed_10m_max')) {
+                    row.wind_speed_10m_max = +d.wind_speed_10m_max || 0;
+                }
+                
+                return row;
+            });
             
             console.log('Parsed data rows:', data.length);
             console.log('First few rows:', data.slice(0, 3));
@@ -65,7 +79,7 @@ class DataProcessor {
                 this.currentDate = targetDate;
             }
 
-            console.log(`Loading API data for ${targetDate} at ${latitude}, ${longitude}...`);
+            console.log(`🌡️ [DATA] Loading API data for ${targetDate} at ${latitude}, ${longitude}...`);
             
             const data = await this.apiDataFetcher.getTemperatureHistory(
                 latitude, longitude, targetDate, startYear, daysRange
@@ -75,8 +89,8 @@ class DataProcessor {
                 throw new Error('No weather data received from the API. The location or date range might not be available.');
             }
             
-            console.log('API data loaded:', data.length, 'records');
-            console.log('First few records:', data.slice(0, 3));
+            console.log(`✅ [DATA] API data loaded: ${data.length} records`);
+            console.log(`📊 [DATA] First few records:`, data.slice(0, 3));
             
             this.fullData = data;
             this.availableYears = [...new Set(data.map(d => d.year))].sort();
@@ -99,12 +113,25 @@ class DataProcessor {
             return [];
         }
         
+        // 🎛️ Only calculate aggregates if the current metric is active
+        if (!CONFIG.isMetricActive(this.currentMetric)) {
+            console.log(`Metric ${this.currentMetric} is not active, skipping aggregates calculation`);
+            return [];
+        }
+        
         const yearGroups = d3.group(data, d => d.year);
         console.log('Year groups:', yearGroups.size);
         const aggregates = [];
         
         yearGroups.forEach((values, year) => {
-            const temps = values.map(d => d[this.currentMetric]).sort(d3.ascending);
+            // Filter out null/undefined values for the current metric
+            const metricValues = values
+                .map(d => d[this.currentMetric])
+                .filter(v => v !== null && v !== undefined);
+                
+            if (metricValues.length === 0) return; // Skip if no valid data
+            
+            const temps = metricValues.sort(d3.ascending);
             const targetDate = new Date(year, new Date(this.currentDate).getMonth(), new Date(this.currentDate).getDate());
             
             aggregates.push({
@@ -186,6 +213,20 @@ class DataProcessor {
 
     // Update current metric
     setCurrentMetric(metric) {
+        // 🎛️ Only allow setting active metrics
+        if (!CONFIG.isMetricActive(metric)) {
+            console.warn(`Cannot set metric ${metric} - it is not active in CONFIG.ACTIVE_METRICS`);
+            // Fallback to first active metric
+            const activeMetrics = CONFIG.getActiveMetrics();
+            if (activeMetrics.length > 0) {
+                metric = activeMetrics[0];
+                console.log(`Falling back to first active metric: ${metric}`);
+            } else {
+                console.error('No active metrics available!');
+                return;
+            }
+        }
+        
         this.currentMetric = metric;
         // Recalculate full aggregates with new metric
         if (this.fullData.length > 0) {

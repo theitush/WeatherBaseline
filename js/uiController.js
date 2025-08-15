@@ -42,17 +42,60 @@ class UIController {
             this.updateYearInfo();
         });
         
-        // Set metric selector to match DataProcessor's default and add event listener
-        const metricSelect = d3.select("#metric-select");
-        metricSelect.property("value", this.dataProcessor.currentMetric);
+        // 🎛️ Populate metric selector with only active metrics
+        this.initializeMetricSelector();
         
+        this.updateYearInfo();
+    }
+
+    // Initialize metric selector with active metrics only
+    initializeMetricSelector() {
+        const metricSelect = d3.select("#metric-select");
+        
+        // Clear existing options
+        metricSelect.selectAll("option").remove();
+        
+        // Get active metrics from CONFIG
+        const activeMetrics = CONFIG.getActiveMetrics();
+        
+        if (activeMetrics.length === 0) {
+            console.warn('No active metrics configured!');
+            return;
+        }
+        
+        // Define display names for metrics
+        const metricDisplayNames = {
+            max_temperature: 'Maximum Apparent Temperature',
+            min_temperature: 'Minimum Apparent Temperature',
+            precipitation_sum: 'Precipitation Sum',
+            wind_speed_10m_max: 'Maximum Wind Speed'
+        };
+        
+        // Populate only active metrics
+        metricSelect.selectAll("option")
+            .data(activeMetrics)
+            .enter()
+            .append("option")
+            .attr("value", d => d)
+            .text(d => metricDisplayNames[d] || d);
+        
+        // Set to current data processor metric, or first active if invalid
+        const currentMetric = this.dataProcessor.currentMetric;
+        if (CONFIG.isMetricActive(currentMetric)) {
+            metricSelect.property("value", currentMetric);
+        } else {
+            // Fallback to first active metric
+            const firstActiveMetric = activeMetrics[0];
+            metricSelect.property("value", firstActiveMetric);
+            this.dataProcessor.setCurrentMetric(firstActiveMetric);
+        }
+        
+        // Add event listener
         metricSelect.on("change", () => {
             const newMetric = metricSelect.property("value");
             this.dataProcessor.setCurrentMetric(newMetric);
             this.updateCharts(); // This will recalculate domains and update everything
         });
-        
-        this.updateYearInfo();
     }
 
     // Update year range information

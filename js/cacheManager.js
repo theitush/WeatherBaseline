@@ -6,7 +6,6 @@ class CacheManager {
     constructor(cacheDir = 'cache') {
         this.cache = new Map(); // In-memory cache
         this.cacheDir = cacheDir;
-        this.cacheFile = path.join(cacheDir, 'weather_cache.json');
         this.initialized = false;
     }
 
@@ -36,10 +35,36 @@ class CacheManager {
         return `weather_hist_${lat}_${lng}`;
     }
 
-    // Get cached data for location
-    getCachedData(latitude, longitude) {
+    // Get CSV file path for location
+    getCsvFilePath(latitude, longitude) {
         const key = this.generateLocationKey(latitude, longitude);
-        return this.cache.get(key) || null;
+        return path.join(this.cacheDir, `${key}.csv`);
+    }
+
+    // Get cached data for location
+    async getCachedData(latitude, longitude) {
+        const key = this.generateLocationKey(latitude, longitude);
+        
+        // Check in-memory cache first
+        if (this.cache.has(key)) {
+            return this.cache.get(key);
+        }
+        
+        // Load from CSV file
+        try {
+            const csvPath = this.getCsvFilePath(latitude, longitude);
+            const csvContent = await fs.readFile(csvPath, 'utf8');
+            const data = this.parseCsv(csvContent);
+            
+            // Cache in memory for future access
+            this.cache.set(key, data);
+            return data;
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('Error reading CSV cache:', error);
+            }
+            return null;
+        }
     }
 
     // Get last date from cached data array
@@ -50,8 +75,8 @@ class CacheManager {
     }
 
     // Check if cache is current (has data up to yesterday)
-    isCacheCurrent(latitude, longitude) {
-        const data = this.getCachedData(latitude, longitude);
+    async isCacheCurrent(latitude, longitude) {
+        const data = await this.getCachedData(latitude, longitude);
         if (!data) return false;
 
         const lastDate = this.getLastCachedDate(data);
@@ -68,7 +93,7 @@ class CacheManager {
     }
 
     // Store data in cache
-    setCachedData(latitude, longitude, data) {
+    async setCachedData(latitude, longitude, data) {
         const key = this.generateLocationKey(latitude, longitude);
         
         // Sort data by date to ensure chronological order
@@ -76,15 +101,15 @@ class CacheManager {
         
         this.cache.set(key, sortedData);
         
-        // Save to disk asynchronously (don't wait for it)
-        this.saveToDisk().catch(error => {
-            console.error('Error saving cache to disk:', error);
+        // Save to CSV file asynchronously
+        this.saveToCsv(latitude, longitude, sortedData).catch(error => {
+            console.error('Error saving cache to CSV:', error);
         });
     }
 
     // Merge new data with existing cache
-    mergeWithCache(latitude, longitude, newData) {
-        const existingData = this.getCachedData(latitude, longitude) || [];
+    async mergeWithCache(latitude, longitude, newData) {
+        const existingData = await this.getCachedData(latitude, longitude) || [];
         
         // Combine existing and new data
         const allData = [...existingData, ...newData];
@@ -94,13 +119,13 @@ class CacheManager {
             index === self.findIndex(other => other.date === item.date)
         ).sort((a, b) => new Date(a.date) - new Date(b.date));
         
-        this.setCachedData(latitude, longitude, uniqueData);
+        await this.setCachedData(latitude, longitude, uniqueData);
         return uniqueData;
     }
 
     // Get date range that needs to be fetched
-    getMissingDateRange(latitude, longitude) {
-        const data = this.getCachedData(latitude, longitude);
+    async getMissingDateRange(latitude, longitude) {
+        const data = await this.getCachedData(latitude, longitude);
         
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
@@ -130,66 +155,109 @@ class CacheManager {
         return { startDate: nextDayStr, endDate: yesterdayStr };
     }
 
-    // Load cache from disk
+    // Load cache from disk (scan for CSV files)
     async loadFromDisk() {
         try {
-            const data = await fs.readFile(this.cacheFile, 'utf8');
-            const cacheData = JSON.parse(data);
+            const files = await fs.readdir(this.cacheDir);
+            const csvFiles = files.filter(file => file.endsWith('.csv') && file.startsWith('weather_hist_'));
             
-            // Convert plain object back to Map
-            this.cache = new Map(Object.entries(cacheData));
+            console.log(`Found ${csvFiles.length} CSV cache files`);
             
-            console.log(`Loaded cache with ${this.cache.size} locations from disk`);
+            // Don't load all CSV files into memory immediately
+            // They'll be loaded on-demand in getCachedData
+            this.cache = new Map();
+            
         } catch (error) {
             if (error.code !== 'ENOENT') {
-                console.error('Error loading cache from disk:', error);
+                console.error('Error scanning cache directory:', error);
             }
-            // If file doesn't exist, start with empty cache
             this.cache = new Map();
         }
     }
 
-    // Save cache to disk
-    async saveToDisk() {
+    // Save data to CSV file
+    async saveToCsv(latitude, longitude, data) {
         try {
-            // Convert Map to plain object for JSON serialization
-            const cacheData = Object.fromEntries(this.cache);
+            const csvPath = this.getCsvFilePath(latitude, longitude);
             
-            await fs.writeFile(this.cacheFile, JSON.stringify(cacheData, null, 2));
+            let csvContent = 'date,min_temperature,max_temperature\n';
+            for (const record of data) {
+                csvContent += `${record.date},${record.min_temperature},${record.max_temperature}\n`;
+            }
+            
+            await fs.writeFile(csvPath, csvContent);
         } catch (error) {
-            console.error('Error saving cache to disk:', error);
+            console.error('Error saving CSV cache:', error);
         }
     }
-
-    // Get cache statistics
-    getStats() {
-        const stats = {
-            totalLocations: this.cache.size,
-            locations: []
-        };
+    
+    // Parse CSV content to data array
+    parseCsv(csvContent) {
+        const lines = csvContent.trim().split('\n');
+        const data = [];
         
-        for (const [key, data] of this.cache.entries()) {
-            const lastDate = this.getLastCachedDate(data);
-            stats.locations.push({
-                key,
-                dataPoints: data.length,
-                lastDate,
-                isCurrent: this.isCacheCurrent(...key.split('_').slice(2, 4))
+        // Skip header line
+        for (let i = 1; i < lines.length; i++) {
+            const [date, minTemp, maxTemp] = lines[i].split(',');
+            data.push({
+                date,
+                min_temperature: parseFloat(minTemp),
+                max_temperature: parseFloat(maxTemp)
             });
         }
         
-        return stats;
+        return data;
+    }
+
+    // Get cache statistics
+    async getStats() {
+        try {
+            const files = await fs.readdir(this.cacheDir);
+            const csvFiles = files.filter(file => file.endsWith('.csv') && file.startsWith('weather_hist_'));
+            
+            const stats = {
+                totalLocations: csvFiles.length,
+                locations: []
+            };
+            
+            for (const file of csvFiles) {
+                const key = file.replace('.csv', '');
+                const [, , lat, lng] = key.split('_');
+                
+                const data = await this.getCachedData(lat, lng);
+                if (data) {
+                    const lastDate = this.getLastCachedDate(data);
+                    stats.locations.push({
+                        key,
+                        dataPoints: data.length,
+                        lastDate,
+                        isCurrent: await this.isCacheCurrent(lat, lng)
+                    });
+                }
+            }
+            
+            return stats;
+        } catch (error) {
+            console.error('Error getting cache stats:', error);
+            return { totalLocations: 0, locations: [] };
+        }
     }
 
     // Clear all cache
     async clearCache() {
         this.cache.clear();
         try {
-            await fs.unlink(this.cacheFile);
+            const files = await fs.readdir(this.cacheDir);
+            const csvFiles = files.filter(file => file.endsWith('.csv') && file.startsWith('weather_hist_'));
+            
+            for (const file of csvFiles) {
+                await fs.unlink(path.join(this.cacheDir, file));
+            }
+            
+            console.log(`Cleared ${csvFiles.length} cache files`);
         } catch (error) {
-            // Ignore if file doesn't exist
+            console.error('Error clearing cache:', error);
         }
-        console.log('Cache cleared');
     }
 }
 

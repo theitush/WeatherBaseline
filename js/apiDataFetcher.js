@@ -26,7 +26,7 @@ class ApiDataFetcher {
 
     // Get temperature history for a specific date range across all available years
     async getTemperatureHistory(latitude, longitude, targetDate, startYear = 1940, daysRange = 7) {
-        console.log(`Fetching temperature data for ${targetDate} ±${daysRange} days at ${latitude}, ${longitude}...`);
+        console.log(`🌡️ [API] Starting temperature data fetch for ${targetDate} ±${daysRange} days at ${latitude}, ${longitude}...`);
         
         // Parse the target date
         const targetDt = this.parseDate(targetDate);
@@ -44,7 +44,7 @@ class ApiDataFetcher {
         const overallStartStr = '1940-01-01';
         const yesterdayStr = this.formatDate(yesterday);
 
-        console.log(`Making historical API call for date range: ${overallStartStr} to ${yesterdayStr}`);
+        console.log(`📊 [API] Historical data request: ${overallStartStr} to ${yesterdayStr}`);
 
         const dataRows = [];
 
@@ -56,7 +56,7 @@ class ApiDataFetcher {
 
         // Get current year data and forecast if needed
         if (targetDt >= yesterday) {
-            console.log(`Making forecast API call for forecast data until ${targetDate}`);
+            console.log(`🔮 [API] Forecast data request until ${targetDate}`);
             
             const forecastData = await this.fetchForecastData(
                 latitude, longitude, yesterdayStr, targetDate
@@ -64,22 +64,31 @@ class ApiDataFetcher {
             dataRows.push(...forecastData);
         }
 
+        console.log(`✅ [API] Temperature history fetch complete: ${dataRows.length} data points`);
+        
         // Process and return data
         return this.processDataRows(dataRows);
     }
 
     // Fetch historical data from archive API
     async fetchHistoricalData(latitude, longitude, startDate, endDate, targetDt, daysRange) {
+        // 🎛️ Dynamic API request based on active metrics in CONFIG
+        const activeMetricsString = CONFIG.getActiveMetricsApiString();
+        console.log(`🔧 Active metrics for API: ${activeMetricsString}`);
+        
         const params = new URLSearchParams({
             latitude: latitude.toString(),
             longitude: longitude.toString(),
             start_date: startDate,
             end_date: endDate,
-            daily: 'apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max',
+            daily: activeMetricsString, // Dynamic based on CONFIG.ACTIVE_METRICS
             timezone: 'auto'
         });
 
         const url = `${this.ARCHIVE_API_URL}?${params}`;
+        
+        console.log(`🔄 [API CALL] Archive API: ${url}`);
+        const startTime = Date.now();
         
         const response = await fetch(url, {
             method: 'GET',
@@ -87,6 +96,15 @@ class ApiDataFetcher {
                 'Accept': 'application/json',
             }
         });
+        
+        const duration = Date.now() - startTime;
+        console.log(`⏱️ [API CALL] Archive API completed in ${duration}ms`);
+        
+        if (response.ok) {
+            console.log(`✅ [API CALL] Archive API successful (${response.status})`);
+        } else {
+            console.error(`❌ [API CALL] Archive API failed (${response.status})`);
+        }
         
         if (!response.ok) {
             // Try to get detailed error from server
@@ -117,19 +135,49 @@ class ApiDataFetcher {
         }
 
         const data = await response.json();
+        console.log(`📈 [API DATA] Archive API returned ${data.daily?.time?.length || 0} daily records`);
+        
+        // Log cache status information if available
+        if (data._cacheStatus) {
+            const cacheEmoji = {
+                'HIT': '💾✅',
+                'MISS_EMPTY': '💾❌', 
+                'MISS_PARTIAL': '💾🔄',
+                'PARTIAL': '💾⚠️'
+            };
+            console.log(`${cacheEmoji[data._cacheStatus] || '💾'} [CACHE STATUS] ${data._cacheStatus} - Data source: ${data._dataSource}`);
+            if (data._cachedRecords) {
+                console.log(`💾 [CACHE INFO] Using ${data._cachedRecords} cached records`);
+            }
+            if (data._newRecords) {
+                console.log(`🆕 [CACHE INFO] Added ${data._newRecords} new records to cache`);
+            }
+            if (data._totalCachedRecords) {
+                console.log(`📊 [CACHE INFO] Total cached records: ${data._totalCachedRecords}`);
+            }
+        }
+        
         const dataRows = [];
 
         if (data.daily && data.daily.time) {
             const dates = data.daily.time;
-            const maxTemps = data.daily.apparent_temperature_max;
-            const minTemps = data.daily.apparent_temperature_min;
-            // Historical data might not include precipitation and wind data
-            const precipitation = data.daily.precipitation_sum || [];
-            const windSpeed = data.daily.wind_speed_10m_max || [];
+            
+            // 🎛️ Dynamically extract data based on active metrics
+            const maxTemps = CONFIG.isMetricActive('max_temperature') ? data.daily.apparent_temperature_max : [];
+            const minTemps = CONFIG.isMetricActive('min_temperature') ? data.daily.apparent_temperature_min : [];
+            // Keep original code but make it conditional
+            const precipitation = CONFIG.isMetricActive('precipitation_sum') ? (data.daily.precipitation_sum || []) : [];
+            const windSpeed = CONFIG.isMetricActive('wind_speed_10m_max') ? (data.daily.wind_speed_10m_max || []) : [];
 
             // Create a row for each date
             for (let i = 0; i < dates.length; i++) {
-                if (maxTemps[i] !== null && minTemps[i] !== null) {
+                // Only require active temperature metrics to be non-null
+                const hasRequiredData = (
+                    (!CONFIG.isMetricActive('max_temperature') || (maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
+                    (!CONFIG.isMetricActive('min_temperature') || (minTemps[i] !== null && minTemps[i] !== undefined))
+                );
+                
+                if (hasRequiredData) {
                     const dateDt = this.parseDate(dates[i]);
                     const year = dateDt.getFullYear();
 
@@ -139,14 +187,26 @@ class ApiDataFetcher {
                     const endRange = this.addDays(targetDateThisYear, daysRange);
 
                     if (dateDt >= startRange && dateDt <= endRange) {
-                        dataRows.push({
+                        const row = {
                             date: dates[i],
-                            min_temperature: minTemps[i],
-                            max_temperature: maxTemps[i],
-                            precipitation_sum: (precipitation.length > i && precipitation[i] !== null) ? precipitation[i] : 0,
-                            wind_speed_10m_max: (windSpeed.length > i && windSpeed[i] !== null) ? windSpeed[i] : 0,
                             data_type: 'historical'
-                        });
+                        };
+                        
+                        // 🎛️ Only include active metrics in the data row
+                        if (CONFIG.isMetricActive('min_temperature')) {
+                            row.min_temperature = minTemps[i];
+                        }
+                        if (CONFIG.isMetricActive('max_temperature')) {
+                            row.max_temperature = maxTemps[i];
+                        }
+                        if (CONFIG.isMetricActive('precipitation_sum')) {
+                            row.precipitation_sum = (precipitation.length > i && precipitation[i] !== null) ? precipitation[i] : 0;
+                        }
+                        if (CONFIG.isMetricActive('wind_speed_10m_max')) {
+                            row.wind_speed_10m_max = (windSpeed.length > i && windSpeed[i] !== null) ? windSpeed[i] : 0;
+                        }
+                        
+                        dataRows.push(row);
                     }
                 }
             }
@@ -157,16 +217,22 @@ class ApiDataFetcher {
 
     // Fetch forecast data from forecast API
     async fetchForecastData(latitude, longitude, startDate, endDate) {
+        // 🎛️ Dynamic API request based on active metrics in CONFIG
+        const activeMetricsString = CONFIG.getActiveMetricsApiString();
+        
         const params = new URLSearchParams({
             latitude: latitude.toString(),
             longitude: longitude.toString(),
             start_date: startDate,
             end_date: endDate,
-            daily: 'apparent_temperature_max,apparent_temperature_min,precipitation_sum,wind_speed_10m_max',
+            daily: activeMetricsString, // Dynamic based on CONFIG.ACTIVE_METRICS
             timezone: 'auto'
         });
 
         const url = `${this.FORECAST_API_URL}?${params}`;
+        
+        console.log(`🔄 [API CALL] Forecast API: ${url}`);
+        const startTime = Date.now();
         
         const response = await fetch(url, {
             method: 'GET',
@@ -174,6 +240,15 @@ class ApiDataFetcher {
                 'Accept': 'application/json',
             }
         });
+        
+        const duration = Date.now() - startTime;
+        console.log(`⏱️ [API CALL] Forecast API completed in ${duration}ms`);
+        
+        if (response.ok) {
+            console.log(`✅ [API CALL] Forecast API successful (${response.status})`);
+        } else {
+            console.error(`❌ [API CALL] Forecast API failed (${response.status})`);
+        }
         
         if (!response.ok) {
             // Try to get detailed error from server
@@ -204,30 +279,62 @@ class ApiDataFetcher {
         }
 
         const data = await response.json();
+        console.log(`📈 [API DATA] Forecast API returned ${data.daily?.time?.length || 0} daily records`);
+        
+        // Log cache status information if available
+        if (data._cacheStatus) {
+            const cacheEmoji = {
+                'BYPASS': '🔄🌐'
+            };
+            console.log(`${cacheEmoji[data._cacheStatus] || '🔄'} [CACHE STATUS] ${data._cacheStatus} - Data source: ${data._dataSource} (forecast data not cached)`);
+        }
+        
         const dataRows = [];
 
         if (data.daily && data.daily.time) {
             const dates = data.daily.time;
-            const maxTemps = data.daily.apparent_temperature_max;
-            const minTemps = data.daily.apparent_temperature_min;
-            const precipitation = data.daily.precipitation_sum;
-            const windSpeed = data.daily.wind_speed_10m_max;
+            
+            // 🎛️ Dynamically extract data based on active metrics
+            const maxTemps = CONFIG.isMetricActive('max_temperature') ? data.daily.apparent_temperature_max : [];
+            const minTemps = CONFIG.isMetricActive('min_temperature') ? data.daily.apparent_temperature_min : [];
+            // Keep original code but make it conditional
+            const precipitation = CONFIG.isMetricActive('precipitation_sum') ? data.daily.precipitation_sum : [];
+            const windSpeed = CONFIG.isMetricActive('wind_speed_10m_max') ? data.daily.wind_speed_10m_max : [];
 
             // Create a row for each date
             for (let i = 0; i < dates.length; i++) {
-                if (maxTemps[i] !== null && minTemps[i] !== null) {
-                    dataRows.push({
+                // Only require active temperature metrics to be non-null
+                const hasRequiredData = (
+                    (!CONFIG.isMetricActive('max_temperature') || (maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
+                    (!CONFIG.isMetricActive('min_temperature') || (minTemps[i] !== null && minTemps[i] !== undefined))
+                );
+                
+                if (hasRequiredData) {
+                    const row = {
                         date: dates[i],
-                        min_temperature: minTemps[i],
-                        max_temperature: maxTemps[i],
-                        precipitation_sum: precipitation[i] || 0,
-                        wind_speed_10m_max: windSpeed[i] || 0,
                         data_type: 'forecast'
-                    });
+                    };
+                    
+                    // 🎛️ Only include active metrics in the data row
+                    if (CONFIG.isMetricActive('min_temperature')) {
+                        row.min_temperature = minTemps[i];
+                    }
+                    if (CONFIG.isMetricActive('max_temperature')) {
+                        row.max_temperature = maxTemps[i];
+                    }
+                    if (CONFIG.isMetricActive('precipitation_sum')) {
+                        row.precipitation_sum = precipitation[i] || 0;
+                    }
+                    if (CONFIG.isMetricActive('wind_speed_10m_max')) {
+                        row.wind_speed_10m_max = windSpeed[i] || 0;
+                    }
+                    
+                    dataRows.push(row);
                 }
             }
         }
 
+        console.log(`📊 [API DATA] Forecast API processed ${dataRows.length} matching records`);
         return dataRows;
     }
 
