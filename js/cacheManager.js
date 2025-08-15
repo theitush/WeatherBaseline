@@ -82,15 +82,20 @@ class CacheManager {
         const lastDate = this.getLastCachedDate(data);
         if (!lastDate) return false;
 
-        // Use requested end date if provided, otherwise default to yesterday
-        let targetEndDate;
+        // Historical API can only go up to yesterday
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+
+        // Use the earlier of requested end date or yesterday for historical API
+        let targetEndDate = yesterday;
         if (requestedEndDate) {
-            targetEndDate = new Date(requestedEndDate);
-        } else {
-            targetEndDate = new Date();
-            targetEndDate.setDate(targetEndDate.getDate() - 1);
+            const requestedDate = new Date(requestedEndDate);
+            requestedDate.setHours(0, 0, 0, 0);
+            if (requestedDate < yesterday) {
+                targetEndDate = requestedDate;
+            }
         }
-        targetEndDate.setHours(0, 0, 0, 0);
 
         const lastCachedDate = new Date(lastDate);
         lastCachedDate.setHours(0, 0, 0, 0);
@@ -133,14 +138,15 @@ class CacheManager {
     async getMissingDateRange(latitude, longitude, requestedEndDate = null) {
         const data = await this.getCachedData(latitude, longitude);
         
-        // Use requested end date if provided, otherwise default to yesterday
-        let targetEndDate;
-        if (requestedEndDate) {
+        // Historical API can only go up to yesterday
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        
+        // Use the earlier of requested end date or yesterday for historical API
+        let targetEndDate = yesterdayStr;
+        if (requestedEndDate && requestedEndDate < yesterdayStr) {
             targetEndDate = requestedEndDate;
-        } else {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            targetEndDate = yesterday.toISOString().split('T')[0];
         }
         
         if (!data || data.length === 0) {
