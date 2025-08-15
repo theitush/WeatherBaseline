@@ -55,12 +55,34 @@ class ApiDataFetcher {
         );
         dataRows.push(...historicalData);
 
-        // Get current year data and forecast if needed
-        if (targetDt >= endDate) {
-            const forecastData = await this.fetchForecastData(
-                latitude, longitude, endDateStr, targetDate
-            );
-            dataRows.push(...forecastData);
+        // Get forecast data if target date is beyond actual historical data
+        if (historicalData.length > 0) {
+            // Find the actual last date in historical data
+            const historicalDates = historicalData.map(row => this.parseDate(row.date));
+            const lastHistoricalDate = new Date(Math.max(...historicalDates));
+            
+            // Only fetch forecast if target date is beyond last historical date
+            if (targetDt > lastHistoricalDate) {
+                // Forecast should start from day after last historical date
+                const forecastStartDate = this.addDays(lastHistoricalDate, 1);
+                const forecastStartStr = this.formatDate(forecastStartDate);
+                
+                console.log(`📡 Fetching forecast from ${forecastStartStr} to ${targetDate}`);
+                const forecastData = await this.fetchForecastData(
+                    latitude, longitude, forecastStartStr, targetDate
+                );
+                dataRows.push(...forecastData);
+            }
+        } else {
+            // No historical data, check if we need forecast from current date
+            if (targetDt >= currentDate) {
+                const todayStr = this.formatDate(currentDate);
+                console.log(`📡 No historical data, fetching forecast from ${todayStr} to ${targetDate}`);
+                const forecastData = await this.fetchForecastData(
+                    latitude, longitude, todayStr, targetDate
+                );
+                dataRows.push(...forecastData);
+            }
         }
         
         // Process and return data

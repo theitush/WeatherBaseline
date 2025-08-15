@@ -261,20 +261,25 @@ class ChartRenderer {
 
     // Draw current temperature indicators
     drawCurrentTemperatureIndicators() {
-        const currentDateData = this.dataProcessor.getCurrentDateData();
+        // Check full data (including forecast) for current date, not just filtered data
+        const currentDateData = this.dataProcessor.getCurrentDateData(this.dataProcessor.getFullData());
+        
         
         if (currentDateData.length > 0) {
             const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
             
-            // Current temperature line
+            // Current temperature horizontal dashed line
             this.mainG.append("line")
                 .attr("class", "current-temp-line")
                 .attr("x1", 0)
                 .attr("x2", this.config.mainWidth)
                 .attr("y1", this.yScale(currentTemp))
-                .attr("y2", this.yScale(currentTemp));
+                .attr("y2", this.yScale(currentTemp))
+                .attr("stroke", "#333")
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "5,5");
             
-            // Current temperature point
+            // Current temperature point with tooltip
             this.mainG.selectAll(".current-temp-point")
                 .data(currentDateData)
                 .enter()
@@ -282,7 +287,18 @@ class ChartRenderer {
                 .attr("class", "current-temp-point")
                 .attr("cx", d => this.xScale(d.date))
                 .attr("cy", d => this.yScale(d[this.dataProcessor.currentMetric]))
-                .attr("r", 4);
+                .attr("r", 4)
+                .on("mouseover", (event, d) => {
+                    this.tooltip.style("opacity", 1)
+                        .html(`Date: ${d.date.toDateString()}<br/>
+                               ${this.formatTooltipValue(this.dataProcessor.currentMetric, d[this.dataProcessor.currentMetric])}<br/>
+                               <em>Target Date</em>`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", () => {
+                    this.tooltip.style("opacity", 0);
+                });
         }
     }
 
@@ -361,7 +377,7 @@ class ChartRenderer {
     drawHistogramBars(bins) {
         
         const bars = this.histG.selectAll(".bar")
-            .data(bins, (d, i) => `bin_${i}`);
+            .data(bins, (_, i) => `bin_${i}`);
             
         // Remove bars that are no longer needed
         bars.exit()
