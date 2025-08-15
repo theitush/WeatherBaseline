@@ -79,8 +79,6 @@ class DataProcessor {
                 this.currentDate = targetDate;
             }
 
-            console.log(`🌡️ [DATA] Loading API data for ${targetDate} at ${latitude}, ${longitude}...`);
-            
             const data = await this.apiDataFetcher.getTemperatureHistory(
                 latitude, longitude, targetDate, startYear, daysRange
             );
@@ -89,8 +87,7 @@ class DataProcessor {
                 throw new Error('No weather data received from the API. The location or date range might not be available.');
             }
             
-            console.log(`✅ [DATA] API data loaded: ${data.length} records`);
-            console.log(`📊 [DATA] First few records:`, data.slice(0, 3));
+            console.log(`Loaded ${data.length} records`);
             
             this.fullData = data;
             this.availableYears = [...new Set(data.map(d => d.year))].sort();

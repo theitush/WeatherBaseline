@@ -26,13 +26,12 @@ class ApiDataFetcher {
 
     // Get temperature history for a specific date range across all available years
     async getTemperatureHistory(latitude, longitude, targetDate, startYear = 1940, daysRange = 7) {
-        console.log(`🌡️ [API] Starting temperature data fetch for ${targetDate} ±${daysRange} days at ${latitude}, ${longitude}...`);
+        console.log(`Getting ${targetDate} ±${daysRange} days data for ${latitude}, ${longitude}`);
         
         // Parse the target date
         const targetDt = this.parseDate(targetDate);
         const currentDate = new Date();
         currentDate.setHours(0, 0, 0, 0); // Reset time for comparison
-        const yesterday = this.addDays(currentDate, -1);
 
         // Validate target date
         const maxDate = this.addDays(currentDate, 3);
@@ -40,31 +39,29 @@ class ApiDataFetcher {
             throw new Error(`${targetDate} should be within 3 days of today!`);
         }
 
-        // Always fetch complete historical data from 1940-01-01
+        // Calculate end date based on target date + days range in current year
+        const currentYear = currentDate.getFullYear();
+        const targetDateCurrentYear = new Date(currentYear, targetDt.getMonth(), targetDt.getDate());
+        const endDate = this.addDays(targetDateCurrentYear, daysRange);
+        
         const overallStartStr = '1940-01-01';
-        const yesterdayStr = this.formatDate(yesterday);
-
-        console.log(`📊 [API] Historical data request: ${overallStartStr} to ${yesterdayStr}`);
+        const endDateStr = this.formatDate(endDate);
 
         const dataRows = [];
 
         // Make historical API request
         const historicalData = await this.fetchHistoricalData(
-            latitude, longitude, overallStartStr, yesterdayStr, targetDt, daysRange
+            latitude, longitude, overallStartStr, endDateStr, targetDt, daysRange
         );
         dataRows.push(...historicalData);
 
         // Get current year data and forecast if needed
-        if (targetDt >= yesterday) {
-            console.log(`🔮 [API] Forecast data request until ${targetDate}`);
-            
+        if (targetDt >= endDate) {
             const forecastData = await this.fetchForecastData(
-                latitude, longitude, yesterdayStr, targetDate
+                latitude, longitude, endDateStr, targetDate
             );
             dataRows.push(...forecastData);
         }
-
-        console.log(`✅ [API] Temperature history fetch complete: ${dataRows.length} data points`);
         
         // Process and return data
         return this.processDataRows(dataRows);
@@ -87,24 +84,12 @@ class ApiDataFetcher {
 
         const url = `${this.ARCHIVE_API_URL}?${params}`;
         
-        console.log(`🔄 [API CALL] Archive API: ${url}`);
-        const startTime = Date.now();
-        
         const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
             }
         });
-        
-        const duration = Date.now() - startTime;
-        console.log(`⏱️ [API CALL] Archive API completed in ${duration}ms`);
-        
-        if (response.ok) {
-            console.log(`✅ [API CALL] Archive API successful (${response.status})`);
-        } else {
-            console.error(`❌ [API CALL] Archive API failed (${response.status})`);
-        }
         
         if (!response.ok) {
             // Try to get detailed error from server
@@ -135,25 +120,15 @@ class ApiDataFetcher {
         }
 
         const data = await response.json();
-        console.log(`📈 [API DATA] Archive API returned ${data.daily?.time?.length || 0} daily records`);
         
         // Log cache status information if available
         if (data._cacheStatus) {
-            const cacheEmoji = {
-                'HIT': '💾✅',
-                'MISS_EMPTY': '💾❌', 
-                'MISS_PARTIAL': '💾🔄',
-                'PARTIAL': '💾⚠️'
-            };
-            console.log(`${cacheEmoji[data._cacheStatus] || '💾'} [CACHE STATUS] ${data._cacheStatus} - Data source: ${data._dataSource}`);
-            if (data._cachedRecords) {
-                console.log(`💾 [CACHE INFO] Using ${data._cachedRecords} cached records`);
-            }
-            if (data._newRecords) {
-                console.log(`🆕 [CACHE INFO] Added ${data._newRecords} new records to cache`);
-            }
-            if (data._totalCachedRecords) {
-                console.log(`📊 [CACHE INFO] Total cached records: ${data._totalCachedRecords}`);
+            if (data._cacheStatus === 'HIT') {
+                console.log(`Cache hit: served ${data._cachedRecords} records from cache`);
+            } else if (data._cacheStatus === 'MISS_EMPTY') {
+                console.log(`Cache miss: fetching all data from API`);
+            } else if (data._cacheStatus === 'MISS_PARTIAL') {
+                console.log(`Cache partial: adding ${data._newRecords} new records to existing cache`);
             }
         }
         
@@ -231,24 +206,12 @@ class ApiDataFetcher {
 
         const url = `${this.FORECAST_API_URL}?${params}`;
         
-        console.log(`🔄 [API CALL] Forecast API: ${url}`);
-        const startTime = Date.now();
-        
         const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
             }
         });
-        
-        const duration = Date.now() - startTime;
-        console.log(`⏱️ [API CALL] Forecast API completed in ${duration}ms`);
-        
-        if (response.ok) {
-            console.log(`✅ [API CALL] Forecast API successful (${response.status})`);
-        } else {
-            console.error(`❌ [API CALL] Forecast API failed (${response.status})`);
-        }
         
         if (!response.ok) {
             // Try to get detailed error from server
@@ -279,15 +242,7 @@ class ApiDataFetcher {
         }
 
         const data = await response.json();
-        console.log(`📈 [API DATA] Forecast API returned ${data.daily?.time?.length || 0} daily records`);
-        
-        // Log cache status information if available
-        if (data._cacheStatus) {
-            const cacheEmoji = {
-                'BYPASS': '🔄🌐'
-            };
-            console.log(`${cacheEmoji[data._cacheStatus] || '🔄'} [CACHE STATUS] ${data._cacheStatus} - Data source: ${data._dataSource} (forecast data not cached)`);
-        }
+        console.log(`Forecast: ${data.daily?.time?.length || 0} records (not cached)`);
         
         const dataRows = [];
 

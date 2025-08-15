@@ -74,22 +74,28 @@ class CacheManager {
         return lastEntry.date;
     }
 
-    // Check if cache is current (has data up to yesterday)
-    async isCacheCurrent(latitude, longitude) {
+    // Check if cache is current (has data up to the requested end date or yesterday)
+    async isCacheCurrent(latitude, longitude, requestedEndDate = null) {
         const data = await this.getCachedData(latitude, longitude);
         if (!data) return false;
 
         const lastDate = this.getLastCachedDate(data);
         if (!lastDate) return false;
 
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(0, 0, 0, 0);
+        // Use requested end date if provided, otherwise default to yesterday
+        let targetEndDate;
+        if (requestedEndDate) {
+            targetEndDate = new Date(requestedEndDate);
+        } else {
+            targetEndDate = new Date();
+            targetEndDate.setDate(targetEndDate.getDate() - 1);
+        }
+        targetEndDate.setHours(0, 0, 0, 0);
 
         const lastCachedDate = new Date(lastDate);
         lastCachedDate.setHours(0, 0, 0, 0);
 
-        return lastCachedDate >= yesterday;
+        return lastCachedDate >= targetEndDate;
     }
 
     // Store data in cache
@@ -124,21 +130,27 @@ class CacheManager {
     }
 
     // Get date range that needs to be fetched
-    async getMissingDateRange(latitude, longitude) {
+    async getMissingDateRange(latitude, longitude, requestedEndDate = null) {
         const data = await this.getCachedData(latitude, longitude);
         
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        // Use requested end date if provided, otherwise default to yesterday
+        let targetEndDate;
+        if (requestedEndDate) {
+            targetEndDate = requestedEndDate;
+        } else {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            targetEndDate = yesterday.toISOString().split('T')[0];
+        }
         
         if (!data || data.length === 0) {
             // No cache - need everything from 1940
-            return { startDate: '1940-01-01', endDate: yesterdayStr };
+            return { startDate: '1940-01-01', endDate: targetEndDate };
         }
         
         const lastDate = this.getLastCachedDate(data);
         if (!lastDate) {
-            return { startDate: '1940-01-01', endDate: yesterdayStr };
+            return { startDate: '1940-01-01', endDate: targetEndDate };
         }
         
         const lastCachedDate = new Date(lastDate);
@@ -148,11 +160,11 @@ class CacheManager {
         const nextDayStr = nextDay.toISOString().split('T')[0];
         
         // Check if we need any new data
-        if (nextDayStr > yesterdayStr) {
+        if (nextDayStr > targetEndDate) {
             return null; // Cache is current
         }
         
-        return { startDate: nextDayStr, endDate: yesterdayStr };
+        return { startDate: nextDayStr, endDate: targetEndDate };
     }
 
     // Load cache from disk (scan for CSV files)
