@@ -279,6 +279,149 @@
             color: #666;
             margin-top: 2px;
         }
+        
+        .info-button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .data-info-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .data-info-popup.show {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .data-info-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .data-info-content h2 {
+            color: #1976d2;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 24px;
+            border-bottom: 2px solid #1976d2;
+            padding-bottom: 10px;
+        }
+        
+        .data-info-content h3 {
+            color: #333;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+        
+        .data-info-content p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .data-info-content ul {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        
+        .data-info-content li {
+            margin-bottom: 8px;
+        }
+        
+        .data-info-content a {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .data-info-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            color: #666;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .close-button:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .highlight-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .highlight-box p {
+            margin: 0;
+            color: #0d47a1;
+        }
     </style>
 </head>
 <body>
@@ -326,6 +469,7 @@
                 <select id="metric-select">
                     <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
                 </select>
+                <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
             </div>
         </div>
         
@@ -345,6 +489,50 @@
         </div>
         
         <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <!-- Data Information Popup -->
+    <div class="data-info-popup" id="data-info-popup">
+        <div class="data-info-content">
+            <button class="close-button" id="close-popup-btn">&times;</button>
+            <h2>About the Weather Data</h2>
+            
+            <h3>ERA5 Reanalysis Data</h3>
+            <p>This application uses <strong>ERA5</strong>, the fifth generation of European Centre for Medium-Range Weather Forecasts (ECMWF) atmospheric reanalysis data. ERA5 provides comprehensive, high-quality weather information by combining:</p>
+            <ul>
+                <li><strong>Historical observations</strong> from weather stations, satellites, and other sources worldwide</li>
+                <li><strong>Advanced climate models</strong> that use the laws of physics to fill gaps in observations</li>
+                <li><strong>Global coverage</strong> on a 31km grid with hourly data from 1940 to present</li>
+            </ul>
+            
+            <div class="highlight-box">
+                <p><strong>Why ERA5?</strong> It's considered the gold standard for climate reanalysis, providing consistent, quality-assured weather data that's used by researchers, meteorologists, and climate scientists worldwide.</p>
+            </div>
+            
+            <h3>UTCI (Universal Thermal Climate Index)</h3>
+            <p>The <strong>UTCI</strong> measures how hot or cold it actually feels to the human body, not just the air temperature. It accounts for:</p>
+            <ul>
+                <li><strong>Air temperature</strong> - The basic temperature measurement</li>
+                <li><strong>Humidity</strong> - How moisture affects heat perception</li>
+                <li><strong>Wind speed</strong> - Cooling effect of air movement</li>
+                <li><strong>Solar radiation</strong> - Heat from direct sunlight</li>
+            </ul>
+            
+            <p>UTCI is expressed as an equivalent temperature (°C) that represents how the human body physiologically responds to these combined weather conditions. For example, 35°C air temperature with high humidity and no wind might feel like 42°C UTCI.</p>
+            
+            <div class="highlight-box">
+                <p><strong>UTCI Comfort Categories:</strong> No thermal stress (9-26°C), Moderate heat stress (32-38°C), Strong heat stress (38-46°C), and Extreme heat stress (above 46°C).</p>
+            </div>
+            
+            <h3>Learn More</h3>
+            <p>For detailed information about these datasets:</p>
+            <ul>
+                <li><a href="https://climate.copernicus.eu/climate-reanalysis" target="_blank">Copernicus Climate Reanalysis</a> - Official ERA5 information</li>
+                <li><a href="https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5" target="_blank">ECMWF ERA5 Documentation</a> - Technical details</li>
+                <li><a href="https://www.utci.org/" target="_blank">UTCI Official Website</a> - Universal Thermal Climate Index</li>
+                <li><a href="https://utci.lobelia.earth/what-is-utci" target="_blank">What is UTCI?</a> - Comprehensive UTCI explanation</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Load modules -->
@@ -713,6 +901,29 @@
                 
                 // Add event listeners
                 document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
+                
+                // Add data info popup event listeners
+                document.getElementById('data-info-btn').addEventListener('click', () => {
+                    document.getElementById('data-info-popup').classList.add('show');
+                });
+                
+                document.getElementById('close-popup-btn').addEventListener('click', () => {
+                    document.getElementById('data-info-popup').classList.remove('show');
+                });
+                
+                // Close popup when clicking outside content
+                document.getElementById('data-info-popup').addEventListener('click', (e) => {
+                    if (e.target.id === 'data-info-popup') {
+                        document.getElementById('data-info-popup').classList.remove('show');
+                    }
+                });
+                
+                // Close popup with Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        document.getElementById('data-info-popup').classList.remove('show');
+                    }
+                });
                 
                 // Add enter key support for inputs
                 ['latitude', 'longitude', 'target-date', 'city-search'].forEach(id => {
