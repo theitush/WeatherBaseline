@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Temperature History</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script></script>
+    <title>How Hot Was It?</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -226,6 +226,35 @@
             60%, 100% { content: '...'; }
         }
         
+        .chart-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            border-radius: 8px;
+        }
+        
+        .chart-loading-overlay .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(25, 118, 210, 0.3);
+            border-top-color: #1976d2;
+            margin-bottom: 15px;
+        }
+        
+        .chart-loading-overlay .loading-text {
+            color: #1976d2;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
         .city-suggestion {
             padding: 8px 12px;
             cursor: pointer;
@@ -254,7 +283,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Interactive Temperature History</h1>
+        <h1>How Hot Was It?</h1>
         
         <div class="controls">
             <h3>Location & Date Settings</h3>
@@ -580,18 +609,26 @@
             }
 
             try {
-                // Show loading state with spinner
-                d3.select("#data-info")
-                    .attr("class", "loading-text")
-                    .html('<div class="loading-spinner"></div><span class="loading-dots">Fetching weather data from Open-Meteo API</span>');
+                // Show loading overlay on charts container
+                const chartsContainer = document.querySelector('.charts-container');
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.className = 'chart-loading-overlay';
+                loadingOverlay.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
+                `;
+                chartsContainer.appendChild(loadingOverlay);
                 
                 document.getElementById('fetch-data-btn').disabled = true;
-                document.getElementById('fetch-data-btn').innerHTML = '<div class="loading-spinner" style="border-color: rgba(255,255,255,0.3); border-top-color: #fff;"></div>Loading...';
                 
                 // Load API data from 1940 (default)
                 const data = await dataProcessor.loadApiData(coords.latitude, coords.longitude, targetDate);
                 
                 if (data.length === 0) {
+                    // Remove loading overlay
+                    const loadingOverlay = document.querySelector('.chart-loading-overlay');
+                    if (loadingOverlay) loadingOverlay.remove();
+                    
                     d3.select("#data-info")
                         .attr("class", null)
                         .html("❌ Could not fetch data. Please check your location coordinates and date.");
@@ -601,6 +638,10 @@
                 // Update UI with new data
                 uiController.initializeYearControls();
                 uiController.updateCharts();
+                
+                // Remove loading overlay
+                let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
+                if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
                 
                 // Get location name for display
                 const cityInput = document.getElementById('city-search');
@@ -638,8 +679,11 @@
                 
                 showError(error.message || 'Unknown error occurred', errorDetails);
             } finally {
+                // Remove loading overlay in case of error
+                let finalLoadingOverlay = document.querySelector('.chart-loading-overlay');
+                if (finalLoadingOverlay) finalLoadingOverlay.remove();
+                
                 document.getElementById('fetch-data-btn').disabled = false;
-                document.getElementById('fetch-data-btn').textContent = 'Fetch Data';
             }
         }
 
