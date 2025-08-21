@@ -14,7 +14,7 @@ const CONFIG = {
     
     // Chart dimensions
     mainMargin: {top: 20, right: 30, bottom: 40, left: 50},
-    histMargin: {top: 20, right: 100, bottom: 40, left: 0},
+    histMargin: {top: 20, right: 100, bottom: 40, left: 15},
     
     get mainWidth() { return 800 - this.mainMargin.left - this.mainMargin.right; },
     get mainHeight() { return 400 - this.mainMargin.top - this.mainMargin.bottom; },

@@ -373,6 +373,103 @@ class ChartRenderer {
         this.drawCurrentTemperatureIndicators();
     }
 
+    // Draw legend
+    drawLegend() {
+        // Remove existing legend from both charts
+        this.mainG.selectAll(".legend").remove();
+        this.histG.selectAll(".legend").remove();
+        
+        const legend = this.histG.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${this.config.histWidth + 100}, 20)`);
+        
+        const legendItems = [
+            {
+                type: "rect",
+                color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand90'),
+                label: "10th-90th percentile",
+                opacity: 0.2
+            },
+            {
+                type: "rect", 
+                color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand75'),
+                label: "25th-75th percentile",
+                opacity: 0.2
+            },
+            {
+                type: "line",
+                color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'trendLine'),
+                label: "Rolling median (±2 years)",
+                opacity: 1
+            },
+            {
+                type: "circle",
+                color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'dataPoints'),
+                label: "Historical data",
+                opacity: 1
+            },
+            {
+                type: "circle",
+                color: "#333",
+                label: "Target date",
+                opacity: 1,
+                special: "target"
+            }
+        ];
+        
+        legendItems.forEach((item, i) => {
+            const legendRow = legend.append("g")
+                .attr("transform", `translate(0, ${i * 18})`);
+            
+            if (item.type === "rect") {
+                legendRow.append("rect")
+                    .attr("width", 12)
+                    .attr("height", 12)
+                    .attr("fill", item.color)
+                    .attr("opacity", item.opacity);
+            } else if (item.type === "line") {
+                legendRow.append("line")
+                    .attr("x1", 0)
+                    .attr("x2", 12)
+                    .attr("y1", 6)
+                    .attr("y2", 6)
+                    .attr("stroke", item.color)
+                    .attr("stroke-width", 3)
+                    .attr("opacity", item.opacity);
+            } else if (item.type === "circle") {
+                legendRow.append("circle")
+                    .attr("cx", 6)
+                    .attr("cy", 6)
+                    .attr("r", item.special === "target" ? 4 : 2)
+                    .attr("fill", item.color)
+                    .attr("stroke", item.special === "target" ? "white" : "none")
+                    .attr("stroke-width", item.special === "target" ? 2 : 0)
+                    .attr("opacity", item.opacity);
+            }
+            
+            legendRow.append("text")
+                .attr("x", 18)
+                .attr("y", 6)
+                .attr("dy", "0.35em")
+                .style("font-size", "11px")
+                .style("fill", "#333")
+                .text(item.label);
+        });
+        
+        // Add legend background
+        const bbox = legend.node().getBBox();
+        legend.insert("rect", ":first-child")
+            .attr("x", bbox.x - 5)
+            .attr("y", bbox.y - 5)
+            .attr("width", bbox.width + 10)
+            .attr("height", bbox.height + 10)
+            .attr("fill", "white")
+            .attr("stroke", "#ccc")
+            .attr("stroke-width", 1)
+            .attr("rx", 3)
+            .attr("opacity", 0.9);
+    }
+
     // Draw histogram bars
     drawHistogramBars(bins) {
         
@@ -529,6 +626,9 @@ class ChartRenderer {
             .style("text-anchor", "middle")
             .style("font-size", "12px")
             .text("Count");
+        
+        // Draw legend
+        this.drawLegend();
     }
 
     // Update both charts
