@@ -234,12 +234,12 @@ class DataProcessor {
             // Bottom 5% - very extreme cold
             context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
             context.description = getRandomPhrase(extremeColdPhrases);
-            context.ranking = `${rankingFromColdest}${this.getOrdinalSuffix(rankingFromColdest)} coldest since ${Math.min(...data.map(d => d.year))}!`;
+            context.ranking = `${rankingFromColdest}${this.getOrdinalSuffix(rankingFromColdest)} coldest in dataset!`;
         } else if (percentile <= 5) {
             // Top 5% - very extreme hot
             context.percentile = `${percentile.toFixed(0)}th percentile`;
             context.description = getRandomPhrase(extremeHotPhrases);
-            context.ranking = `${rankingFromHottest}${this.getOrdinalSuffix(rankingFromHottest)} hottest since ${Math.min(...data.map(d => d.year))}!`;
+            context.ranking = `${rankingFromHottest}${this.getOrdinalSuffix(rankingFromHottest)} hottest in dataset!`;
         } else if (percentileFromBottom <= 10) {
             // Bottom 10% - extreme cold
             context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
