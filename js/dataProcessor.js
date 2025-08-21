@@ -142,16 +142,16 @@ class DataProcessor {
             });
         });
         
-        // Calculate moving averages (5-year window) - only show after 5 years of data
+        // Calculate moving averages (±2 years window, 5 total) - only show after having 2 years before and after
         aggregates.sort((a, b) => a.year - b.year);
-        const windowSize = 5;
+        const windowRadius = 2; // ±2 years around current year
         
         aggregates.forEach((d, i) => {
-            // Only calculate rolling median if we have at least 4 previous years (so 5 years total including current)
-            if (i >= windowSize - 1) {
-                // Take the current year and the previous 4 years
-                const start = i - windowSize + 1;
-                const end = i + 1;
+            // Only calculate rolling median if we have at least 2 years before and 2 years after (so 5 years total)
+            if (i >= windowRadius && i < aggregates.length - windowRadius) {
+                // Take ±2 years around current year (5 years total)
+                const start = i - windowRadius;
+                const end = i + windowRadius + 1;
                 const window = aggregates.slice(start, end);
                 
                 d.movingMedian = d3.median(window, d => d.p50);
@@ -160,7 +160,7 @@ class DataProcessor {
                 d.moving75 = d3.median(window, d => d.p75);
                 d.moving90 = d3.median(window, d => d.p90);
             } else {
-                // Set to null for years that don't have enough previous data
+                // Set to null for years that don't have enough surrounding data
                 d.movingMedian = null;
                 d.moving10 = null;
                 d.moving25 = null;
@@ -214,12 +214,16 @@ class DataProcessor {
         let rankingFromHottest = totalCount - allTemps.lastIndexOf(currentTemp);
         
         // Random phrase arrays
-        const normalPhrases = ["Pretty typical", "Normal range", "Average temp", "Nothing unusual", "Right on track"];
-        const coolPhrases = ["A bit cool", "Slightly chilly", "Cooler side", "Touch below normal", "Mildly cold"];
-        const warmPhrases = ["A bit warm", "Slightly toasty", "Warmer side", "Touch above normal", "Mildly hot"];
-        const coldPhrases = ["Unusually cold", "Quite chilly", "Pretty frigid", "Really cool", "Very cold"];
-        const hotPhrases = ["Unusually hot", "Quite toasty", "Pretty scorching", "Really warm", "Very hot"];
-        const extremePhrases = ["Scorching rare heat!", "Blazing anomaly!", "Exceptionally frigid!", "Bone-chilling!", "Historic extreme!"];
+        const normalPhrases = ["Pretty typical", "Normal range", "Average temp", "Nothing unusual", "Right on track", "Nothing special", "Just average", "Not exciting"];
+        const coolPhrases = ["A bit cool", "Slightly chilly", "Cooler side", "Touch below normal", "Mildly cold", "A bit brisk", "Slightly frosty", "A bit nippy", 
+                             "Somewhat chilly", "A bit fresh", "A bit crisp", "A bit brisk", "Sorta cool",
+        ];
+        const warmPhrases = ["A bit warm", "Slightly toasty", "Warmer side", "Touch above normal", "Mildly hot", "A bit balmy", "Slightly sultry", "A bit steamy",
+                             "Somewhat warm", "A bit toasty", "Sorta hot"];
+        const coldPhrases = ["Unusually cold", "Quite chilly", "Pretty frigid", "Really cool", "Very cold", "Bitterly cold", "Chill af", "Nippy!"];
+        const hotPhrases = ["Unusually hot", "Quite toasty", "Pretty scorching", "Really warm", "Very hot", "Hot af", "Sweltering", "Scorching"];
+        const extremeColdPhrases = ["Exceptionally frigid!", "Bone-chilling!", "Historic freeze!", "Brutal cold!", "Arctic blast!"];
+        const extremeHotPhrases = ["Scorching rare heat!", "Blazing anomaly!", "Infernal heat!", "Blistering hot!", "Record heat!"];
         
         // Get random phrase
         const getRandomPhrase = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -229,12 +233,12 @@ class DataProcessor {
         if (percentileFromBottom <= 5) {
             // Bottom 5% - very extreme cold
             context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
-            context.description = getRandomPhrase(extremePhrases);
+            context.description = getRandomPhrase(extremeColdPhrases);
             context.ranking = `${rankingFromColdest}${this.getOrdinalSuffix(rankingFromColdest)} coldest since ${Math.min(...data.map(d => d.year))}!`;
         } else if (percentile <= 5) {
             // Top 5% - very extreme hot
             context.percentile = `${percentile.toFixed(0)}th percentile`;
-            context.description = getRandomPhrase(extremePhrases);
+            context.description = getRandomPhrase(extremeHotPhrases);
             context.ranking = `${rankingFromHottest}${this.getOrdinalSuffix(rankingFromHottest)} hottest since ${Math.min(...data.map(d => d.year))}!`;
         } else if (percentileFromBottom <= 10) {
             // Bottom 10% - extreme cold
