@@ -98,20 +98,41 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
-            height: 450px;
+            height: 530px;
             width: 1360px;
+        }
+        
+        .chart-controls {
+            margin-bottom: 20px;
+            display: none;
+            gap: 30px;
+            align-items: center;
+        }
+        
+        .chart-controls.show {
+            display: flex;
         }
         
         .main-chart {
             position: absolute;
             left: 0;
-            top: 0;
+            top: 20px;
+            transition: top 0.3s ease;
         }
         
         .histogram-chart {
             position: absolute;
-            left: 800px;
-            top: 0;
+            left: 770px;
+            top: 20px;
+            transition: top 0.3s ease;
+        }
+        
+        .chart-controls.show ~ .main-chart {
+            top: 80px;
+        }
+        
+        .chart-controls.show ~ .histogram-chart {
+            top: 80px;
         }
         
         .chart-title {
@@ -485,23 +506,6 @@
             
             
             
-            <h3>Chart Display</h3>
-            <div class="year-range-control">
-                <label for="start-year">Display From:</label>
-                <select id="start-year">
-                    <!-- Options will be populated by JavaScript -->
-                </select>
-                <div class="year-info" id="year-info">
-                    <!-- Year range info will be populated by JavaScript -->
-                </div>
-            </div>
-            <div class="year-range-control">
-                <label for="metric-select">Metric:</label>
-                <select id="metric-select">
-                    <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
-                </select>
-                <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
-            </div>
         </div>
         
         <div class="temperature-context" id="temperature-context">
@@ -509,6 +513,24 @@
         </div>
         
         <div class="charts-container">
+            <div class="chart-controls">
+                <div class="year-range-control">
+                    <label for="start-year">Display From:</label>
+                    <select id="start-year">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                    <div class="year-info" id="year-info">
+                        <!-- Year range info will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="year-range-control">
+                    <label for="metric-select">Metric:</label>
+                    <select id="metric-select">
+                        <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
+                    </select>
+                    <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
+                </div>
+            </div>
             <div class="main-chart">
                 <svg id="main-svg" width="800" height="400"></svg>
             </div>
@@ -804,6 +826,9 @@
             // Also update the context display with error message
             d3.select("#temperature-context")
                 .html(`❌ Error: ${errorMessage}`);
+                
+            // Hide chart controls on error
+            document.querySelector('.chart-controls').classList.remove('show');
         }
 
         // Fetch data from API
@@ -847,12 +872,18 @@
                     
                     d3.select("#temperature-context")
                         .html("❌ Could not fetch data. Please check your location coordinates and date.");
+                    
+                    // Hide chart controls when no data
+                    document.querySelector('.chart-controls').classList.remove('show');
                     return;
                 }
 
                 // Update UI with new data
                 uiController.initializeYearControls();
                 uiController.updateCharts();
+                
+                // Show chart controls now that we have data
+                document.querySelector('.chart-controls').classList.add('show');
                 
                 // Remove loading overlay
                 let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
