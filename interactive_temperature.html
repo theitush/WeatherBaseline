@@ -156,6 +156,37 @@
             color: #1976d2;
         }
         
+        .temperature-context {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            font-size: 16px;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .temperature-context .percentile {
+            font-weight: bold;
+            font-size: 18px;
+            color: #1976d2;
+        }
+        
+        .temperature-context .description {
+            margin-top: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .temperature-context .ranking {
+            margin-top: 5px;
+            font-weight: bold;
+            color: #d32f2f;
+            font-size: 14px;
+        }
+        
         .percentile-band {
             fill-opacity: 0.2;
         }
@@ -473,6 +504,10 @@
             </div>
         </div>
         
+        <div class="temperature-context" id="temperature-context">
+            <!-- Temperature context message will be populated by JavaScript -->
+        </div>
+        
         <div class="charts-container">
             <div class="main-chart">
                 <div class="chart-title">Temperature Over Time</div>
@@ -482,10 +517,6 @@
                 <div class="chart-title">Distribution</div>
                 <svg id="histogram-svg" width="300" height="400"></svg>
             </div>
-        </div>
-        
-        <div class="data-info" id="data-info">
-            <!-- Data information will be populated by JavaScript -->
         </div>
         
         <div class="tooltip" id="tooltip"></div>
@@ -772,9 +803,8 @@
             // Always show popup alert with all details
             alert(popupMessage);
             
-            // Also update the info display with shortened message
-            d3.select("#data-info")
-                .attr("class", null)
+            // Also update the context display with error message
+            d3.select("#temperature-context")
                 .html(`❌ Error: ${errorMessage}`);
         }
 
@@ -817,8 +847,7 @@
                     const loadingOverlay = document.querySelector('.chart-loading-overlay');
                     if (loadingOverlay) loadingOverlay.remove();
                     
-                    d3.select("#data-info")
-                        .attr("class", null)
+                    d3.select("#temperature-context")
                         .html("❌ Could not fetch data. Please check your location coordinates and date.");
                     return;
                 }
@@ -830,18 +859,6 @@
                 // Remove loading overlay
                 let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
                 if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
-                
-                // Get location name for display
-                const cityInput = document.getElementById('city-search');
-                const locationName = cityInput.value.trim() 
-                    ? cityInput.value
-                    : `${coords.latitude}, ${coords.longitude}`;
-                    
-                d3.select("#data-info")
-                    .attr("class", null)
-                    .html(
-                        `✅ Successfully loaded ${data.length} weather records for ${locationName} around ${targetDate} (data from 1940)`
-                    );
                 
             } catch (error) {
                 console.error('Error fetching API data:', error);
@@ -894,7 +911,7 @@
                 // Initialize UI controls even before data is loaded
                 uiController.initializeYearControls();
                 
-                d3.select("#data-info").html("🌍 Select a location and date above to fetch weather data from Open-Meteo API.");
+                d3.select("#temperature-context").html("🌍 Select a location and date above to see temperature context");
                 
                 // Initialize city search selector
                 initializeCitySearch();
@@ -936,7 +953,7 @@
                 
             } catch (error) {
                 console.error('Error initializing visualization:', error);
-                d3.select("#data-info").html("❌ Error initializing application. Check console for details.");
+                d3.select("#temperature-context").html("❌ Error initializing application. Check console for details.");
             }
         }
 

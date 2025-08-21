@@ -198,6 +198,79 @@ class DataProcessor {
         return (higherCount / totalCount * 100);
     }
 
+    // Generate temperature context message
+    generateTemperatureContext(currentTemp, data = this.filteredData) {
+        if (!currentTemp || !data || data.length === 0) return null;
+        
+        const percentile = this.calculateTemperaturePercentile(currentTemp, data);
+        const percentileFromBottom = 100 - percentile;
+        
+        // Sort all temperatures to get rankings
+        const allTemps = data.map(d => d[this.currentMetric]).sort((a, b) => a - b);
+        const totalCount = allTemps.length;
+        
+        // Find exact ranking
+        let rankingFromColdest = allTemps.findIndex(temp => temp >= currentTemp) + 1;
+        let rankingFromHottest = totalCount - allTemps.lastIndexOf(currentTemp);
+        
+        // Random phrase arrays
+        const normalPhrases = ["Pretty typical", "Normal range", "Average temp", "Nothing unusual", "Right on track"];
+        const coolPhrases = ["A bit cool", "Slightly chilly", "Cooler side", "Touch below normal", "Mildly cold"];
+        const warmPhrases = ["A bit warm", "Slightly toasty", "Warmer side", "Touch above normal", "Mildly hot"];
+        const coldPhrases = ["Unusually cold", "Quite chilly", "Pretty frigid", "Really cool", "Very cold"];
+        const hotPhrases = ["Unusually hot", "Quite toasty", "Pretty scorching", "Really warm", "Very hot"];
+        const extremePhrases = ["Scorching rare heat!", "Blazing anomaly!", "Exceptionally frigid!", "Bone-chilling!", "Historic extreme!"];
+        
+        // Get random phrase
+        const getRandomPhrase = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        
+        let context = {};
+        
+        if (percentileFromBottom <= 5) {
+            // Bottom 5% - very extreme cold
+            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(extremePhrases);
+            context.ranking = `${rankingFromColdest}${this.getOrdinalSuffix(rankingFromColdest)} coldest since ${Math.min(...data.map(d => d.year))}!`;
+        } else if (percentile <= 5) {
+            // Top 5% - very extreme hot
+            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(extremePhrases);
+            context.ranking = `${rankingFromHottest}${this.getOrdinalSuffix(rankingFromHottest)} hottest since ${Math.min(...data.map(d => d.year))}!`;
+        } else if (percentileFromBottom <= 10) {
+            // Bottom 10% - extreme cold
+            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(coldPhrases);
+        } else if (percentile <= 10) {
+            // Top 10% - extreme hot
+            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(hotPhrases);
+        } else if (percentileFromBottom <= 20) {
+            // 10-20th percentile - a bit cool
+            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(coolPhrases);
+        } else if (percentile <= 20) {
+            // 80-90th percentile - a bit warm
+            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(warmPhrases);
+        } else {
+            // 20-80th percentile - normal
+            context.percentile = `${Math.min(percentile, percentileFromBottom).toFixed(0)}th percentile`;
+            context.description = getRandomPhrase(normalPhrases);
+        }
+        
+        return context;
+    }
+    
+    // Helper function to get ordinal suffix (1st, 2nd, 3rd, etc.)
+    getOrdinalSuffix(num) {
+        const j = num % 10;
+        const k = num % 100;
+        if (j == 1 && k != 11) return "st";
+        if (j == 2 && k != 12) return "nd";
+        if (j == 3 && k != 13) return "rd";
+        return "th";
+    }
+
     // Get data extents
     getDataExtents() {
         if (this.filteredData.length === 0) return null;

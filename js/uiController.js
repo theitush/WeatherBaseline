@@ -116,22 +116,32 @@ class UIController {
             .text(`${yearCount} years, ${dataPointCount} data points`);
     }
 
-    // Update data info display
-    updateDataInfo() {
-        const yearRange = `${this.startYear}-${this.endYear}`;
-        const totalPoints = this.dataProcessor.getFilteredData().length;
-        
+    // Update temperature context display
+    updateTemperatureContext() {
         const currentDateData = this.dataProcessor.getCurrentDateData();
+        const contextElement = d3.select("#temperature-context");
         
-        let infoText = `Showing data from ${yearRange} (${totalPoints} data points)`;
-        
-        if (currentDateData.length > 0) {
-            const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
-            const percentHigher = this.dataProcessor.calculateTemperaturePercentile(currentTemp).toFixed(1);
-            infoText += `<br/>Current temperature (${this.dataProcessor.currentDate}): ${currentTemp}°C (${percentHigher}th percentile)`;
+        if (currentDateData.length === 0 || this.dataProcessor.getFilteredData().length === 0) {
+            contextElement.html("Select a location and date to see temperature context");
+            return;
         }
         
-        d3.select("#data-info").html(infoText);
+        const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
+        const context = this.dataProcessor.generateTemperatureContext(currentTemp);
+        
+        if (!context) {
+            contextElement.html("No temperature context available");
+            return;
+        }
+        
+        let html = `<div class="percentile">${context.percentile}</div>`;
+        html += `<div class="description">${context.description}</div>`;
+        
+        if (context.ranking) {
+            html += `<div class="ranking">${context.ranking}</div>`;
+        }
+        
+        contextElement.html(html);
     }
 
     // Main update function
@@ -139,7 +149,7 @@ class UIController {
         this.dataProcessor.filterData(this.startYear, this.endYear);
         this.chartRenderer.updateDomains(this.startYear, this.endYear);
         this.chartRenderer.updateCharts();
-        this.updateDataInfo();
+        this.updateTemperatureContext();
     }
 
     // Get current year range

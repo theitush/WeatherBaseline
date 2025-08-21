@@ -491,7 +491,6 @@ class ChartRenderer {
         this.histG.selectAll("g.upper-bracket").remove();
         this.histG.selectAll("g.lower-bracket").remove();
         this.histG.selectAll("g").selectAll("text").remove();
-        this.histG.selectAll("*:not(.bar)").remove();
         
         // Create histogram data
         const bins = d3.histogram()
@@ -518,9 +517,15 @@ class ChartRenderer {
             this.drawHistogramBrackets(currentTemp);
         }
         
+        // Add x-axis
+        this.histG.append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(0,${this.config.histHeight})`)
+            .call(d3.axisBottom(this.histXScale).ticks(5));
+        
         // Add x-axis label
         this.histG.append("text")
-            .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 30})`)
+            .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
             .style("text-anchor", "middle")
             .style("font-size", "12px")
             .text("Count");
