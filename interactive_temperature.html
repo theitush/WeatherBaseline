@@ -483,7 +483,7 @@
         <div class="controls">
             <h3>Location & Date Settings</h3>
             <div class="year-range-control">
-                <label for="city-select">City:</label>
+                <label for="city-select">City*:</label>
                 <div style="position: relative; display: inline-block;">
                     <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
                         <option value="">Select a city...</option>
@@ -494,6 +494,9 @@
                 <input type="date" id="target-date">
                 
                 <button id="fetch-data-btn" style="padding: 8px 16px; margin-left: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
+            </div>
+            <div style="font-size: 12px; color: #666; margin-left: 0; margin-top: 5px; font-style: italic;">
+                *Limited cities available in alpha version
             </div>
             
             
@@ -516,11 +519,18 @@
                     </div>
                 </div>
                 <div class="year-range-control">
-                    <label for="metric-select">Metric:</label>
-                    <select id="metric-select">
-                        <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
-                    </select>
-                    <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <label for="metric-select">Metric:</label>
+                            <select id="metric-select">
+                                <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
+                            </select>
+                            <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
+                        </div>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
+                            *Limited metrics available in alpha version
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="main-chart">
