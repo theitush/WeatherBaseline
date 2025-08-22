@@ -84,34 +84,10 @@ class CitySelector {
             
         } catch (error) {
             console.error('City search error:', error);
-            // Fallback to a simple hardcoded search
-            this.fallbackSearch(query);
-        }
-    }
-
-    /**
-     * Fallback search using hardcoded cities
-     * @param {string} query - Search query
-     */
-    fallbackSearch(query) {
-        const hardcodedCities = [
-            {display_name: "Tel Aviv, Israel", lat: "32.0853", lon: "34.7818"},
-            {display_name: "New York, United States", lat: "40.7128", lon: "-74.0060"},
-            {display_name: "London, United Kingdom", lat: "51.5074", lon: "-0.1278"},
-            {display_name: "Paris, France", lat: "48.8566", lon: "2.3522"},
-            {display_name: "Tokyo, Japan", lat: "35.6762", lon: "139.6503"}
-        ];
-        
-        const filtered = hardcodedCities.filter(city => 
-            city.display_name.toLowerCase().includes(query.toLowerCase())
-        );
-        
-        if (filtered.length > 0) {
-            this.displaySuggestions(filtered);
-        } else {
             this.suggestionsDiv.style.display = 'none';
         }
     }
+
 
     /**
      * Display city suggestions
