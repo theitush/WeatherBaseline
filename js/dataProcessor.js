@@ -216,17 +216,25 @@ class DataProcessor {
         // Random phrase arrays
         const normalPhrases = ["Pretty typical", "Normal range", "Average temp", "Nothing unusual", "Right on track", "Nothing special", "Just average", "Not exciting"];
         const coolPhrases = ["A bit cool", "Slightly chilly", "Cooler side", "Touch below normal", "Mildly cold", "A bit brisk", "Slightly frosty", "A bit nippy", 
-                             "Somewhat chilly", "A bit fresh", "A bit crisp", "A bit brisk", "Sorta cool",
-        ];
+                             "Somewhat chilly", "A bit fresh", "A bit crisp", "A bit brisk", "Sorta cool"];
         const warmPhrases = ["A bit warm", "Slightly toasty", "Warmer side", "Touch above normal", "Mildly hot", "A bit balmy", "Slightly sultry", "A bit steamy",
-                             "Somewhat warm", "A bit toasty", "Sorta hot"];
+                             "Somewhat warm", "Sorta hot"];
         const coldPhrases = ["Unusually cold", "Quite chilly", "Pretty frigid", "Really cool", "Very cold", "Bitterly cold", "Chill af", "Nippy!"];
         const hotPhrases = ["Unusually hot", "Quite toasty", "Pretty scorching", "Really warm", "Very hot", "Hot af", "Sweltering", "Scorching"];
         const extremeColdPhrases = ["Exceptionally frigid!", "Bone-chilling!", "Historic freeze!", "Brutal cold!", "Arctic blast!"];
         const extremeHotPhrases = ["Scorching rare heat!", "Blazing anomaly!", "Infernal heat!", "Blistering hot!", "Record heat!"];
         
         // Get random phrase
-        const getRandomPhrase = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const getRandomPhrase = (arr) => {
+            const phrase = arr[Math.floor(Math.random() * arr.length)];
+            // Add seasonal context to non-normal phrases
+            if (arr === extremeColdPhrases || arr === extremeHotPhrases) {
+                return phrase + " (for the season)";
+            } else if (arr !== normalPhrases) {
+                return phrase + " for the season";
+            }
+            return phrase;
+        };
         
         let context = {};
         
