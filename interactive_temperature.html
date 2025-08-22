@@ -477,58 +477,414 @@
             margin: 0;
             color: #0d47a1;
         }
+
+        /* Desktop-only elements */
+        .desktop-only {
+            display: block;
+        }
+
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            /* Hide desktop elements on mobile */
+            .desktop-only {
+                display: none !important;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                overflow-x: hidden;
+            }
+
+            .container {
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            /* Mobile sections that stack vertically */
+            .mobile-section {
+                min-height: 100vh;
+                width: 100%;
+                padding: 20px;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+
+            /* Initial controls section */
+            .mobile-controls-section {
+                background: #f8f9fa;
+                position: relative;
+                z-index: 10;
+            }
+
+            /* Loading section */
+            .mobile-loading-section {
+                background: white;
+                display: none;
+                opacity: 0;
+                transform: translateY(100vh);
+                transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+
+            .mobile-loading-section.show {
+                display: flex;
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Charts section */
+            .mobile-charts-section {
+                min-height: 200vh;
+                background: white;
+                position: relative;
+                display: none;
+            }
+
+            .mobile-charts-section.show {
+                display: block;
+            }
+
+            /* Hide desktop title */
+            h1 {
+                display: none;
+            }
+
+            /* Mobile title */
+            .mobile-title {
+                font-size: 28px;
+                font-weight: bold;
+                color: #333;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            /* Controls styling for mobile */
+            .controls {
+                width: 100%;
+                max-width: 400px;
+                margin: 0;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+
+            .controls h3 {
+                text-align: center;
+                font-size: 20px;
+            }
+
+            .year-range-control {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .year-range-control label {
+                font-size: 16px;
+                margin-bottom: 5px;
+            }
+
+            .year-range-control select,
+            .year-range-control input {
+                width: 100%;
+                padding: 12px;
+                font-size: 16px;
+                box-sizing: border-box;
+            }
+
+            #fetch-data-btn {
+                width: 100%;
+                padding: 15px;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 20px 0 0 0 !important;
+                border-radius: 8px;
+            }
+
+            /* Temperature context mobile */
+            .temperature-context {
+                width: 100%;
+                max-width: 400px;
+                margin: 20px 0;
+                font-size: 18px;
+            }
+
+            /* Charts container mobile */
+            .charts-container {
+                position: relative;
+                width: 100%;
+                height: auto;
+                margin: 0;
+                padding: 0;
+                background: transparent;
+                box-shadow: none;
+                overflow: visible;
+            }
+
+            /* Hide desktop chart controls initially */
+            .chart-controls {
+                display: none !important;
+            }
+
+            /* Mobile chart controls */
+            .mobile-chart-controls {
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                background: white;
+                padding: 15px;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                z-index: 1000;
+                display: none;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .mobile-chart-controls.show {
+                display: flex;
+            }
+
+            .mobile-chart-controls select {
+                width: 100%;
+                padding: 12px;
+                font-size: 16px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+            }
+
+            /* Chart positioning and transforms */
+            .histogram-chart {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                transform-origin: center center;
+                z-index: 5;
+            }
+
+            /* Histogram animation states */
+            .histogram-chart.mobile-rotating {
+                transform: translate(-50%, -50%) rotate(90deg) scale(0.8);
+            }
+
+            .histogram-chart.mobile-final {
+                transform: translate(25%, -50%) rotate(90deg) scale(0.6);
+                left: 100%;
+            }
+
+            .main-chart {
+                position: absolute;
+                left: -100%;
+                top: 50%;
+                transform: translate(0, -50%);
+                transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                opacity: 0;
+                z-index: 5;
+            }
+
+            .main-chart.mobile-visible {
+                left: 20px;
+                opacity: 1;
+                transform: translate(0, -50%) scale(0.9);
+            }
+
+            /* Chart title mobile */
+            .chart-title {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                right: 20px;
+                text-align: center;
+                margin: 0;
+                font-size: 18px;
+                z-index: 10;
+            }
+
+            /* SVG responsive sizing */
+            #main-svg, #histogram-svg {
+                max-width: 100%;
+                height: auto;
+            }
+
+            /* Loading spinner mobile */
+            .mobile-loading-content {
+                text-align: center;
+            }
+
+            .mobile-loading-content .loading-spinner {
+                width: 60px;
+                height: 60px;
+                border: 4px solid rgba(25, 118, 210, 0.3);
+                border-top-color: #1976d2;
+                margin: 0 auto 20px;
+            }
+
+            .mobile-loading-content .loading-text {
+                font-size: 18px;
+                justify-content: center;
+            }
+
+            /* Hide elements not needed on mobile initially */
+            .data-info-popup {
+                padding: 10px;
+            }
+
+            .data-info-content {
+                max-width: 90vw;
+                margin: 20px;
+                padding: 20px;
+            }
+        }
+
+        /* Tablet styles */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .charts-container {
+                max-width: 100%;
+                width: auto;
+            }
+            
+            .main-chart {
+                position: absolute;
+                left: 0;
+            }
+            
+            .histogram-chart {
+                position: absolute;
+                left: 520px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>How Hot Was It?</h1>
         
-        <div class="controls">
+        <!-- Mobile Controls Section -->
+        <div class="mobile-section mobile-controls-section">
+            <div class="mobile-title">How Hot Was It?</div>
+            <div class="controls">
+                <h3>Location & Date Settings</h3>
+                <div class="year-range-control">
+                    <label for="city-select">City*:</label>
+                    <div style="position: relative; display: inline-block; width: 100%;">
+                        <select id="city-select" style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
+                            <option value="">Select a city...</option>
+                        </select>
+                    </div>
+                    
+                    <label for="target-date">Target Date:</label>
+                    <input type="date" id="target-date">
+                    
+                    <button id="fetch-data-btn" style="padding: 8px 16px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-left: 0; margin-top: 5px; font-style: italic;">
+                    *Limited cities available in alpha version
+                </div>
+            </div>
+            
+            <div class="temperature-context" id="temperature-context">
+                🌍 Select a location and date above to see temperature context
+            </div>
+        </div>
+
+        <!-- Mobile Loading Section -->
+        <div class="mobile-section mobile-loading-section" id="mobile-loading-section">
+            <div class="mobile-loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
+            </div>
+        </div>
+
+        <!-- Desktop Controls (hidden on mobile) -->
+        <div class="controls desktop-only">
             <h3>Location & Date Settings</h3>
             <div class="year-range-control">
-                <label for="city-select">City*:</label>
+                <label for="city-select-desktop">City*:</label>
                 <div style="position: relative; display: inline-block;">
-                    <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
+                    <select id="city-select-desktop" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
                         <option value="">Select a city...</option>
                     </select>
                 </div>
                 
-                <label for="target-date">Target Date:</label>
-                <input type="date" id="target-date">
+                <label for="target-date-desktop">Target Date:</label>
+                <input type="date" id="target-date-desktop">
                 
-                <button id="fetch-data-btn" style="padding: 8px 16px; margin-left: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
+                <button id="fetch-data-btn-desktop" style="padding: 8px 16px; margin-left: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
             </div>
             <div style="font-size: 12px; color: #666; margin-left: 0; margin-top: 5px; font-style: italic;">
                 *Limited cities available in alpha version
             </div>
-            
-            
-            
         </div>
         
-        <div class="temperature-context" id="temperature-context">
-            <!-- Temperature context message will be populated by JavaScript -->
+        <!-- Desktop Temperature Context (hidden on mobile) -->
+        <div class="temperature-context desktop-only" id="temperature-context-desktop">
+            🌍 Select a location and date above to see temperature context
         </div>
         
-        <div class="charts-container">
+        <!-- Mobile Charts Section -->
+        <div class="mobile-section mobile-charts-section" id="mobile-charts-section">
+            <div class="charts-container">
+                <div class="chart-controls">
+                    <div class="year-range-control">
+                        <label for="start-year">Display From:</label>
+                        <select id="start-year">
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                        <div class="year-info" id="year-info">
+                            <!-- Year range info will be populated by JavaScript -->
+                        </div>
+                    </div>
+                    <div class="year-range-control">
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <label for="metric-select">Metric:</label>
+                                <select id="metric-select">
+                                    <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
+                                </select>
+                                <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
+                            </div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
+                                *Limited metrics available in alpha version
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-title" id="chart-title">
+                    <!-- Chart title will be populated by JavaScript -->
+                </div>
+                <div class="main-chart">
+                    <svg id="main-svg" width="800" height="400"></svg>
+                </div>
+                <div class="histogram-chart">
+                    <svg id="histogram-svg" width="500" height="400"></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Desktop Charts Container (hidden on mobile) -->
+        <div class="charts-container desktop-only">
             <div class="chart-controls">
                 <div class="year-range-control">
-                    <label for="start-year">Display From:</label>
-                    <select id="start-year">
+                    <label for="start-year-desktop">Display From:</label>
+                    <select id="start-year-desktop">
                         <!-- Options will be populated by JavaScript -->
                     </select>
-                    <div class="year-info" id="year-info">
+                    <div class="year-info" id="year-info-desktop">
                         <!-- Year range info will be populated by JavaScript -->
                     </div>
                 </div>
                 <div class="year-range-control">
                     <div style="display: flex; flex-direction: column;">
                         <div style="display: flex; align-items: center; gap: 15px;">
-                            <label for="metric-select">Metric:</label>
-                            <select id="metric-select">
+                            <label for="metric-select-desktop">Metric:</label>
+                            <select id="metric-select-desktop">
                                 <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
                             </select>
-                            <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
+                            <button class="info-button" id="data-info-btn-desktop" title="About ERA5 data and UTCI measurements">i</button>
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
                             *Limited metrics available in alpha version
@@ -536,14 +892,31 @@
                     </div>
                 </div>
             </div>
-            <div class="chart-title" id="chart-title">
+            <div class="chart-title" id="chart-title-desktop">
                 <!-- Chart title will be populated by JavaScript -->
             </div>
             <div class="main-chart">
-                <svg id="main-svg" width="800" height="400"></svg>
+                <svg id="main-svg-desktop" width="800" height="400"></svg>
             </div>
             <div class="histogram-chart">
-                <svg id="histogram-svg" width="500" height="400"></svg>
+                <svg id="histogram-svg-desktop" width="500" height="400"></svg>
+            </div>
+        </div>
+
+        <!-- Mobile Chart Controls (floating) -->
+        <div class="mobile-chart-controls" id="mobile-chart-controls">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label for="start-year-mobile" style="font-weight: bold;">From Year:</label>
+                <select id="start-year-mobile">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label for="metric-select-mobile" style="font-weight: bold;">Metric:</label>
+                <select id="metric-select-mobile">
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <button class="info-button" id="data-info-btn-mobile" title="About ERA5 data and UTCI measurements">i</button>
             </div>
         </div>
         
@@ -810,6 +1183,231 @@
             }
         }
 
+        // Mobile interaction logic
+        let isMobile = window.innerWidth <= 768;
+        let mobileScrollState = 'controls'; // 'controls', 'loading', 'histogram', 'rotating', 'final'
+        let isDataLoaded = false;
+
+        // Check if mobile
+        function checkMobile() {
+            isMobile = window.innerWidth <= 768;
+        }
+
+        // Mobile scroll handler
+        function handleMobileScroll() {
+            if (!isMobile || !isDataLoaded) return;
+            
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            
+            const histogramChart = document.querySelector('.histogram-chart');
+            const mainChart = document.querySelector('.main-chart');
+            const mobileChartControls = document.getElementById('mobile-chart-controls');
+            
+            if (scrollTop < windowHeight) {
+                // State 1: Show histogram centered
+                mobileScrollState = 'histogram';
+                histogramChart.classList.remove('mobile-rotating', 'mobile-final');
+                mainChart.classList.remove('mobile-visible');
+                mobileChartControls.classList.remove('show');
+            } else if (scrollTop < windowHeight * 1.5) {
+                // State 2: Start rotating histogram
+                mobileScrollState = 'rotating';
+                const progress = (scrollTop - windowHeight) / (windowHeight * 0.5);
+                histogramChart.classList.add('mobile-rotating');
+                histogramChart.classList.remove('mobile-final');
+                mainChart.classList.remove('mobile-visible');
+                mobileChartControls.classList.remove('show');
+            } else {
+                // State 3: Final position with both charts
+                mobileScrollState = 'final';
+                histogramChart.classList.add('mobile-rotating', 'mobile-final');
+                mainChart.classList.add('mobile-visible');
+                mobileChartControls.classList.add('show');
+            }
+        }
+
+        // Show mobile loading
+        function showMobileLoading() {
+            if (!isMobile) return;
+            
+            const loadingSection = document.getElementById('mobile-loading-section');
+            loadingSection.classList.add('show');
+            
+            // Auto scroll to loading section
+            setTimeout(() => {
+                loadingSection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }, 300);
+        }
+
+        // Hide mobile loading and show charts
+        function showMobileCharts() {
+            if (!isMobile) return;
+            
+            const loadingSection = document.getElementById('mobile-loading-section');
+            const chartsSection = document.getElementById('mobile-charts-section');
+            
+            loadingSection.classList.remove('show');
+            chartsSection.classList.add('show');
+            isDataLoaded = true;
+            
+            // Auto scroll to charts section
+            setTimeout(() => {
+                chartsSection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                
+                // Setup scroll listener after charts are shown
+                window.addEventListener('scroll', handleMobileScroll, { passive: true });
+            }, 300);
+        }
+
+        // Sync mobile controls with main controls
+        function syncMobileControls() {
+            if (!isMobile) return;
+            
+            const startYearMobile = document.getElementById('start-year-mobile');
+            const metricSelectMobile = document.getElementById('metric-select-mobile');
+            const startYear = document.getElementById('start-year');
+            const metricSelect = document.getElementById('metric-select');
+            
+            // Copy options
+            startYearMobile.innerHTML = startYear.innerHTML;
+            metricSelectMobile.innerHTML = metricSelect.innerHTML;
+            
+            // Set values
+            startYearMobile.value = startYear.value;
+            metricSelectMobile.value = metricSelect.value;
+            
+            // Add event listeners for mobile controls
+            startYearMobile.addEventListener('change', (e) => {
+                startYear.value = e.target.value;
+                startYear.dispatchEvent(new Event('change'));
+            });
+            
+            metricSelectMobile.addEventListener('change', (e) => {
+                metricSelect.value = e.target.value;
+                metricSelect.dispatchEvent(new Event('change'));
+            });
+        }
+
+        // Override fetchApiData for mobile
+        async function fetchApiData() {
+            // Check if mobile and show mobile loading
+            checkMobile();
+            if (isMobile) {
+                showMobileLoading();
+            }
+            
+            let coords, targetDate;
+            
+            try {
+                coords = getCurrentCoordinates();
+                targetDate = document.getElementById('target-date').value;
+                
+                if (!coords.latitude || !coords.longitude || !targetDate) {
+                    showError('Please select a location and date');
+                    return;
+                }
+
+            } catch (error) {
+                showError(`Input validation error: ${error.message}`);
+                return;
+            }
+
+            try {
+                // Show loading overlay on charts container (desktop only)
+                if (!isMobile) {
+                    const chartsContainer = document.querySelector('.charts-container');
+                    const loadingOverlay = document.createElement('div');
+                    loadingOverlay.className = 'chart-loading-overlay';
+                    loadingOverlay.innerHTML = `
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
+                    `;
+                    chartsContainer.appendChild(loadingOverlay);
+                }
+                
+                document.getElementById('fetch-data-btn').disabled = true;
+                
+                // Load API data from 1940 (default)
+                const data = await dataProcessor.loadApiData(coords.latitude, coords.longitude, targetDate);
+                
+                if (data.length === 0) {
+                    // Remove loading overlay
+                    const loadingOverlay = document.querySelector('.chart-loading-overlay');
+                    if (loadingOverlay) loadingOverlay.remove();
+                    
+                    d3.select("#temperature-context")
+                        .html("❌ Could not fetch data. Please check your location coordinates and date.");
+                    
+                    // Hide chart controls when no data
+                    document.querySelector('.chart-controls').classList.remove('show');
+                    
+                    // Clear chart title when no data
+                    document.getElementById('chart-title').textContent = '';
+                    return;
+                }
+
+                // Update UI with new data
+                uiController.initializeYearControls();
+                uiController.updateCharts();
+                
+                // Update chart title with formatted date
+                const chartTitle = document.getElementById('chart-title');
+                chartTitle.textContent = formatDateForTitle(targetDate);
+                
+                // Show chart controls now that we have data
+                document.querySelector('.chart-controls').classList.add('show');
+                
+                // Handle mobile state
+                if (isMobile) {
+                    showMobileCharts();
+                    setTimeout(() => {
+                        syncMobileControls();
+                    }, 500);
+                } else {
+                    // Remove loading overlay for desktop
+                    let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
+                    if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
+                }
+                
+            } catch (error) {
+                console.error('Error fetching API data:', error);
+                
+                // Build error details object
+                const errorDetails = {
+                    timestamp: new Date().toISOString(),
+                    location: coords ? `${coords.latitude}, ${coords.longitude}` : 'Unknown',
+                    dateRange: targetDate ? `${targetDate} (from 1940)` : 'Unknown',
+                    technical: error.stack || error.toString()
+                };
+                
+                // Add enhanced error information if available
+                if (error.httpStatus) {
+                    errorDetails.status = error.httpStatus;
+                }
+                if (error.url) {
+                    errorDetails.url = error.url;
+                }
+                if (error.serverDetails) {
+                    errorDetails.technical = error.serverDetails + '\n\n' + errorDetails.technical;
+                }
+                
+                showError(error.message || 'Unknown error occurred', errorDetails);
+            } finally {
+                // Remove loading overlay in case of error
+                let finalLoadingOverlay = document.querySelector('.chart-loading-overlay');
+                if (finalLoadingOverlay) finalLoadingOverlay.remove();
+                
+                document.getElementById('fetch-data-btn').disabled = false;
+            }
+        }
+        
         // Initialize the application
         async function init() {
             try {
@@ -837,12 +1435,20 @@
                 // Initialize city selector with cached cities
                 await initializeCitySelector();
                 
+                // Check initial mobile state
+                checkMobile();
+                
                 // Add event listeners
                 document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
                 
-                // Add data info popup event listeners
-                document.getElementById('data-info-btn').addEventListener('click', () => {
-                    document.getElementById('data-info-popup').classList.add('show');
+                // Add data info popup event listeners (main and mobile)
+                ['data-info-btn', 'data-info-btn-mobile'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.addEventListener('click', () => {
+                            document.getElementById('data-info-popup').classList.add('show');
+                        });
+                    }
                 });
                 
                 document.getElementById('close-popup-btn').addEventListener('click', () => {
@@ -876,6 +1482,17 @@
                 document.getElementById('city-select').addEventListener('change', () => {
                     // Optional: Auto-fetch data when city changes
                     // fetchApiData();
+                });
+                
+                // Add resize event listener
+                window.addEventListener('resize', () => {
+                    const wasMobile = isMobile;
+                    checkMobile();
+                    
+                    // If switching between mobile and desktop, reload the page for now
+                    if (wasMobile !== isMobile) {
+                        location.reload();
+                    }
                 });
                 
             } catch (error) {
