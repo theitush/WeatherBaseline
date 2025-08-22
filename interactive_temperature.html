@@ -127,19 +127,22 @@
             transition: top 0.3s ease;
         }
         
-        .chart-controls.show ~ .main-chart {
-            top: 80px;
+        .chart-controls.show ~ .chart-title ~ .main-chart {
+            top: 120px;
         }
         
-        .chart-controls.show ~ .histogram-chart {
-            top: 80px;
+        .chart-controls.show ~ .chart-title ~ .histogram-chart {
+            top: 120px;
         }
         
         .chart-title {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             color: #333;
+            text-align: left;
+            padding: 10px 0;
+            margin-left: 350px;
         }
         
         .tooltip {
@@ -533,6 +536,9 @@
                     </div>
                 </div>
             </div>
+            <div class="chart-title" id="chart-title">
+                <!-- Chart title will be populated by JavaScript -->
+            </div>
             <div class="main-chart">
                 <svg id="main-svg" width="800" height="400"></svg>
             </div>
@@ -634,6 +640,35 @@
             };
         }
 
+        // Format date for chart title
+        function formatDateForTitle(dateString) {
+            const date = new Date(dateString);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            const month = months[date.getMonth()];
+            const day = date.getDate();
+            const year = date.getFullYear();
+            
+            // Add ordinal suffix
+            const ordinal = getOrdinalSuffix(day);
+            
+            return `${month} ${day}${ordinal} ± 7 days`;
+        }
+
+        // Get ordinal suffix for day
+        function getOrdinalSuffix(day) {
+            if (day >= 11 && day <= 13) {
+                return 'th';
+            }
+            switch (day % 10) {
+                case 1: return 'st';
+                case 2: return 'nd';
+                case 3: return 'rd';
+                default: return 'th';
+            }
+        }
+
         // Initialize city selector with cached cities from JSON
         async function initializeCitySelector() {
             try {
@@ -718,6 +753,9 @@
                 
             // Hide chart controls on error
             document.querySelector('.chart-controls').classList.remove('show');
+            
+            // Clear chart title on error
+            document.getElementById('chart-title').textContent = '';
         }
 
         // Fetch data from API
@@ -764,12 +802,19 @@
                     
                     // Hide chart controls when no data
                     document.querySelector('.chart-controls').classList.remove('show');
+                    
+                    // Clear chart title when no data
+                    document.getElementById('chart-title').textContent = '';
                     return;
                 }
 
                 // Update UI with new data
                 uiController.initializeYearControls();
                 uiController.updateCharts();
+                
+                // Update chart title with formatted date
+                const chartTitle = document.getElementById('chart-title');
+                chartTitle.textContent = formatDateForTitle(targetDate);
                 
                 // Show chart controls now that we have data
                 document.querySelector('.chart-controls').classList.add('show');
