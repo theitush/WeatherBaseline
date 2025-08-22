@@ -486,8 +486,11 @@
         <div class="controls">
             <h3>Location & Date Settings</h3>
             <div class="year-range-control">
-                <label for="city-select">City*:</label>
+                <label for="city-select">City:</label>
                 <div style="position: relative; display: inline-block;">
+                    <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
+                        <option value="">Select a city...</option>
+                    </select>
                     <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
                         <option value="">Select a city...</option>
                     </select>
@@ -627,6 +630,7 @@
         }
 
         // Get current coordinates from selected city
+        // Get current coordinates from selected city
         function getCurrentCoordinates() {
             const selectedValue = document.getElementById('city-select').value;
             if (!selectedValue) {
@@ -635,6 +639,8 @@
             
             const [lat, lon] = selectedValue.split(',');
             return {
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lon)
                 latitude: parseFloat(lat),
                 longitude: parseFloat(lon)
             };
@@ -703,8 +709,47 @@
                 if (telAvivCity) {
                     citySelect.value = `${telAvivCity.lat},${telAvivCity.lon}`;
                 }
+        // Initialize city selector with cached cities from JSON
+        async function initializeCitySelector() {
+            try {
+                const response = await fetch('cache_cities_mapping.json');
+                const cityMapping = await response.json();
+                
+                const citySelect = document.getElementById('city-select');
+                
+                // Extract coordinates from CSV filenames and map to city names
+                const cities = [];
+                Object.entries(cityMapping).forEach(([csvFile, cityName]) => {
+                    const match = csvFile.match(/weather_hist_(-?\d+\.?\d*)_(-?\d+\.?\d*)\.csv/);
+                    if (match) {
+                        cities.push({
+                            name: cityName,
+                            lat: parseFloat(match[1]),
+                            lon: parseFloat(match[2])
+                        });
+                    }
+                });
+                
+                // Sort cities alphabetically and populate select
+                cities.sort((a, b) => a.name.localeCompare(b.name)).forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = `${city.lat},${city.lon}`;
+                    option.textContent = city.name;
+                    citySelect.appendChild(option);
+                });
+                
+                // Set default city to Tel Aviv if available
+                const telAvivCity = cities.find(city => city.name.includes('Tel Aviv'));
+                if (telAvivCity) {
+                    citySelect.value = `${telAvivCity.lat},${telAvivCity.lon}`;
+                }
                 
             } catch (error) {
+                console.error('Error loading city mapping:', error);
+                // Fallback message
+                const citySelect = document.getElementById('city-select');
+                citySelect.innerHTML = '<option value="">Error loading cities</option>';
+            }
                 console.error('Error loading city mapping:', error);
                 // Fallback message
                 const citySelect = document.getElementById('city-select');
@@ -878,6 +923,8 @@
                 
                 // Initialize city selector with cached cities
                 await initializeCitySelector();
+                // Initialize city selector with cached cities
+                await initializeCitySelector();
                 
                 // Add event listeners
                 document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
@@ -912,6 +959,12 @@
                             fetchApiData();
                         }
                     });
+                });
+                
+                // Add change event for city selector
+                document.getElementById('city-select').addEventListener('change', () => {
+                    // Optional: Auto-fetch data when city changes
+                    // fetchApiData();
                 });
                 
                 // Add change event for city selector
