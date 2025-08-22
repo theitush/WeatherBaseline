@@ -596,6 +596,7 @@
 
     <!-- Load modules -->
     <script src="js/config.js"></script>
+    <script src="js/citySelector.js"></script>
     <script src="js/apiDataFetcher.js"></script>
     <script src="js/dataProcessor.js"></script>
     <script src="js/chartRenderer.js"></script>
@@ -607,6 +608,7 @@
         let chartRenderer;
         let uiController;
         let apiDataFetcher;
+        let citySelector;
 
         // Set today's date as default and configure date picker limits
         function setDefaultDate() {
@@ -627,18 +629,8 @@
         }
 
         // Get current coordinates from selected city
-        // Get current coordinates from selected city
         function getCurrentCoordinates() {
-            const selectedValue = document.getElementById('city-select').value;
-            if (!selectedValue) {
-                throw new Error('Please select a city');
-            }
-            
-            const [lat, lon] = selectedValue.split(',');
-            return {
-                latitude: parseFloat(lat),
-                longitude: parseFloat(lon)
-            };
+            return citySelector.getCurrentCoordinates();
         }
 
         // Format date for chart title
@@ -672,45 +664,7 @@
 
         // Initialize city selector with cached cities from JSON
         async function initializeCitySelector() {
-            try {
-                const response = await fetch('cache_cities_mapping.json');
-                const cityMapping = await response.json();
-                
-                const citySelect = document.getElementById('city-select');
-                
-                // Extract coordinates from CSV filenames and map to city names
-                const cities = [];
-                Object.entries(cityMapping).forEach(([csvFile, cityName]) => {
-                    const match = csvFile.match(/weather_hist_(-?\d+\.?\d*)_(-?\d+\.?\d*)\.csv/);
-                    if (match) {
-                        cities.push({
-                            name: cityName,
-                            lat: parseFloat(match[1]),
-                            lon: parseFloat(match[2])
-                        });
-                    }
-                });
-                
-                // Sort cities alphabetically and populate select
-                cities.sort((a, b) => a.name.localeCompare(b.name)).forEach(city => {
-                    const option = document.createElement('option');
-                    option.value = `${city.lat},${city.lon}`;
-                    option.textContent = city.name;
-                    citySelect.appendChild(option);
-                });
-                
-                // Set default city to Tel Aviv if available
-                const telAvivCity = cities.find(city => city.name.includes('Tel Aviv'));
-                if (telAvivCity) {
-                    citySelect.value = `${telAvivCity.lat},${telAvivCity.lon}`;
-                }
-                
-            } catch (error) {
-                console.error('Error loading city mapping:', error);
-                // Fallback message
-                const citySelect = document.getElementById('city-select');
-                citySelect.innerHTML = '<option value="">Error loading cities</option>';
-            }
+            return citySelector.initialize();
         }
 
         // Show comprehensive error popup and update display
@@ -861,6 +815,9 @@
             try {
                 // Set default date
                 setDefaultDate();
+
+                // Initialize city selector
+                citySelector = new CitySelector();
 
                 // Initialize API data fetcher
                 apiDataFetcher = new ApiDataFetcher();
