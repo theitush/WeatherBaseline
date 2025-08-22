@@ -48,13 +48,8 @@ class MobileController {
         const mainChart = chartsSection.querySelector('.main-chart');
         const mobileChartControls = document.getElementById('mobile-chart-controls');
         
-        console.log('Elements found - histogramChart:', !!histogramChart, 'mainChart:', !!mainChart);
-        
         // Calculate scroll relative to charts section
         const relativeScroll = scrollTop - chartsSectionTop;
-        
-        // Debug logging  
-        console.log('Scroll:', scrollTop, 'ChartsTop:', chartsSectionTop, 'Relative:', relativeScroll, 'WindowHeight:', windowHeight);
         
         let newState;
         if (relativeScroll < 150) {
@@ -69,7 +64,6 @@ class MobileController {
         
         // Only update if state has changed
         if (newState !== this.previousScrollState) {
-            console.log('STATE CHANGE:', this.previousScrollState, '->', newState);
             this.previousScrollState = newState;
             this.mobileScrollState = newState;
             
@@ -77,7 +71,6 @@ class MobileController {
                 // State 1: Show histogram upright and centered
                 if (histogramChart) {
                     histogramChart.classList.remove('mobile-rotating', 'mobile-final');
-                    console.log('State: histogram upright');
                 }
                 if (mainChart) {
                     mainChart.classList.remove('mobile-visible');
@@ -90,7 +83,6 @@ class MobileController {
                 if (histogramChart) {
                     histogramChart.classList.add('mobile-rotating');
                     histogramChart.classList.remove('mobile-final');
-                    console.log('State: rotating');
                 }
                 if (mainChart) {
                     mainChart.classList.remove('mobile-visible');
@@ -102,7 +94,6 @@ class MobileController {
                 // State 3: Final position with both charts
                 if (histogramChart) {
                     histogramChart.classList.add('mobile-rotating', 'mobile-final');
-                    console.log('State: final with both charts');
                 }
                 if (mainChart) {
                     mainChart.classList.add('mobile-visible');
@@ -245,7 +236,6 @@ class MobileController {
             .domain(isFlipped ? [tempExtent[1], tempExtent[0]] : tempExtent)
             .range([0, width]);
             
-        console.log('Histogram rendering - isFlipped:', isFlipped, 'domain:', xScale.domain());
             
         const yScale = d3.scaleLinear()
             .domain([0, d3.max(bins, d => d.length)])

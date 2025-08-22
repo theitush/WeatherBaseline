@@ -252,6 +252,16 @@
         display: block !important;
     }
     
+    /* Hide y-axis during rotation, show it normally in final state */
+    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-right {
+        opacity: 0 !important;
+    }
+    
+    .mobile-charts-section .histogram-chart.mobile-final .y-axis-right {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    
     .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-text,
     .mobile-charts-section .histogram-chart.mobile-final .y-axis-text {
         font-size: 12px !important;
@@ -261,8 +271,8 @@
         stroke: none !important;
         font-weight: bold !important;
         transform-box: fill-box !important;
-        /* Counter-rotate and counter-flip to keep text readable */
-        transform: rotate(-90deg) scaleX(-1) !important;
+        /* Counter-rotate to keep text readable */
+        transform: rotate(-90deg) !important;
         transform-origin: 50% 50% !important;
     }
     
