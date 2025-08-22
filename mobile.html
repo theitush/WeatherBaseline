@@ -3,78 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>How Hot Was It?</title>
-    <script>
-        // Redirect mobile users to mobile version
-        if (window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            window.location.href = 'mobile.html';
-        }
-    </script>
+    <title>How Hot Was It? - Mobile</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <link rel="stylesheet" href="css/desktop.css">
+    <link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
     <div class="container">
-        <h1>How Hot Was It?</h1>
-        
-        <div class="controls">
-            <h3>Location & Date Settings</h3>
-            <div class="year-range-control">
-                <label for="city-select">City*:</label>
-                <div style="position: relative; display: inline-block;">
-                    <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
+        <!-- Mobile Controls Section -->
+        <div class="mobile-section mobile-controls-section">
+            <div class="mobile-title">How Hot Was It?</div>
+            <div class="controls">
+                <h3>Location & Date Settings</h3>
+                <div class="year-range-control">
+                    <label for="city-select">City*:</label>
+                    <select id="city-select">
                         <option value="">Select a city...</option>
                     </select>
+                    
+                    <label for="target-date">Target Date:</label>
+                    <input type="date" id="target-date">
+                    
+                    <button id="fetch-data-btn">Fetch Data</button>
                 </div>
-                
-                <label for="target-date">Target Date:</label>
-                <input type="date" id="target-date">
-                
-                <button id="fetch-data-btn" style="padding: 8px 16px; margin-left: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Data</button>
+                <div style="font-size: 12px; color: #666; margin-left: 0; margin-top: 5px; font-style: italic;">
+                    *Limited cities available in alpha version
+                </div>
             </div>
-            <div style="font-size: 12px; color: #666; margin-left: 0; margin-top: 5px; font-style: italic;">
-                *Limited cities available in alpha version
+            
+            <div class="temperature-context" id="temperature-context">
+                🌍 Select a location and date above to see temperature context
             </div>
         </div>
-        
-        <div class="temperature-context" id="temperature-context">
-            <!-- Temperature context message will be populated by JavaScript -->
+
+        <!-- Mobile Loading Section -->
+        <div class="mobile-section mobile-loading-section" id="mobile-loading-section">
+            <div class="mobile-loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
+            </div>
         </div>
-        
-        <div class="charts-container">
-            <div class="chart-controls">
-                <div class="year-range-control">
-                    <label for="start-year">Display From:</label>
-                    <select id="start-year">
-                        <!-- Options will be populated by JavaScript -->
-                    </select>
-                    <div class="year-info" id="year-info">
-                        <!-- Year range info will be populated by JavaScript -->
-                    </div>
+
+        <!-- Mobile Charts Section -->
+        <div class="mobile-section mobile-charts-section" id="mobile-charts-section">
+            <div class="charts-container">
+                <div class="chart-title" id="chart-title">
+                    <!-- Chart title will be populated by JavaScript -->
                 </div>
-                <div class="year-range-control">
-                    <div style="display: flex; flex-direction: column;">
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <label for="metric-select">Metric:</label>
-                            <select id="metric-select">
-                                <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
-                            </select>
-                            <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
-                        </div>
-                        <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
-                            *Limited metrics available in alpha version
-                        </div>
-                    </div>
+                <div class="main-chart">
+                    <svg id="main-svg" width="800" height="400"></svg>
+                </div>
+                <div class="histogram-chart">
+                    <svg id="histogram-svg" width="500" height="400"></svg>
                 </div>
             </div>
-            <div class="chart-title" id="chart-title">
-                <!-- Chart title will be populated by JavaScript -->
+        </div>
+
+        <!-- Mobile Chart Controls (floating) -->
+        <div class="mobile-chart-controls" id="mobile-chart-controls">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label for="start-year-mobile" style="font-weight: bold;">From Year:</label>
+                <select id="start-year-mobile">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
             </div>
-            <div class="main-chart">
-                <svg id="main-svg" width="800" height="400"></svg>
-            </div>
-            <div class="histogram-chart">
-                <svg id="histogram-svg" width="500" height="400"></svg>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label for="metric-select-mobile" style="font-weight: bold;">Metric:</label>
+                <select id="metric-select-mobile">
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <button class="info-button" id="data-info-btn-mobile" title="About ERA5 data and UTCI measurements">i</button>
             </div>
         </div>
         
@@ -132,6 +129,7 @@
     <script src="js/dataProcessor.js"></script>
     <script src="js/chartRenderer.js"></script>
     <script src="js/uiController.js"></script>
+    <script src="js/mobile.js"></script>
 
     <script>
         // Global instances
@@ -140,6 +138,7 @@
         let uiController;
         let apiDataFetcher;
         let citySelector;
+        let mobileController;
 
         // Set today's date as default and configure date picker limits
         function setDefaultDate() {
@@ -236,15 +235,9 @@
             // Also update the context display with error message
             d3.select("#temperature-context")
                 .html(`❌ Error: ${errorMessage}`);
-                
-            // Hide chart controls on error
-            document.querySelector('.chart-controls').classList.remove('show');
-            
-            // Clear chart title on error
-            document.getElementById('chart-title').textContent = '';
         }
 
-        // Fetch data from API
+        // Mobile-enhanced fetch data function
         async function fetchApiData() {
             let coords, targetDate;
             
@@ -263,15 +256,8 @@
             }
 
             try {
-                // Show loading overlay on charts container
-                const chartsContainer = document.querySelector('.charts-container');
-                const loadingOverlay = document.createElement('div');
-                loadingOverlay.className = 'chart-loading-overlay';
-                loadingOverlay.innerHTML = `
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
-                `;
-                chartsContainer.appendChild(loadingOverlay);
+                // Show mobile loading
+                mobileController.showMobileLoading();
                 
                 document.getElementById('fetch-data-btn').disabled = true;
                 
@@ -279,18 +265,8 @@
                 const data = await dataProcessor.loadApiData(coords.latitude, coords.longitude, targetDate);
                 
                 if (data.length === 0) {
-                    // Remove loading overlay
-                    const loadingOverlay = document.querySelector('.chart-loading-overlay');
-                    if (loadingOverlay) loadingOverlay.remove();
-                    
                     d3.select("#temperature-context")
                         .html("❌ Could not fetch data. Please check your location coordinates and date.");
-                    
-                    // Hide chart controls when no data
-                    document.querySelector('.chart-controls').classList.remove('show');
-                    
-                    // Clear chart title when no data
-                    document.getElementById('chart-title').textContent = '';
                     return;
                 }
 
@@ -302,12 +278,11 @@
                 const chartTitle = document.getElementById('chart-title');
                 chartTitle.textContent = formatDateForTitle(targetDate);
                 
-                // Show chart controls now that we have data
-                document.querySelector('.chart-controls').classList.add('show');
-                
-                // Remove loading overlay
-                let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
-                if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
+                // Show mobile charts
+                mobileController.showMobileCharts();
+                setTimeout(() => {
+                    mobileController.syncMobileControls();
+                }, 500);
                 
             } catch (error) {
                 console.error('Error fetching API data:', error);
@@ -333,112 +308,11 @@
                 
                 showError(error.message || 'Unknown error occurred', errorDetails);
             } finally {
-                // Remove loading overlay in case of error
-                let finalLoadingOverlay = document.querySelector('.chart-loading-overlay');
-                if (finalLoadingOverlay) finalLoadingOverlay.remove();
-                
                 document.getElementById('fetch-data-btn').disabled = false;
             }
         }
 
-        // Fetch data from API
-        async function fetchApiData() {
-            let coords, targetDate;
-            
-            try {
-                coords = getCurrentCoordinates();
-                targetDate = document.getElementById('target-date').value;
-                
-                if (!coords.latitude || !coords.longitude || !targetDate) {
-                    showError('Please select a location and date');
-                    return;
-                }
-
-            } catch (error) {
-                showError(`Input validation error: ${error.message}`);
-                return;
-            }
-
-            try {
-                // Show loading overlay on charts container
-                const chartsContainer = document.querySelector('.charts-container');
-                const loadingOverlay = document.createElement('div');
-                loadingOverlay.className = 'chart-loading-overlay';
-                loadingOverlay.innerHTML = `
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
-                `;
-                chartsContainer.appendChild(loadingOverlay);
-                
-                document.getElementById('fetch-data-btn').disabled = true;
-                
-                // Load API data from 1940 (default)
-                const data = await dataProcessor.loadApiData(coords.latitude, coords.longitude, targetDate);
-                
-                if (data.length === 0) {
-                    // Remove loading overlay
-                    const loadingOverlay = document.querySelector('.chart-loading-overlay');
-                    if (loadingOverlay) loadingOverlay.remove();
-                    
-                    d3.select("#temperature-context")
-                        .html("❌ Could not fetch data. Please check your location coordinates and date.");
-                    
-                    // Hide chart controls when no data
-                    document.querySelector('.chart-controls').classList.remove('show');
-                    
-                    // Clear chart title when no data
-                    document.getElementById('chart-title').textContent = '';
-                    return;
-                }
-
-                // Update UI with new data
-                uiController.initializeYearControls();
-                uiController.updateCharts();
-                
-                // Update chart title with formatted date
-                const chartTitle = document.getElementById('chart-title');
-                chartTitle.textContent = formatDateForTitle(targetDate);
-                
-                // Show chart controls now that we have data
-                document.querySelector('.chart-controls').classList.add('show');
-                
-                // Remove loading overlay
-                let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
-                if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
-                
-            } catch (error) {
-                console.error('Error fetching API data:', error);
-                
-                // Build error details object
-                const errorDetails = {
-                    timestamp: new Date().toISOString(),
-                    location: coords ? `${coords.latitude}, ${coords.longitude}` : 'Unknown',
-                    dateRange: targetDate ? `${targetDate} (from 1940)` : 'Unknown',
-                    technical: error.stack || error.toString()
-                };
-                
-                // Add enhanced error information if available
-                if (error.httpStatus) {
-                    errorDetails.status = error.httpStatus;
-                }
-                if (error.url) {
-                    errorDetails.url = error.url;
-                }
-                if (error.serverDetails) {
-                    errorDetails.technical = error.serverDetails + '\n\n' + errorDetails.technical;
-                }
-                
-                showError(error.message || 'Unknown error occurred', errorDetails);
-            } finally {
-                // Remove loading overlay in case of error
-                let finalLoadingOverlay = document.querySelector('.chart-loading-overlay');
-                if (finalLoadingOverlay) finalLoadingOverlay.remove();
-                
-                document.getElementById('fetch-data-btn').disabled = false;
-            }
-        }
-        
-        // Initialize the application
+        // Initialize the mobile application
         async function init() {
             try {
                 // Set default date
@@ -465,11 +339,15 @@
                 // Initialize city selector with cached cities
                 await initializeCitySelector();
                 
+                // Initialize mobile controller
+                mobileController = new MobileController();
+                mobileController.setupMobileInfoButton();
+                
                 // Add event listeners
                 document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
                 
                 // Add data info popup event listeners
-                document.getElementById('data-info-btn').addEventListener('click', () => {
+                document.getElementById('data-info-btn-mobile').addEventListener('click', () => {
                     document.getElementById('data-info-popup').classList.add('show');
                 });
                 
@@ -507,12 +385,12 @@
                 });
                 
             } catch (error) {
-                console.error('Error initializing visualization:', error);
+                console.error('Error initializing mobile visualization:', error);
                 d3.select("#temperature-context").html("❌ Error initializing application. Check console for details.");
             }
         }
 
-        // Start the application
+        // Start the mobile application
         init();
     </script>
 </body>

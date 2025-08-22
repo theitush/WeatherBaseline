@@ -1,0 +1,255 @@
+/* Mobile Styles */
+@media (max-width: 768px) {
+    body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+    }
+
+    .container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Mobile sections that stack vertically */
+    .mobile-section {
+        min-height: 100vh;
+        width: 100%;
+        padding: 20px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Initial controls section */
+    .mobile-controls-section {
+        background: #f8f9fa;
+        position: relative;
+        z-index: 10;
+    }
+
+    /* Loading section */
+    .mobile-loading-section {
+        background: white;
+        display: none;
+        opacity: 0;
+        transform: translateY(100vh);
+        transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .mobile-loading-section.show {
+        display: flex;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* Charts section */
+    .mobile-charts-section {
+        min-height: 200vh;
+        background: white;
+        position: relative;
+        display: none;
+    }
+
+    .mobile-charts-section.show {
+        display: block;
+    }
+
+    /* Hide desktop title */
+    h1 {
+        display: none;
+    }
+
+    /* Mobile title */
+    .mobile-title {
+        font-size: 28px;
+        font-weight: bold;
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    /* Controls styling for mobile */
+    .controls {
+        width: 100%;
+        max-width: 400px;
+        margin: 0;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .controls h3 {
+        text-align: center;
+        font-size: 20px;
+    }
+
+    .year-range-control {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .year-range-control label {
+        font-size: 16px;
+        margin-bottom: 5px;
+    }
+
+    .year-range-control select,
+    .year-range-control input {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        box-sizing: border-box;
+    }
+
+    #fetch-data-btn {
+        width: 100%;
+        padding: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 20px 0 0 0 !important;
+        border-radius: 8px;
+    }
+
+    /* Temperature context mobile */
+    .temperature-context {
+        width: 100%;
+        max-width: 400px;
+        margin: 20px 0;
+        font-size: 18px;
+    }
+
+    /* Charts container mobile */
+    .charts-container {
+        position: relative;
+        width: 100%;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    /* Hide desktop chart controls initially */
+    .chart-controls {
+        display: none !important;
+    }
+
+    /* Mobile chart controls */
+    .mobile-chart-controls {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .mobile-chart-controls.show {
+        display: flex;
+    }
+
+    .mobile-chart-controls select {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+    }
+
+    /* Chart positioning and transforms - Mobile specific */
+    .mobile-charts-section .histogram-chart {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        /* Start upright (0 degrees rotation) - this is the key difference from desktop */
+        transform: translate(-50%, -50%) rotate(0deg);
+        transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transform-origin: center center;
+        z-index: 5;
+    }
+
+    /* Histogram animation states */
+    .mobile-charts-section .histogram-chart.mobile-rotating {
+        /* Rotate to sideways (90 degrees) - same as desktop final position */
+        transform: translate(-50%, -50%) rotate(90deg) scale(0.8);
+    }
+
+    .mobile-charts-section .histogram-chart.mobile-final {
+        /* Final sideways position, scaled and positioned to the right */
+        transform: translate(25%, -50%) rotate(90deg) scale(0.6);
+        left: 100%;
+    }
+
+    .mobile-charts-section .main-chart {
+        position: absolute;
+        left: -100%;
+        top: 50%;
+        transform: translate(0, -50%);
+        transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        opacity: 0;
+        z-index: 5;
+    }
+
+    .mobile-charts-section .main-chart.mobile-visible {
+        left: 20px;
+        opacity: 1;
+        transform: translate(0, -50%) scale(0.9);
+    }
+
+    /* Chart title mobile */
+    .chart-title {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        text-align: center;
+        margin: 0;
+        font-size: 18px;
+        z-index: 10;
+    }
+
+    /* SVG responsive sizing */
+    #main-svg, #histogram-svg {
+        max-width: 100%;
+        height: auto;
+    }
+
+    /* Loading spinner mobile */
+    .mobile-loading-content {
+        text-align: center;
+    }
+
+    .mobile-loading-content .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(25, 118, 210, 0.3);
+        border-top-color: #1976d2;
+        margin: 0 auto 20px;
+    }
+
+    .mobile-loading-content .loading-text {
+        font-size: 18px;
+        justify-content: center;
+    }
+
+    /* Hide elements not needed on mobile initially */
+    .data-info-popup {
+        padding: 10px;
+    }
+
+    .data-info-content {
+        max-width: 90vw;
+        margin: 20px;
+        padding: 20px;
+    }
+}
