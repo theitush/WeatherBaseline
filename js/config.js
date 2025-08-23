@@ -14,11 +14,11 @@ const CONFIG = {
     
     // Chart dimensions
     mainMargin: {top: 20, right: 30, bottom: 40, left: 50},
-    histMargin: {top: 20, right: 100, bottom: 40, left: 15},
+    histMargin: {top: 20, right: 140, bottom: 40, left: 15},
     
-    get mainWidth() { return 800 - this.mainMargin.left - this.mainMargin.right; },
+    get mainWidth() { return 720 - this.mainMargin.left - this.mainMargin.right; },
     get mainHeight() { return 400 - this.mainMargin.top - this.mainMargin.bottom; },
-    get histWidth() { return 300 - this.histMargin.left - this.histMargin.right; },
+    get histWidth() { return 280 - this.histMargin.left - this.histMargin.right; },
     get histHeight() { return 400 - this.histMargin.top - this.histMargin.bottom; },
     
     // Base colors for different metrics (all available, only active ones used)

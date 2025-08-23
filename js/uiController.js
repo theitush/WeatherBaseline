@@ -65,8 +65,8 @@ class UIController {
         
         // Define display names for metrics
         const metricDisplayNames = {
-            max_temperature: 'Maximum Apparent Temperature',
-            min_temperature: 'Minimum Apparent Temperature',
+            max_temperature: 'Maximum Temperature (UTCI)',
+            min_temperature: 'Minimum Temperature (UTCI)',
             precipitation_sum: 'Precipitation Sum',
             wind_speed_10m_max: 'Maximum Wind Speed'
         };

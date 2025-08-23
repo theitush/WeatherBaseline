@@ -13,7 +13,7 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1050px;
             margin: 0 auto;
         }
         
@@ -22,6 +22,10 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            max-width: 1050px;
+            margin-left: auto;
+            margin-right: auto;
             margin-bottom: 20px;
         }
         
@@ -98,8 +102,9 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
-            height: 530px;
-            width: 1360px;
+            height: 580px;
+            max-width: 1050px;
+            margin: 0 auto;
         }
         
         .chart-controls {
@@ -115,7 +120,7 @@
         
         .main-chart {
             position: absolute;
-            left: 0;
+            left: 50px;
             top: 20px;
             transition: top 0.3s ease;
         }
@@ -127,13 +132,6 @@
             transition: top 0.3s ease;
         }
         
-        .chart-controls.show ~ .chart-title ~ .main-chart {
-            top: 120px;
-        }
-        
-        .chart-controls.show ~ .chart-title ~ .histogram-chart {
-            top: 120px;
-        }
         
         .chart-title {
             font-size: 18px;
@@ -143,6 +141,14 @@
             text-align: left;
             padding: 10px 0;
             margin-left: 350px;
+        }
+        
+        .chart-controls.show ~ .chart-title ~ .main-chart {
+            top: 120px;
+        }
+        
+        .chart-controls.show ~ .chart-title ~ .histogram-chart {
+            top: 120px;
         }
         
         .tooltip {
@@ -181,7 +187,7 @@
         }
         
         .temperature-context {
-            margin: 20px 0;
+            margin: 20px auto;
             padding: 20px;
             background: white;
             border-radius: 8px;
@@ -190,6 +196,7 @@
             font-size: 16px;
             line-height: 1.4;
             color: #333;
+            max-width: 1050px;
         }
         
         .temperature-context .percentile {
@@ -296,6 +303,21 @@
             border-radius: 8px;
         }
         
+        .temperature-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            border-radius: 8px;
+        }
+        
         .chart-loading-overlay .loading-spinner {
             width: 40px;
             height: 40px;
@@ -304,10 +326,19 @@
             margin-bottom: 15px;
         }
         
-        .chart-loading-overlay .loading-text {
+        .chart-loading-overlay .loading-text,
+        .temperature-loading-overlay .loading-text {
             color: #1976d2;
             font-size: 16px;
             font-weight: bold;
+        }
+        
+        .temperature-loading-overlay .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(25, 118, 210, 0.3);
+            border-top-color: #1976d2;
+            margin-bottom: 15px;
         }
         
         .city-suggestion {
@@ -335,135 +366,39 @@
             margin-top: 2px;
         }
         
-        .info-button {
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-left: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .data-info-popup {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .data-info-popup.show {
-            display: flex;
-            animation: fadeIn 0.3s ease;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .data-info-content {
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            max-width: 700px;
-            max-height: 80vh;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateY(-20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .data-info-content h2 {
-            color: #1976d2;
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 24px;
-            border-bottom: 2px solid #1976d2;
-            padding-bottom: 10px;
-        }
-        
-        .data-info-content h3 {
-            color: #333;
-            margin-top: 25px;
-            margin-bottom: 12px;
-            font-size: 18px;
-        }
-        
-        .data-info-content p {
-            color: #555;
-            line-height: 1.6;
-            margin-bottom: 15px;
-        }
-        
-        .data-info-content ul {
-            color: #555;
-            line-height: 1.6;
-            margin-bottom: 15px;
-            padding-left: 20px;
-        }
-        
-        .data-info-content li {
-            margin-bottom: 8px;
-        }
-        
-        .data-info-content a {
-            color: #1976d2;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        
-        .data-info-content a:hover {
-            text-decoration: underline;
-        }
-        
-        .close-button {
+        .chart-legend {
             position: absolute;
-            top: 15px;
+            bottom: 50px;
+            left:   -220px;
             right: 20px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            font-weight: bold;
-            color: #666;
-            cursor: pointer;
-            width: 30px;
-            height: 30px;
             display: flex;
-            align-items: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 20px;
             justify-content: center;
-            border-radius: 50%;
-            transition: background-color 0.2s;
+            font-size: 12px;
+            padding: 15px;
+            background: transparent;
         }
         
-        .close-button:hover {
-            background: #f0f0f0;
-            color: #333;
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        .legend-line {
+            width: 20px;
+            height: 2px;
+            border-radius: 1px;
+        }
+        
         
         .highlight-box {
             background: #e3f2fd;
@@ -476,6 +411,60 @@
         .highlight-box p {
             margin: 0;
             color: #0d47a1;
+        }
+        
+        .data-info-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 30px;
+            max-width: 1050px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .data-info-section h2 {
+            color: #1976d2;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 24px;
+            border-bottom: 2px solid #1976d2;
+            padding-bottom: 10px;
+        }
+        
+        .data-info-section h3 {
+            color: #333;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+        
+        .data-info-section p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .data-info-section ul {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        
+        .data-info-section li {
+            margin-bottom: 8px;
+        }
+        
+        .data-info-section a {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .data-info-section a:hover {
+            text-decoration: underline;
         }
         
         /* Mobile Responsive Styles */
@@ -531,6 +520,15 @@
                 margin-bottom: 10px;
             }
             
+            .chart-legend {
+                position: static;
+                margin: 15px 0;
+                padding: 10px;
+                gap: 15px;
+                left: auto;
+                right: auto;
+            }
+            
             .chart-title {
                 text-align: center;
                 margin-left: 0;
@@ -575,18 +573,17 @@
                 font-size: 14px;
             }
             
-            .data-info-content {
-                margin: 10px;
-                padding: 20px;
-                max-width: none;
-                max-height: 90vh;
+            
+            .data-info-section {
+                margin: 20px 0;
+                padding: 20px 15px;
             }
             
-            .data-info-content h2 {
+            .data-info-section h2 {
                 font-size: 20px;
             }
             
-            .data-info-content h3 {
+            .data-info-section h3 {
                 font-size: 16px;
             }
         }
@@ -702,7 +699,7 @@
             
         </div>
         
-        <div class="temperature-context" id="temperature-context">
+        <div class="temperature-context" id="temperature-context" style="position: relative;">
             <!-- Temperature context message will be populated by JavaScript -->
         </div>
         
@@ -724,7 +721,6 @@
                             <select id="metric-select">
                                 <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
                             </select>
-                            <button class="info-button" id="data-info-btn" title="About ERA5 data and UTCI measurements">i</button>
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
                             *Limited metrics available in alpha version
@@ -736,20 +732,22 @@
                 <!-- Chart title will be populated by JavaScript -->
             </div>
             <div class="main-chart">
-                <svg id="main-svg" width="800" height="400"></svg>
+                <svg id="main-svg" width="720" height="400"></svg>
             </div>
             <div class="histogram-chart">
-                <svg id="histogram-svg" width="500" height="400"></svg>
+                <svg id="histogram-svg" width="420" height="400"></svg>
+            </div>
+            
+            <!-- Chart Legend -->
+            <div class="chart-legend" id="chart-legend">
+                <!-- Real legend will be populated here -->
             </div>
         </div>
         
         <div class="tooltip" id="tooltip"></div>
-    </div>
-
-    <!-- Data Information Popup -->
-    <div class="data-info-popup" id="data-info-popup">
-        <div class="data-info-content">
-            <button class="close-button" id="close-popup-btn">&times;</button>
+        
+        <!-- Data Information Section -->
+        <div class="data-info-section">
             <h2>About the Weather Data</h2>
             
             <h3>ERA5 Reanalysis Data</h3>
@@ -764,8 +762,8 @@
                 <p><strong>Why ERA5?</strong> It's considered the gold standard for climate reanalysis, providing consistent, quality-assured weather data that's used by researchers, meteorologists, and climate scientists worldwide.</p>
             </div>
             
-            <h3>UTCI (Universal Thermal Climate Index)</h3>
-            <p>The <strong>UTCI</strong> measures how hot or cold it actually feels to the human body, not just the air temperature. It accounts for:</p>
+            <h3>Appearent Temperature (UTCI)</h3>
+            <p>The <strong>UTCI</strong> (Universal Thermal Climate Index) measures how hot or cold it actually feels to the human body, not just the air temperature. It accounts for:</p>
             <ul>
                 <li><strong>Air temperature</strong> - The basic temperature measurement</li>
                 <li><strong>Humidity</strong> - How moisture affects heat perception</li>
@@ -789,6 +787,7 @@
             </ul>
         </div>
     </div>
+
 
     <!-- Mobile Orientation Popup -->
     <div class="orientation-popup" id="orientation-popup">
@@ -939,15 +938,15 @@
             }
 
             try {
-                // Show loading overlay on charts container
-                const chartsContainer = document.querySelector('.charts-container');
+                // Show loading overlay on temperature context area
+                const temperatureContext = document.getElementById('temperature-context');
                 const loadingOverlay = document.createElement('div');
-                loadingOverlay.className = 'chart-loading-overlay';
+                loadingOverlay.className = 'temperature-loading-overlay';
                 loadingOverlay.innerHTML = `
                     <div class="loading-spinner"></div>
-                    <div class="loading-text loading-dots">Fetching weather data from Open-Meteo API</div>
+                    <div class="loading-text loading-dots">Fetching weather data...</div>
                 `;
-                chartsContainer.appendChild(loadingOverlay);
+                temperatureContext.appendChild(loadingOverlay);
                 
                 document.getElementById('fetch-data-btn').disabled = true;
                 
@@ -956,7 +955,7 @@
                 
                 if (data.length === 0) {
                     // Remove loading overlay
-                    const loadingOverlay = document.querySelector('.chart-loading-overlay');
+                    const loadingOverlay = document.querySelector('.temperature-loading-overlay');
                     if (loadingOverlay) loadingOverlay.remove();
                     
                     d3.select("#temperature-context")
@@ -982,7 +981,7 @@
                 document.querySelector('.chart-controls').classList.add('show');
                 
                 // Remove loading overlay
-                let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
+                let loadingOverlayToRemove = document.querySelector('.temperature-loading-overlay');
                 if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
                 
                 // Auto-scroll on mobile after successful data fetch
@@ -1013,7 +1012,7 @@
                 showError(error.message || 'Unknown error occurred', errorDetails);
             } finally {
                 // Remove loading overlay in case of error
-                let finalLoadingOverlay = document.querySelector('.chart-loading-overlay');
+                let finalLoadingOverlay = document.querySelector('.temperature-loading-overlay');
                 if (finalLoadingOverlay) finalLoadingOverlay.remove();
                 
                 document.getElementById('fetch-data-btn').disabled = false;
@@ -1040,24 +1039,15 @@
         }
         
         function scrollToResults() {
-            if (isMobile()) {
-                // Scroll to temperature context first, then to charts
-                setTimeout(() => {
-                    const temperatureContext = document.getElementById('temperature-context');
-                    if (temperatureContext) {
-                        temperatureContext.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        
-                        // Then scroll to charts after a brief delay
-                        setTimeout(() => {
-                            const chartsContainer = document.querySelector('.charts-container');
-                            if (chartsContainer) {
-                                chartsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        }, 500);
-                    }
-                }, 300);
-            }
+            // Scroll to temperature context for both mobile and desktop
+            setTimeout(() => {
+                const temperatureContext = document.getElementById('temperature-context');
+                if (temperatureContext) {
+                    temperatureContext.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 300);
         }
+        
 
         // Initialize the application
         async function init() {
@@ -1120,26 +1110,9 @@
                     }
                 });
                 
-                // Add data info popup event listeners
-                document.getElementById('data-info-btn').addEventListener('click', () => {
-                    document.getElementById('data-info-popup').classList.add('show');
-                });
-                
-                document.getElementById('close-popup-btn').addEventListener('click', () => {
-                    document.getElementById('data-info-popup').classList.remove('show');
-                });
-                
-                // Close popup when clicking outside content
-                document.getElementById('data-info-popup').addEventListener('click', (e) => {
-                    if (e.target.id === 'data-info-popup') {
-                        document.getElementById('data-info-popup').classList.remove('show');
-                    }
-                });
-                
-                // Close popups with Escape key
+                // Close orientation popup with Escape key
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
-                        document.getElementById('data-info-popup').classList.remove('show');
                         hideOrientationPopup();
                     }
                 });
