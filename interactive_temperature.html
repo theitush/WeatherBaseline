@@ -477,6 +477,202 @@
             margin: 0;
             color: #0d47a1;
         }
+        
+        /* Mobile Responsive Styles */
+        @media screen and (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 0;
+            }
+            
+            .controls {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            .year-range-control {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            
+            .year-range-control select,
+            .year-range-control input,
+            .year-range-control button {
+                width: 100%;
+                margin: 0;
+                margin-bottom: 10px;
+            }
+            
+            #city-select {
+                width: 100% !important;
+            }
+            
+            .charts-container {
+                width: 100%;
+                height: auto;
+                min-height: 800px;
+                padding: 15px;
+                position: relative;
+                overflow-x: auto;
+            }
+            
+            .chart-controls {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            
+            .chart-controls .year-range-control {
+                margin-bottom: 10px;
+            }
+            
+            .chart-title {
+                text-align: center;
+                margin-left: 0;
+                font-size: 16px;
+                padding: 10px 0;
+            }
+            
+            .main-chart {
+                position: static;
+                margin-bottom: 20px;
+                width: 100%;
+                overflow-x: auto;
+            }
+            
+            .histogram-chart {
+                position: static;
+                left: 0;
+                width: 100%;
+                overflow-x: auto;
+            }
+            
+            #main-svg {
+                width: 100%;
+                min-width: 600px;
+                height: 350px;
+            }
+            
+            #histogram-svg {
+                width: 100%;
+                min-width: 400px;
+                height: 350px;
+            }
+            
+            .chart-controls.show ~ .chart-title ~ .main-chart,
+            .chart-controls.show ~ .chart-title ~ .histogram-chart {
+                top: auto;
+            }
+            
+            .temperature-context {
+                margin: 15px 0;
+                padding: 15px;
+                font-size: 14px;
+            }
+            
+            .data-info-content {
+                margin: 10px;
+                padding: 20px;
+                max-width: none;
+                max-height: 90vh;
+            }
+            
+            .data-info-content h2 {
+                font-size: 20px;
+            }
+            
+            .data-info-content h3 {
+                font-size: 16px;
+            }
+        }
+        
+        /* Mobile Landscape Orientation Popup */
+        .orientation-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .orientation-popup.show {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .orientation-popup-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+        
+        .orientation-popup-content h2 {
+            color: #1976d2;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        
+        .orientation-popup-content p {
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        
+        .rotate-icon {
+            font-size: 48px;
+            margin: 15px 0;
+            animation: rotatePhone 2s infinite ease-in-out;
+        }
+        
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(90deg); }
+            75% { transform: rotate(90deg); }
+        }
+        
+        .orientation-popup button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .orientation-popup button:hover {
+            background: #1565c0;
+        }
+        
+        /* Hide orientation popup on landscape or desktop */
+        @media screen and (orientation: landscape) and (max-width: 768px) {
+            .orientation-popup {
+                display: none !important;
+            }
+        }
+        
+        @media screen and (min-width: 769px) {
+            .orientation-popup {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -591,6 +787,17 @@
                 <li><a href="https://www.utci.org/" target="_blank">UTCI Official Website</a> - Universal Thermal Climate Index</li>
                 <li><a href="https://utci.lobelia.earth/what-is-utci" target="_blank">What is UTCI?</a> - Comprehensive UTCI explanation</li>
             </ul>
+        </div>
+    </div>
+
+    <!-- Mobile Orientation Popup -->
+    <div class="orientation-popup" id="orientation-popup">
+        <div class="orientation-popup-content">
+            <h2>📱 Better Experience</h2>
+            <div class="rotate-icon">📱</div>
+            <p>For the best viewing experience, please rotate your device to landscape mode (sideways).</p>
+            <p>The charts and data will be much easier to read!</p>
+            <button id="orientation-continue-btn">Got it!</button>
         </div>
     </div>
 
@@ -778,6 +985,9 @@
                 let loadingOverlayToRemove = document.querySelector('.chart-loading-overlay');
                 if (loadingOverlayToRemove) loadingOverlayToRemove.remove();
                 
+                // Auto-scroll on mobile after successful data fetch
+                scrollToResults();
+                
             } catch (error) {
                 console.error('Error fetching API data:', error);
                 
@@ -810,6 +1020,45 @@
             }
         }
 
+        // Mobile detection and orientation popup functions
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+        
+        function isPortrait() {
+            return window.innerHeight > window.innerWidth;
+        }
+        
+        function showOrientationPopup() {
+            if (isMobile() && isPortrait()) {
+                document.getElementById('orientation-popup').classList.add('show');
+            }
+        }
+        
+        function hideOrientationPopup() {
+            document.getElementById('orientation-popup').classList.remove('show');
+        }
+        
+        function scrollToResults() {
+            if (isMobile()) {
+                // Scroll to temperature context first, then to charts
+                setTimeout(() => {
+                    const temperatureContext = document.getElementById('temperature-context');
+                    if (temperatureContext) {
+                        temperatureContext.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        
+                        // Then scroll to charts after a brief delay
+                        setTimeout(() => {
+                            const chartsContainer = document.querySelector('.charts-container');
+                            if (chartsContainer) {
+                                chartsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 500);
+                    }
+                }, 300);
+            }
+        }
+
         // Initialize the application
         async function init() {
             try {
@@ -837,8 +1086,39 @@
                 // Initialize city selector with cached cities
                 await initializeCitySelector();
                 
+                // Show orientation popup for mobile portrait users
+                showOrientationPopup();
+                
                 // Add event listeners
-                document.getElementById('fetch-data-btn').addEventListener('click', fetchApiData);
+                document.getElementById('fetch-data-btn').addEventListener('click', () => {
+                    fetchApiData();
+                    // Show orientation popup again when they try to fetch data
+                    if (isMobile() && isPortrait()) {
+                        setTimeout(showOrientationPopup, 100);
+                    }
+                });
+                
+                // Add orientation popup event listeners
+                document.getElementById('orientation-continue-btn').addEventListener('click', hideOrientationPopup);
+                
+                // Hide orientation popup when orientation changes
+                window.addEventListener('orientationchange', () => {
+                    setTimeout(() => {
+                        if (!isPortrait() || !isMobile()) {
+                            hideOrientationPopup();
+                        }
+                    }, 500); // Delay to allow orientation change to complete
+                });
+                
+                // Also listen to resize events for more responsive behavior
+                window.addEventListener('resize', () => {
+                    if (!isPortrait() || !isMobile()) {
+                        hideOrientationPopup();
+                    } else if (isMobile() && isPortrait()) {
+                        // Only show if user hasn't dismissed it yet
+                        setTimeout(showOrientationPopup, 100);
+                    }
+                });
                 
                 // Add data info popup event listeners
                 document.getElementById('data-info-btn').addEventListener('click', () => {
@@ -856,10 +1136,11 @@
                     }
                 });
                 
-                // Close popup with Escape key
+                // Close popups with Escape key
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
                         document.getElementById('data-info-popup').classList.remove('show');
+                        hideOrientationPopup();
                     }
                 });
                 
