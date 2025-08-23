@@ -105,6 +105,18 @@
             height: 580px;
             max-width: 1050px;
             margin: 0 auto;
+            overflow-x: hidden;
+        }
+        
+        /* Desktop SVG sizing - maintain original dimensions */
+        #main-svg {
+            width: 720px;
+            height: 400px;
+        }
+        
+        #histogram-svg {
+            width: 420px;
+            height: 400px;
         }
         
         .chart-controls {
@@ -471,6 +483,12 @@
         @media screen and (max-width: 768px) {
             body {
                 margin: 10px;
+                overflow-x: hidden;
+            }
+            
+            * {
+                max-width: 100vw;
+                box-sizing: border-box;
             }
             
             .container {
@@ -499,6 +517,11 @@
             
             #city-select {
                 width: 100% !important;
+                max-width: 100vw !important;
+            }
+            
+            .year-range-control div[style*="width: 320px"] {
+                width: 100% !important;
             }
             
             .charts-container {
@@ -507,7 +530,7 @@
                 min-height: 800px;
                 padding: 15px;
                 position: relative;
-                overflow-x: auto;
+                overflow-x: hidden;
             }
             
             .chart-controls {
@@ -540,25 +563,29 @@
                 position: static;
                 margin-bottom: 20px;
                 width: 100%;
-                overflow-x: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
             }
             
             .histogram-chart {
                 position: static;
                 left: 0;
                 width: 100%;
-                overflow-x: auto;
+                max-width: 100vw;
+                overflow-x: hidden;
             }
             
             #main-svg {
                 width: 100%;
-                min-width: 600px;
+                min-width: 320px;
+                max-width: 100vw;
                 height: 350px;
             }
             
             #histogram-svg {
                 width: 100%;
-                min-width: 400px;
+                min-width: 280px;
+                max-width: 100vw;
                 height: 350px;
             }
             
@@ -732,10 +759,10 @@
                 <!-- Chart title will be populated by JavaScript -->
             </div>
             <div class="main-chart">
-                <svg id="main-svg" width="720" height="400"></svg>
+                <svg id="main-svg" viewBox="0 0 720 400"></svg>
             </div>
             <div class="histogram-chart">
-                <svg id="histogram-svg" width="420" height="400"></svg>
+                <svg id="histogram-svg" viewBox="0 0 420 400"></svg>
             </div>
             
             <!-- Chart Legend -->
