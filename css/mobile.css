@@ -1,4 +1,4 @@
-/* Mobile Styles */
+/* Mobile Styles - Simplified */
 @media (max-width: 768px) {
     body {
         margin: 0;
@@ -46,28 +46,17 @@
         transform: translateY(0);
     }
 
-    /* Charts section */
+    /* Charts section - simplified */
     .mobile-charts-section {
-        min-height: 300vh;
         background: white;
         position: relative;
         display: none;
-        padding: 20px 0;
-        overflow: visible;
+        padding: 20px;
+        min-height: 100vh;
     }
 
     .mobile-charts-section.show {
         display: block;
-    }
-
-    /* Ensure charts container is visible */
-    .mobile-charts-section .charts-container {
-        position: relative;
-        width: 100%;
-        height: 100vh;
-        min-height: 100vh;
-        background: white;
-        overflow: visible;
     }
 
     /* Hide desktop title */
@@ -101,11 +90,13 @@
         flex-direction: column;
         gap: 15px;
         align-items: stretch;
+        margin-bottom: 15px;
     }
 
     .year-range-control label {
         font-size: 16px;
         margin-bottom: 5px;
+        font-weight: bold;
     }
 
     .year-range-control select,
@@ -147,200 +138,109 @@
         font-size: 18px;
     }
 
-    /* Charts container mobile */
-    .charts-container {
-        position: relative;
-        width: 100%;
-        height: auto;
-        margin: 0;
-        padding: 0;
-        background: transparent;
-        box-shadow: none;
-        overflow: visible;
-    }
-
-    /* Hide desktop chart controls initially */
-    .chart-controls {
-        display: none !important;
-    }
-
-    /* Mobile chart controls */
-    .mobile-chart-controls {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        right: 20px;
-        background: white;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        z-index: 1000;
-        display: none;
+    /* Chart controls for mobile charts section */
+    .mobile-charts-section .chart-controls {
+        display: flex !important;
         flex-direction: column;
         gap: 15px;
+        margin-bottom: 20px;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
     }
 
-    .mobile-chart-controls.show {
+    .mobile-charts-section .chart-controls .year-range-control {
         display: flex;
-    }
-
-    .mobile-chart-controls select {
-        width: 100%;
-        padding: 12px;
-        font-size: 16px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-    }
-
-    /* Chart positioning and transforms - Mobile specific */
-    .mobile-charts-section .histogram-chart {
-        position: absolute;
-        left: 50%;
-        top: 200px;
-        /* Position histogram with fixed top position */
-        transform: translate(-50%, 0);
-        transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        transform-origin: center center;
-        z-index: 5;
-        width: 350px;
-        height: 400px;
-        overflow: visible;
-        background: white;
-    }
-
-    /* Override any desktop histogram styling that might be interfering */
-    .mobile-charts-section .histogram-chart svg {
-        max-width: 95vw !important;
-        max-height: 70vh !important;
-        width: 350px !important;
-        height: 400px !important;
-    }
-
-    /* Ensure the histogram chart container is properly sized */
-    .mobile-charts-section .histogram-chart {
-        width: 95vw;
-        height: 70vh;
-        display: flex;
+        flex-direction: row;
         align-items: center;
+        gap: 10px;
+        margin-bottom: 0;
+    }
+
+    .mobile-charts-section .chart-controls label {
+        min-width: 100px;
+        margin-bottom: 0;
+    }
+
+    .mobile-charts-section .chart-controls select {
+        flex: 1;
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    .info-button {
+        min-width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #1976d2;
+        color: white;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+
+    /* Charts container - simplified layout like desktop but rotated */
+    .charts-container {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    /* Chart title */
+    .chart-title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    /* Histogram positioned like desktop but upright */
+    .histogram-chart {
+        width: 100%;
+        max-width: 350px;
+        display: flex;
         justify-content: center;
     }
 
-    /* Histogram animation states */
-    .mobile-charts-section .histogram-chart.mobile-rotating {
-        /* Rotate 90 degrees clockwise + flip horizontally so low temps end up at bottom */
-        transform: translate(-50%, 0) rotate(90deg) scaleX(-1) scale(0.8);
-    }
-
-    .mobile-charts-section .histogram-chart.mobile-final {
-        /* Final sideways position, rotated right + flipped so low temps at bottom */
-        transform: translate(25%, 0) rotate(90deg) scaleX(-1) scale(0.6);
-        left: 100%;
-        top: 150px;
-    }
-
-    /* Hide X-axis after rotation starts */
-    .mobile-charts-section .histogram-chart.mobile-rotating .x-axis,
-    .mobile-charts-section .histogram-chart.mobile-final .x-axis {
-        opacity: 0;
-    }
-
-    /* Keep Y-axis (right) visible and readable during rotation */
-    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-right,
-    .mobile-charts-section .histogram-chart.mobile-final .y-axis-right {
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: block !important;
-    }
-    
-    /* Hide y-axis during rotation, show it normally in final state */
-    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-right {
-        opacity: 0 !important;
-    }
-    
-    .mobile-charts-section .histogram-chart.mobile-final .y-axis-right {
-        opacity: 1 !important;
-        transform: none !important;
-    }
-    
-    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-text,
-    .mobile-charts-section .histogram-chart.mobile-final .y-axis-text {
-        font-size: 12px !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        fill: #333 !important;
-        stroke: none !important;
-        font-weight: bold !important;
-        transform-box: fill-box !important;
-        /* Counter-rotate to keep text readable */
-        transform: rotate(-90deg) !important;
-        transform-origin: 50% 50% !important;
-    }
-    
-    
-    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-right line,
-    .mobile-charts-section .histogram-chart.mobile-final .y-axis-right line {
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-    
-    /* Catch-all for any text elements in the y-axis during rotation */
-    .mobile-charts-section .histogram-chart.mobile-rotating .y-axis-right *,
-    .mobile-charts-section .histogram-chart.mobile-final .y-axis-right * {
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
-    /* Keep current temperature line visible */
-    .mobile-charts-section .histogram-chart .current-temp-line {
-        opacity: 1;
-    }
-    
-
-    .mobile-charts-section .main-chart {
-        position: absolute;
-        left: -400px;
-        top: 150px;
-        transform: translate(0, 0) scale(0.7);
-        transition: all 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        opacity: 0;
-        z-index: 4;
-        width: 300px;
-        height: 300px;
-        background: white;
-        overflow: visible;
-        border: 1px solid #ddd;
-    }
-
-    .mobile-charts-section .main-chart.mobile-visible {
-        left: 5px;
-        opacity: 1;
-        transform: translate(0, 0) scale(0.7);
-    }
-
-    /* Ensure main chart SVG is properly sized */
-    .mobile-charts-section .main-chart svg {
-        max-width: 100% !important;
-        max-height: 100% !important;
-        width: 320px !important;
-        height: 320px !important;
-    }
-
-    /* Chart title mobile */
-    .chart-title {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        right: 20px;
-        text-align: center;
-        margin: 0;
-        font-size: 18px;
-        z-index: 10;
-    }
-
-    /* SVG responsive sizing */
-    #main-svg, #histogram-svg {
+    .histogram-chart svg {
         max-width: 100%;
         height: auto;
+    }
+
+    /* Main chart positioned underneath and on its side */
+    .main-chart {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transform: rotate(90deg);
+        margin: 80px 0;
+        overflow: visible;
+        /* Container needs to be big enough for rotated 350x200 -> 200x350 */
+        height: 380px;  /* Slightly larger than 350px to account for rotation */
+        min-height: 380px;
+    }
+
+    .main-chart svg {
+        width: 350px !important;
+        height: 200px !important;
+        max-width: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        transform-origin: center center;
+    }
+
+    /* Ensure the charts section has enough height */
+    .mobile-charts-section {
+        background: white;
+        position: relative;
+        display: none;
+        padding: 20px;
+        min-height: 120vh;
     }
 
     /* Loading spinner mobile */
@@ -376,7 +276,7 @@
         to { transform: rotate(360deg); }
     }
 
-    /* Hide elements not needed on mobile initially */
+    /* Data info popup adjustments */
     .data-info-popup {
         padding: 10px;
     }
@@ -385,5 +285,17 @@
         max-width: 90vw;
         margin: 20px;
         padding: 20px;
+    }
+
+    /* Tooltip positioning */
+    .tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1000;
     }
 }

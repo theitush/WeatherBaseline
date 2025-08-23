@@ -1,12 +1,7 @@
-// Mobile interaction logic
+// Mobile controller - Simplified
 class MobileController {
     constructor() {
         this.isMobile = window.innerWidth <= 768;
-        this.mobileScrollState = 'controls'; // 'controls', 'loading', 'histogram', 'rotating', 'final'
-        this.previousScrollState = 'controls'; // Track previous state to avoid re-rendering
-        this.isDataLoaded = false;
-        this.chartRenderer = null; // Store chart renderer locally
-        
         this.init();
     }
 
@@ -26,83 +21,11 @@ class MobileController {
             const wasMobile = this.isMobile;
             this.checkMobile();
             
-            // If switching between mobile and desktop, reload the page for now
+            // If switching between mobile and desktop, reload the page
             if (wasMobile !== this.isMobile) {
                 location.reload();
             }
         });
-    }
-
-    // Mobile scroll handler
-    handleMobileScroll() {
-        if (!this.isMobile || !this.isDataLoaded) return;
-        
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const windowHeight = window.innerHeight;
-        const chartsSection = document.getElementById('mobile-charts-section');
-        
-        if (!chartsSection) return;
-        
-        const chartsSectionTop = chartsSection.offsetTop;
-        const histogramChart = chartsSection.querySelector('.histogram-chart');
-        const mainChart = chartsSection.querySelector('.main-chart');
-        const mobileChartControls = document.getElementById('mobile-chart-controls');
-        
-        // Calculate scroll relative to charts section
-        const relativeScroll = scrollTop - chartsSectionTop;
-        
-        let newState;
-        if (relativeScroll < 150) {
-            newState = 'histogram';
-        } else if (relativeScroll < 500) {
-            newState = 'rotating';
-        } else {
-            newState = 'final';
-        }
-        
-        // Only render histogram when state actually changes, not on every scroll
-        
-        // Only update if state has changed
-        if (newState !== this.previousScrollState) {
-            this.previousScrollState = newState;
-            this.mobileScrollState = newState;
-            
-            if (newState === 'histogram') {
-                // State 1: Show histogram upright and centered
-                if (histogramChart) {
-                    histogramChart.classList.remove('mobile-rotating', 'mobile-final');
-                }
-                if (mainChart) {
-                    mainChart.classList.remove('mobile-visible');
-                }
-                if (mobileChartControls) {
-                    mobileChartControls.classList.remove('show');
-                }
-            } else if (newState === 'rotating') {
-                // State 2: Start rotating histogram
-                if (histogramChart) {
-                    histogramChart.classList.add('mobile-rotating');
-                    histogramChart.classList.remove('mobile-final');
-                }
-                if (mainChart) {
-                    mainChart.classList.remove('mobile-visible');
-                }
-                if (mobileChartControls) {
-                    mobileChartControls.classList.remove('show');
-                }
-            } else {
-                // State 3: Final position with both charts
-                if (histogramChart) {
-                    histogramChart.classList.add('mobile-rotating', 'mobile-final');
-                }
-                if (mainChart) {
-                    mainChart.classList.add('mobile-visible');
-                }
-                if (mobileChartControls) {
-                    mobileChartControls.classList.add('show');
-                }
-            }
-        }
     }
 
     // Show mobile loading
@@ -136,18 +59,6 @@ class MobileController {
         
         if (chartsSection) {
             chartsSection.classList.add('show');
-            this.isDataLoaded = true;
-            
-            const histogramChart = chartsSection.querySelector('.histogram-chart');
-            const mainChart = chartsSection.querySelector('.main-chart');
-            
-            // Ensure histogram starts upright and main chart is hidden
-            if (histogramChart) {
-                histogramChart.classList.remove('mobile-rotating', 'mobile-final');
-            }
-            if (mainChart) {
-                mainChart.classList.remove('mobile-visible');
-            }
             
             // Auto scroll to charts section
             setTimeout(() => {
@@ -155,13 +66,6 @@ class MobileController {
                     behavior: 'smooth',
                     block: 'start'
                 });
-                
-                // Setup scroll listener after charts are shown
-                setTimeout(() => {
-                    window.addEventListener('scroll', () => this.handleMobileScroll(), { passive: true });
-                    // Trigger initial scroll check
-                    this.handleMobileScroll();
-                }, 500);
             }, 300);
         }
     }
@@ -184,69 +88,56 @@ class MobileController {
         // Set values
         startYearMobile.value = startYear.value;
         metricSelectMobile.value = metricSelect.value;
-        
-        // Add event listeners for mobile controls
-        startYearMobile.addEventListener('change', (e) => {
-            startYear.value = e.target.value;
-            startYear.dispatchEvent(new Event('change'));
-        });
-        
-        metricSelectMobile.addEventListener('change', (e) => {
-            metricSelect.value = e.target.value;
-            metricSelect.dispatchEvent(new Event('change'));
-        });
     }
 
-    // Override histogram rendering for mobile (vertical bars)
-    renderMobileHistogram(chartRenderer, isFlipped = false) {
+    // Render vertical histogram for mobile (override the desktop version)
+    renderMobileHistogram(chartRenderer) {
         if (!this.isMobile) return;
         
-        // Get the histogram SVG
+        // Clear and rebuild the histogram SVG completely
         const histogramSvg = d3.select("#histogram-svg");
-        
-        // Clear existing content
         histogramSvg.selectAll("*").remove();
         
-        // Get data from chart renderer
+        // Use the exact same data that the main chart uses
         const data = chartRenderer.dataProcessor.filteredData;
         const metric = chartRenderer.dataProcessor.currentMetric;
         
-        if (!data || data.length === 0) return;
+        if (!data || data.length === 0) {
+            console.log('No data available for mobile histogram');
+            return;
+        }
         
-        // Set up dimensions for vertical bars - more room at top
-        const margin = { top: 40, right: 30, bottom: 80, left: 60 };
+        console.log('Mobile histogram data length:', data.length, 'Metric:', metric);
+        
+        // Mobile histogram dimensions
+        const margin = { top: 20, right: 30, bottom: 60, left: 50 };
         const width = 350 - margin.left - margin.right;
-        const height = 400 - margin.top - margin.bottom;
+        const height = 300 - margin.top - margin.bottom;
         
-        // Create main group
         const g = histogramSvg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
         
-        // Get temperature values
+        // Get temperature values and create bins
         const values = data.map(d => d[metric]);
-        
-        // Create bins for histogram
         const bins = d3.histogram()
             .domain(d3.extent(values))
             .thresholds(15)(values);
         
-        // Set up scales - X is temperature, Y is count
-        const tempExtent = d3.extent(values);
+        // Use the EXACT same temperature domain as the main chart (with padding)
         const xScale = d3.scaleLinear()
-            .domain(isFlipped ? [tempExtent[1], tempExtent[0]] : tempExtent)
+            .domain(chartRenderer.yScale.domain())  // Same as main chart!
             .range([0, width]);
-            
             
         const yScale = d3.scaleLinear()
             .domain([0, d3.max(bins, d => d.length)])
             .range([height, 0]);
         
-        // Create vertical bars with proper colors
+        // Create vertical bars
         g.selectAll(".bar")
             .data(bins)
             .enter().append("rect")
             .attr("class", "bar")
-            .attr("x", d => xScale(d.x0)) // Normal positioning
+            .attr("x", d => xScale(d.x0))
             .attr("y", d => yScale(d.length))
             .attr("width", d => Math.max(0, xScale(d.x1) - xScale(d.x0) - 1))
             .attr("height", d => height - yScale(d.length))
@@ -254,54 +145,57 @@ class MobileController {
             .attr("stroke", "white")
             .attr("stroke-width", 0.5);
         
-        // Add X axis (temperature) - normal left-to-right orientation initially
-        // Low temps on left, high temps on right (normal axis)
+        // Add X axis (temperature)
         g.append("g")
             .attr("class", "x-axis")
             .attr("transform", `translate(0,${height})`)
             .call(d3.axisBottom(xScale).ticks(6));
         
-        // Add Y axis (count) on RIGHT side (will be bottom after rotation)
-        const yAxis = g.append("g")
-            .attr("class", "y-axis-right")
-            .attr("transform", `translate(${width},0)`)
-            .call(d3.axisRight(yScale).ticks(6));
-            
-        // Style the text elements
-        yAxis.selectAll("text")
+        // Add Y axis (count)
+        g.append("g")
+            .attr("class", "y-axis")
+            .call(d3.axisLeft(yScale).ticks(6));
+        
+        // Add axis labels
+        g.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left)
+            .attr("x", 0 - (height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
             .style("font-size", "12px")
-            .style("fill", "#333")
-            .style("opacity", "1")
-            .attr("class", "y-axis-text");
+            .text("Count");
         
-        // Add current temperature line - get from target date data
-        const targetDate = document.getElementById('target-date').value;
-        console.log('Target date:', targetDate, 'Data length:', data.length);
+        g.append("text")
+            .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
+            .style("text-anchor", "middle")
+            .style("font-size", "12px")
+            .text("Temperature (°C)");
         
-        if (targetDate && data.length > 0) {
-            // Find the current day's average temperature
-            const targetData = data.find(d => d.date.toISOString().split('T')[0] === targetDate);
-            console.log('Target data found:', !!targetData);
+        // Use the SAME logic as desktop charts - don't duplicate!
+        const currentDateData = chartRenderer.dataProcessor.getCurrentDateData(chartRenderer.dataProcessor.getFullData());
+        
+        if (currentDateData.length > 0) {
+            const currentTemp = currentDateData[0][metric];
+            console.log('Mobile histogram: Using same currentTemp as desktop:', currentTemp);
             
-            if (targetData) {
-                const currentTemp = targetData[metric];
-                console.log('Adding current temp line at:', currentTemp, 'X position:', xScale(currentTemp));
-                
-                g.append("line")
-                    .attr("class", "current-temp-line")
-                    .attr("x1", xScale(currentTemp))
-                    .attr("x2", xScale(currentTemp))
-                    .attr("y1", 0)
-                    .attr("y2", height)
-                    .attr("stroke", "#333")
-                    .attr("stroke-width", 3)
-                    .attr("stroke-dasharray", "5,5")
-                    .attr("opacity", 1);
-            } else {
-                console.log('No target data found. Available dates:', data.slice(0,3).map(d => d.date.toISOString().split('T')[0]));
-            }
+            g.append("line")
+                .attr("class", "current-temp-line")
+                .attr("x1", xScale(currentTemp))
+                .attr("x2", xScale(currentTemp))
+                .attr("y1", 0)
+                .attr("y2", height)
+                .attr("stroke", "#333")
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "5,5")
+                .attr("opacity", 1);
+            
+            // Store for alignment  
+            this.currentTemp = currentTemp;
         }
     }
+
+    // No need for alignment function - both charts now use the same data source!
 
     // Setup mobile info button
     setupMobileInfoButton() {
