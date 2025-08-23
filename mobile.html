@@ -65,12 +65,13 @@
                 <!-- Chart title will be populated by JavaScript -->
             </div>
             
+            <!-- 🎯 PERFECT ALIGNMENT: Histogram width = 340px usable + margins -->
             <div class="charts-container">
                 <div class="histogram-chart">
-                    <svg id="histogram-svg" width="350" height="300"></svg>
+                    <svg id="histogram-svg" width="455" height="400"></svg>
                 </div>
                 <div class="main-chart">
-                    <svg id="main-svg" width="350" height="200" viewBox="0 0 350 200" preserveAspectRatio="xMidYMid meet"></svg>
+                    <svg id="main-svg" width="800" height="400" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet"></svg>
                 </div>
             </div>
         </div>
@@ -274,10 +275,10 @@
                 uiController.initializeYearControls();
                 uiController.updateCharts();
                 
-                // Override histogram with mobile version (vertical bars)
+                // Debug main chart after rendering (original chartRenderer now handles mobile)
                 setTimeout(() => {
-                    mobileController.renderMobileHistogram(chartRenderer);
-                }, 100);
+                    mobileController.debugMainChart(chartRenderer);
+                }, 500);  // Debug after everything is rendered
                 
                 // Update chart title with formatted date
                 const chartTitle = document.getElementById('chart-title');

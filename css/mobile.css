@@ -180,13 +180,13 @@
         margin-left: 10px;
     }
 
-    /* Charts container - simplified layout like desktop but rotated */
+    /* ✅ FINAL: Tight chart spacing */
     .charts-container {
         width: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 20px;
+        gap: 0px;  /* 🎛️ ADJUST: 0px=touching, 10px=small gap, 20px=larger gap */
     }
 
     /* Chart title */
@@ -198,36 +198,39 @@
         color: #333;
     }
 
-    /* Histogram positioned like desktop but upright */
+    /* ✅ FIXED: Histogram with proper tight height */
     .histogram-chart {
         width: 100%;
-        max-width: 350px;
+        max-width: 455px;
         display: flex;
         justify-content: center;
+        height: 400px;  /* 🔧 EXACT height, no extra space */
+        min-height: 400px;  /* Match SVG height exactly */
+        margin: 0px;  /* Tight spacing */
     }
 
     .histogram-chart svg {
         max-width: 100%;
-        height: auto;
+        height: 400px !important;
+        width: 455px !important;  /* 340px usable + 115px margins for perfect alignment */
     }
 
-    /* Main chart positioned underneath and on its side */
+    /* ✅ FINAL: Main chart with tight spacing */
     .main-chart {
         width: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
         transform: rotate(90deg);
-        margin: 80px 0;
+        margin: 0px;  /* 🎛️ ADJUST: 0px=touching, 10px=small gap, 20px=more space */
         overflow: visible;
-        /* Container needs to be big enough for rotated 350x200 -> 200x350 */
-        height: 380px;  /* Slightly larger than 350px to account for rotation */
-        min-height: 380px;
+        height: 820px;
+        min-height: 820px;
     }
 
     .main-chart svg {
-        width: 350px !important;
-        height: 200px !important;
+        width: 800px !important;  /* Changed from 350px to match config */
+        height: 400px !important;  /* Changed from 200px to match config */
         max-width: none !important;
         max-height: none !important;
         overflow: visible !important;

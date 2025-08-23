@@ -74,18 +74,50 @@ class ChartRenderer {
         const extents = this.dataProcessor.getDataExtents();
         if (!extents) return;
         
+        const isMobile = window.innerWidth <= 768;
+        
         this.xScale.domain(extents.dateExtent);
         this.yScale.domain([extents.tempExtent[0] - 2, extents.tempExtent[1] + 2]);
-        this.histYScale.domain(this.yScale.domain());
         this.colorScale.domain([startYear, endYear]);
         
-        // Update histogram x scale
+        // 🔄 REVERSE TIME AXIS for mobile (recent years at top after rotation)
+        if (isMobile) {
+            console.log('🔄 REVERSING time axis for mobile - recent years at top');
+            console.log('📅 Original xScale range:', this.xScale.range());
+            this.xScale.range([this.config.mainWidth, 0]); // Reversed: newest dates map to 0 (top after rotation)
+            console.log('📅 Reversed xScale range:', this.xScale.range());
+        } else {
+            this.xScale.range([0, this.config.mainWidth]); // Normal: oldest to newest left to right
+        }
+        
+        // Update histogram scales (different for mobile vs desktop)
         const bins = d3.histogram()
             .domain(this.yScale.domain())
             .thresholds(30)
             (this.dataProcessor.getFilteredData().map(d => d[this.dataProcessor.currentMetric]));
         
-        this.histXScale.domain([0, d3.max(bins, d => d.length)]);
+        if (isMobile) {
+            // 🎯 PERFECT ALIGNMENT: Make histogram temp axis same 340px as main chart
+            console.log('🎯 PERFECT ALIGNMENT: Making histogram use same 340px temperature range');
+            
+            this.mobileHistHeight = 140;
+            
+            // After rotation, main chart's Y-axis (temperature) becomes horizontal 340px
+            // So histogram's X-axis (temperature) must also be 340px for perfect alignment
+            this.histXScale.domain(this.yScale.domain());    // Same temperature domain
+            this.histXScale.range([0, this.config.mainHeight]); // Same 340px range as main chart Y
+            this.histYScale.range([this.mobileHistHeight, 0]);
+            this.histYScale.domain([0, d3.max(bins, d => d.length)]);
+            
+            console.log('🎯 ALIGNMENT CHECK:');
+            console.log('📊 Main chart temp axis (Y, becomes horizontal after rotation):', this.yScale.range());
+            console.log('📊 Histogram temp axis (X, horizontal):', this.histXScale.range());
+            console.log('✅ Should be identical for perfect alignment');
+        } else {
+            // Desktop: X = count, Y = temperature (horizontal bars) - use full height
+            this.histXScale.domain([0, d3.max(bins, d => d.length)]);  // count domain
+            this.histYScale.domain(this.yScale.domain());  // temperature domain (same as before)
+        }
         
         // Track year range change for animation direction
         const currentYearRange = endYear - startYear + 1;
@@ -94,6 +126,12 @@ class ChartRenderer {
         
         // Store animation direction globally
         window.isAddingYears = isAddingYears;
+    }
+
+    // Helper method to get correct histogram height for mobile vs desktop
+    getHistHeight() {
+        const isMobile = window.innerWidth <= 768;
+        return isMobile ? this.mobileHistHeight : this.config.histHeight;
     }
 
     // Create smooth fade transition
@@ -472,6 +510,7 @@ class ChartRenderer {
 
     // Draw histogram bars
     drawHistogramBars(bins) {
+        const isMobile = window.innerWidth <= 768;
         
         const bars = this.histG.selectAll(".bar")
             .data(bins, (_, i) => `bin_${i}`);
@@ -480,36 +519,61 @@ class ChartRenderer {
         bars.exit()
             .transition()
             .duration(500)
-            .attr("width", 0)
+            .attr(isMobile ? "height" : "width", 0)
             .attr("opacity", 0)
             .remove();
         
-        // Update existing bars
-        bars.transition()
-            .duration(500)
-            .attr("y", d => this.histYScale(d.x1))
-            .attr("width", d => this.histXScale(d.length))
-            .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
-        
-        // Add new bars
-        bars.enter()
-            .append("rect")
-            .attr("class", "bar")
-            .attr("x", 0)
-            .attr("y", d => this.histYScale(d.x1))
-            .attr("width", 0)
-            .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
-            .attr("opacity", 1)
-            .transition()
-            .duration(500)
-            .attr("width", d => this.histXScale(d.length));
+        if (isMobile) {
+            // Mobile: Vertical bars (temperature on X-axis, count on Y-axis)
+            bars.transition()
+                .duration(500)
+                .attr("x", d => this.histXScale(d.x0))
+                .attr("y", d => this.histYScale(d.length))
+                .attr("width", d => Math.max(0, this.histXScale(d.x1) - this.histXScale(d.x0) - 1))
+                .attr("height", d => this.getHistHeight() - this.histYScale(d.length))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
+            
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", d => this.histXScale(d.x0))
+                .attr("y", this.getHistHeight())
+                .attr("width", d => Math.max(0, this.histXScale(d.x1) - this.histXScale(d.x0) - 1))
+                .attr("height", 0)
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
+                .attr("opacity", 1)
+                .transition()
+                .duration(500)
+                .attr("y", d => this.histYScale(d.length))
+                .attr("height", d => this.getHistHeight() - this.histYScale(d.length));
+        } else {
+            // Desktop: Horizontal bars (count on X-axis, temperature on Y-axis)
+            bars.transition()
+                .duration(500)
+                .attr("y", d => this.histYScale(d.x1))
+                .attr("width", d => this.histXScale(d.length))
+                .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
+            
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", 0)
+                .attr("y", d => this.histYScale(d.x1))
+                .attr("width", 0)
+                .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
+                .attr("opacity", 1)
+                .transition()
+                .duration(500)
+                .attr("width", d => this.histXScale(d.length));
+        }
     }
 
     // Draw histogram percentile brackets
     drawHistogramBrackets(currentTemp) {
         const filteredData = this.dataProcessor.getFilteredData();
+        const isMobile = window.innerWidth <= 768;
         
         // Calculate percentiles
         const higherCount = filteredData.filter(d => d[this.dataProcessor.currentMetric] > currentTemp).length;
@@ -517,62 +581,132 @@ class ChartRenderer {
         const percentHigher = (higherCount / totalCount * 100).toFixed(1);
         const percentLower = (100 - parseFloat(percentHigher)).toFixed(1);
         
-        // Bracket dimensions
-        const rightX = this.config.histWidth + 15;
-        const bracketWidth = 18;
-        const yMid = this.histYScale(currentTemp);
-        const yTop = 15;
-        const yBottom = this.config.histHeight - 15;
-        
-        // Upper bracket
-        const upperBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
-        
-        upperBracketGroup.append("path")
-            .attr("d", `M ${rightX} ${yTop} 
-                       L ${rightX + bracketWidth * 0.5} ${yTop}
-                       Q ${rightX + bracketWidth * 0.8} ${yTop + 10} ${rightX + bracketWidth * 0.5} ${yTop + 20}
-                       L ${rightX + bracketWidth * 0.5} ${yMid - 25}
-                       Q ${rightX + bracketWidth * 0.8} ${yMid - 15} ${rightX + bracketWidth * 0.5} ${yMid - 5}`)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "none");
-        
-        upperBracketGroup.append("text")
-            .attr("x", rightX + bracketWidth + 8)
-            .attr("y", (yTop + yMid - 10) / 2)
-            .attr("dy", "0.35em")
-            .attr("text-anchor", "start")
-            .style("font-size", "13px")
-            .style("font-weight", "normal")
-            .style("fill", "#555")
-            .text(percentHigher + '%');
-        
-        // Lower bracket
-        const lowerBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
-        
-        lowerBracketGroup.append("path")
-            .attr("d", `M ${rightX + bracketWidth * 0.5} ${yMid + 5}
-                       Q ${rightX + bracketWidth * 0.8} ${yMid + 15} ${rightX + bracketWidth * 0.5} ${yMid + 25}
-                       L ${rightX + bracketWidth * 0.5} ${yBottom - 20}
-                       Q ${rightX + bracketWidth * 0.8} ${yBottom - 10} ${rightX + bracketWidth * 0.5} ${yBottom}
-                       L ${rightX} ${yBottom}`)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "none");
-        
-        lowerBracketGroup.append("text")
-            .attr("x", rightX + bracketWidth + 8)
-            .attr("y", (yMid + 10 + yBottom) / 2)
-            .attr("dy", "0.35em")
-            .attr("text-anchor", "start")
-            .style("font-size", "13px")
-            .style("font-weight", "normal")
-            .style("fill", "#555")
-            .text(percentLower + '%');
+        if (isMobile) {
+            // Mobile: brackets at top (horizontal layout)
+            const xMid = this.histXScale(currentTemp);
+            const bracketHeight = 18;
+            const xLeft = 15;
+            const xRight = this.config.histWidth - 15;
+            const topY = -35;  // Position above the chart
+            
+            // Left bracket (lower temps)
+            const leftBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
+            
+            leftBracketGroup.append("path")
+                .attr("d", `M ${xLeft} ${topY} 
+                           L ${xLeft} ${topY + bracketHeight * 0.5}
+                           Q ${xLeft + 10} ${topY + bracketHeight * 0.8} ${xLeft + 20} ${topY + bracketHeight * 0.5}
+                           L ${xMid - 25} ${topY + bracketHeight * 0.5}
+                           Q ${xMid - 15} ${topY + bracketHeight * 0.8} ${xMid - 5} ${topY + bracketHeight * 0.5}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            leftBracketGroup.append("text")
+                .attr("x", (xLeft + xMid - 10) / 2)
+                .attr("y", topY - 8)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "middle")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentLower + '%');
+                
+            // Right bracket (higher temps)
+            const rightBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
+            
+            rightBracketGroup.append("path")
+                .attr("d", `M ${xMid + 5} ${topY + bracketHeight * 0.5}
+                           Q ${xMid + 15} ${topY + bracketHeight * 0.8} ${xMid + 25} ${topY + bracketHeight * 0.5}
+                           L ${xRight - 20} ${topY + bracketHeight * 0.5}
+                           Q ${xRight - 10} ${topY + bracketHeight * 0.8} ${xRight} ${topY + bracketHeight * 0.5}
+                           L ${xRight} ${topY}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            rightBracketGroup.append("text")
+                .attr("x", (xMid + 10 + xRight) / 2)
+                .attr("y", topY - 8)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "middle")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentHigher + '%');
+                
+        } else {
+            // Desktop: brackets on right side (vertical layout) - original code
+            const rightX = this.config.histWidth + 15;
+            const bracketWidth = 18;
+            const yMid = this.histYScale(currentTemp);
+            const yTop = 15;
+            const yBottom = this.config.histHeight - 15;
+            
+            // Upper bracket
+            const upperBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
+            
+            upperBracketGroup.append("path")
+                .attr("d", `M ${rightX} ${yTop} 
+                           L ${rightX + bracketWidth * 0.5} ${yTop}
+                           Q ${rightX + bracketWidth * 0.8} ${yTop + 10} ${rightX + bracketWidth * 0.5} ${yTop + 20}
+                           L ${rightX + bracketWidth * 0.5} ${yMid - 25}
+                           Q ${rightX + bracketWidth * 0.8} ${yMid - 15} ${rightX + bracketWidth * 0.5} ${yMid - 5}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            upperBracketGroup.append("text")
+                .attr("x", rightX + bracketWidth + 8)
+                .attr("y", (yTop + yMid - 10) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentHigher + '%');
+            
+            // Lower bracket
+            const lowerBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
+            
+            lowerBracketGroup.append("path")
+                .attr("d", `M ${rightX + bracketWidth * 0.5} ${yMid + 5}
+                           Q ${rightX + bracketWidth * 0.8} ${yMid + 15} ${rightX + bracketWidth * 0.5} ${yMid + 25}
+                           L ${rightX + bracketWidth * 0.5} ${yBottom - 20}
+                           Q ${rightX + bracketWidth * 0.8} ${yBottom - 10} ${rightX + bracketWidth * 0.5} ${yBottom}
+                           L ${rightX} ${yBottom}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            lowerBracketGroup.append("text")
+                .attr("x", rightX + bracketWidth + 8)
+                .attr("y", (yMid + 10 + yBottom) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentLower + '%');
+        }
     }
 
     // Draw histogram
     drawHistogram() {
+        // EXPERIMENT 3: Check dimension conflicts
+        const isMobileDevice = window.innerWidth <= 768;
+        if (isMobileDevice) {
+            const htmlWidth = document.getElementById('histogram-svg').getAttribute('width');
+            const configWidth = this.config.histWidth; // Usable width after margins
+            const totalConfigWidth = 300; // Expected total width in config
+            
+            console.log('🧪 EXPERIMENT 3 - SVG dimension conflicts:');
+            console.log(`📐 HTML SVG width: ${htmlWidth}px (FIXED)`);
+            console.log(`📐 Config usable width: ${configWidth}px`);
+            console.log(`📐 Config total width: ${totalConfigWidth}px`);
+            console.log(`📏 Mismatch after fix: ${parseInt(htmlWidth) - totalConfigWidth}px (should be 0)`);
+        }
+        
         const filteredData = this.dataProcessor.getFilteredData();
         if (filteredData.length === 0) {
             this.histG.selectAll("*").remove();
@@ -603,29 +737,68 @@ class ChartRenderer {
         
         if (currentDateData.length > 0 && filteredData.length > 0) {
             const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
+            const isMobile = window.innerWidth <= 768;
             
-            this.histG.append("line")
-                .attr("class", "current-temp-line")
-                .attr("x1", 0)
-                .attr("x2", this.config.histWidth)
-                .attr("y1", this.histYScale(currentTemp))
-                .attr("y2", this.histYScale(currentTemp));
+            if (isMobile) {
+                // Mobile: Vertical line (temperature on X-axis)
+                this.histG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", this.histXScale(currentTemp))
+                    .attr("x2", this.histXScale(currentTemp))
+                    .attr("y1", 0)
+                    .attr("y2", this.getHistHeight())
+                    .attr("stroke", "#333")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-dasharray", "5,5");
+            } else {
+                // Desktop: Horizontal line (temperature on Y-axis)
+                this.histG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", 0)
+                    .attr("x2", this.config.histWidth)
+                    .attr("y1", this.histYScale(currentTemp))
+                    .attr("y2", this.histYScale(currentTemp))
+                    .attr("stroke", "#333")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-dasharray", "5,5");
+            }
             
             this.drawHistogramBrackets(currentTemp);
+        }
+        
+        // EXPERIMENT 1: Fix histogram X-axis positioning
+        const isMobile = window.innerWidth <= 768;
+        const axisHeight = this.getHistHeight();
+        const oldHeight = this.config.histHeight;
+        
+        if (isMobile) {
+            console.log('🧪 EXPERIMENT 1 - Histogram X-axis positioning:');
+            console.log(`📍 OLD position: ${oldHeight}px (desktop height)`);
+            console.log(`📍 NEW position: ${axisHeight}px (mobile height)`);
+            console.log(`📏 Expected change: ${oldHeight - axisHeight}px upward`);
         }
         
         // Add x-axis
         this.histG.append("g")
             .attr("class", "axis")
-            .attr("transform", `translate(0,${this.config.histHeight})`)
+            .attr("transform", `translate(0,${axisHeight})`)
             .call(d3.axisBottom(this.histXScale).ticks(5));
+        
+        // EXPERIMENT 5: Fix histogram X-axis label for mobile
+        const axisLabel = isMobile ? this.getYAxisLabel(this.dataProcessor.currentMetric) : "Count";
+        if (isMobile) {
+            console.log('🧪 EXPERIMENT 5 - Histogram X-axis label:');
+            console.log(`📊 OLD label: "Count"`);
+            console.log(`📊 NEW label: "${axisLabel}"`);
+            console.log(`📊 Reason: Mobile X-axis shows temperature, not count`);
+        }
         
         // Add x-axis label
         this.histG.append("text")
-            .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
+            .attr("transform", `translate(${this.config.histWidth / 2}, ${axisHeight + 35})`)
             .style("text-anchor", "middle")
             .style("font-size", "12px")
-            .text("Count");
+            .text(axisLabel);
         
         // Draw legend
         this.drawLegend();
