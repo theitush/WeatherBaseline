@@ -236,37 +236,44 @@ class DataProcessor {
             return phrase;
         };
         
+        // Helper to format percentile with proper ordinal suffix and top/bottom indicator
+        const formatPercentile = (value, position = '') => {
+            const num = value.toFixed(0);
+            const prefix = position ? `${position} ` : '';
+            return `${prefix}${num}${this.getOrdinalSuffix(num)} percentile`;
+        };
+        
         let context = {};
         
         if (percentileFromBottom <= 5) {
             // Bottom 5% - very extreme cold
-            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentileFromBottom, 'Bottom');
             context.description = getRandomPhrase(extremeColdPhrases);
             context.ranking = `${rankingFromColdest}${this.getOrdinalSuffix(rankingFromColdest)} coldest in dataset!`;
         } else if (percentile <= 5) {
             // Top 5% - very extreme hot
-            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentile, 'Top');
             context.description = getRandomPhrase(extremeHotPhrases);
             context.ranking = `${rankingFromHottest}${this.getOrdinalSuffix(rankingFromHottest)} hottest in dataset!`;
         } else if (percentileFromBottom <= 10) {
             // Bottom 10% - extreme cold
-            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentileFromBottom, 'Bottom');
             context.description = getRandomPhrase(coldPhrases);
         } else if (percentile <= 10) {
             // Top 10% - extreme hot
-            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentile, 'Top');
             context.description = getRandomPhrase(hotPhrases);
         } else if (percentileFromBottom <= 20) {
             // 10-20th percentile - a bit cool
-            context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentileFromBottom, 'Bottom');
             context.description = getRandomPhrase(coolPhrases);
         } else if (percentile <= 20) {
             // 80-90th percentile - a bit warm
-            context.percentile = `${percentile.toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(percentile, 'Top');
             context.description = getRandomPhrase(warmPhrases);
         } else {
             // 20-80th percentile - normal
-            context.percentile = `${Math.min(percentile, percentileFromBottom).toFixed(0)}th percentile`;
+            context.percentile = formatPercentile(Math.min(percentile, percentileFromBottom));
             context.description = getRandomPhrase(normalPhrases);
         }
         

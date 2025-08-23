@@ -16,6 +16,20 @@ class ChartRenderer {
         this.histSvg = d3.select("#histogram-svg");
         this.tooltip = d3.select("#tooltip");
         
+        // Create arrow marker definition
+        this.mainSvg.append("defs").append("marker")
+            .attr("id", "current-date-arrow")
+            .attr("viewBox", "0 -4 8 8")
+            .attr("refX", 6)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-4L8,0L0,4")
+            .attr("fill", "#333")
+            .attr("stroke", "none");
+        
         // Create chart groups
         this.mainG = this.mainSvg.append("g")
             .attr("transform", `translate(${this.config.mainMargin.left},${this.config.mainMargin.top})`);
@@ -299,6 +313,42 @@ class ChartRenderer {
                 .on("mouseout", () => {
                     this.tooltip.style("opacity", 0);
                 });
+            
+            // Add arrow pointing to current date point
+            const currentPoint = currentDateData[0];
+            const pointX = this.xScale(currentPoint.date);
+            const pointY = this.yScale(currentPoint[this.dataProcessor.currentMetric]);
+            
+            // Determine arrow direction based on year
+            const year = currentPoint.date.getFullYear();
+            const isEarlyYear = year < 1950;
+            
+            // Arrow line pointing to the current date point
+            this.mainG.append("line")
+                .attr("class", "current-date-arrow")
+                .attr("x1", isEarlyYear ? pointX + 30 : pointX - 30)
+                .attr("y1", pointY - 25)
+                .attr("x2", isEarlyYear ? pointX + 6 : pointX - 6)
+                .attr("y2", pointY - 6)
+                .attr("stroke", "#333")
+                .attr("stroke-width", 1.5)
+                .attr("marker-end", "url(#current-date-arrow)");
+            
+            // Arrow label with actual date
+            const dateStr = currentPoint.date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+            });
+            this.mainG.append("text")
+                .attr("class", "current-date-label")
+                .attr("x", isEarlyYear ? pointX + 35 : pointX - 35)
+                .attr("y", pointY - 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#333")
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
+                .text(dateStr);
         }
     }
 
@@ -363,6 +413,8 @@ class ChartRenderer {
         this.mainG.selectAll(".axis").remove();
         this.mainG.selectAll(".current-temp-line").remove();
         this.mainG.selectAll(".current-temp-point").remove();
+        this.mainG.selectAll(".current-date-arrow").remove();
+        this.mainG.selectAll(".current-date-label").remove();
         this.mainG.selectAll("text").remove();
         
         // Draw chart elements
