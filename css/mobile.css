@@ -180,61 +180,102 @@
         margin-left: 10px;
     }
 
-    /* ✅ FINAL: Tight chart spacing */
+    /* 🎯 ALIGNMENT TEST: Add guide lines to visualize alignment */
     .charts-container {
         width: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0px;  /* 🎛️ ADJUST: 0px=touching, 10px=small gap, 20px=larger gap */
+        gap: 0px !important;
+        background: lime !important;
+        padding: 0px !important;
+        margin: 0px !important;
+        border: 5px solid black !important;
+        position: relative;
+    }
+    
+    /* 🎯 VISUAL TEST: Add vertical guide lines for alignment testing */
+    .charts-container::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: red;
+        z-index: 1000;
+    }
+    
+    /* 🔬 DEBUG: Check if there are hidden elements between charts */
+    .charts-container > * {
+        border: 3px solid magenta !important;  /* Magenta border on ALL direct children */
+        margin: 0px !important;
+        padding: 0px !important;
     }
 
-    /* Chart title */
+    /* 🔧 MYSTERY SOLVED: Chart title was creating the gap! */
     .chart-title {
         text-align: center;
         font-size: 18px;
         font-weight: bold;
-        margin-bottom: 20px;
+        margin-bottom: 0px !important;  /* 🔧 REMOVED: This was the 20px gap! */
+        margin-top: 0px !important;
+        padding: 0px !important;
         color: #333;
+        background: pink !important;  /* Pink to identify in debug */
+        border: 2px solid cyan !important;
     }
 
-    /* ✅ FIXED: Histogram with proper tight height */
+    /* 📱 RESPONSIVE: Container works for any mobile width 320px-720px */
     .histogram-chart {
         width: 100%;
-        max-width: 455px;
+        max-width: calc(100vw - 40px);  /* Responsive: screen width minus margins */
         display: flex;
-        justify-content: center;
-        height: 400px;  /* 🔧 EXACT height, no extra space */
-        min-height: 400px;  /* Match SVG height exactly */
-        margin: 0px;  /* Tight spacing */
+        justify-content: center !important;
+        align-items: center !important;
+        height: 400px !important;
+        min-height: 400px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+        background: orange !important;
+        border: 2px solid red !important;
+        overflow: visible !important;
     }
 
     .histogram-chart svg {
-        max-width: 100%;
+        width: 100% !important;  /* 📱 RESPONSIVE: Match container width */
         height: 400px !important;
-        width: 455px !important;  /* 340px usable + 115px margins for perfect alignment */
+        margin: 0px !important;
+        padding: 0px !important;
+        border: 2px solid green !important;
     }
 
-    /* ✅ FINAL: Main chart with tight spacing */
+    /* 📱 RESPONSIVE: Main chart works for any mobile width 320px-720px */
     .main-chart {
         width: 100%;
+        max-width: calc(100vw - 40px);  /* Responsive: screen width minus margins */
+        height: 400px;
         display: flex;
         justify-content: center;
         align-items: center;
         transform: rotate(90deg);
-        margin: 0px;  /* 🎛️ ADJUST: 0px=touching, 10px=small gap, 20px=more space */
+        margin: 0px !important;
+        padding: 0px !important;
         overflow: visible;
-        height: 820px;
-        min-height: 820px;
+        background: yellow !important;
+        border: 2px solid blue !important;
     }
 
     .main-chart svg {
-        width: 800px !important;  /* Changed from 350px to match config */
-        height: 400px !important;  /* Changed from 200px to match config */
+        width: 100% !important;  /* 📱 RESPONSIVE: Match container width */
+        height: 400px !important;
         max-width: none !important;
         max-height: none !important;
         overflow: visible !important;
         transform-origin: center center;
+        margin: 0px !important;
+        padding: 0px !important;
+        border: 2px solid purple !important;
     }
 
     /* Ensure the charts section has enough height */

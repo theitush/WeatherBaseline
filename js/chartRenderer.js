@@ -16,12 +16,26 @@ class ChartRenderer {
         this.histSvg = d3.select("#histogram-svg");
         this.tooltip = d3.select("#tooltip");
         
-        // Create chart groups
+        // Create chart groups with mobile-aware positioning
         this.mainG = this.mainSvg.append("g")
             .attr("transform", `translate(${this.config.mainMargin.left},${this.config.mainMargin.top})`);
             
-        this.histG = this.histSvg.append("g")
-            .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
+        // 📱 RESPONSIVE HISTOGRAM: Center histogram in actual SVG width
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // Get actual SVG width dynamically
+            const histSvgElement = document.getElementById('histogram-svg');
+            const actualSvgWidth = histSvgElement.getBoundingClientRect().width;
+            const centerX = actualSvgWidth / 2;
+            const histWidth = this.config.histWidth; // 185px usable width
+            const leftMargin = centerX - (histWidth / 2); // Center the content
+            console.log('📍 RESPONSIVE HISTOGRAM CENTERING: leftMargin =', leftMargin, 'for', histWidth, 'px content in', actualSvgWidth, 'px SVG');
+            this.histG = this.histSvg.append("g")
+                .attr("transform", `translate(${leftMargin},${this.config.histMargin.top})`);
+        } else {
+            this.histG = this.histSvg.append("g")
+                .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
+        }
     }
 
     initializeScales() {
@@ -37,6 +51,67 @@ class ChartRenderer {
             .x(d => this.xScale(d.date))
             .y(d => this.yScale(d.value))
             .curve(d3.curveMonotoneX);
+    }
+
+    // 🎯 TEST METHOD: Add visual markers to show temperature axis alignment
+    addTemperatureAxisMarkers() {
+        const isMobile = window.innerWidth <= 768;
+        if (!isMobile) return;
+        
+        // Get temperature domain for both charts
+        const tempDomain = this.yScale.domain();
+        const minTemp = tempDomain[0];
+        const maxTemp = tempDomain[1];
+        
+        // HISTOGRAM MARKERS: Show start/end of temperature X-axis
+        this.histG.append("line")
+            .attr("class", "temp-axis-marker")
+            .attr("x1", this.histXScale(minTemp))
+            .attr("x2", this.histXScale(minTemp))
+            .attr("y1", -10)
+            .attr("y2", this.mobileHistHeight + 10)
+            .attr("stroke", "red")
+            .attr("stroke-width", 3)
+            .attr("opacity", 0.8);
+            
+        this.histG.append("line")
+            .attr("class", "temp-axis-marker")
+            .attr("x1", this.histXScale(maxTemp))
+            .attr("x2", this.histXScale(maxTemp))
+            .attr("y1", -10)
+            .attr("y2", this.mobileHistHeight + 10)
+            .attr("stroke", "blue")
+            .attr("stroke-width", 3)
+            .attr("opacity", 0.8);
+        
+        // MAIN CHART MARKERS: Show start/end of temperature Y-axis (becomes horizontal after rotation)
+        this.mainG.append("line")
+            .attr("class", "temp-axis-marker")
+            .attr("x1", -10)
+            .attr("x2", this.config.mainWidth + 10)
+            .attr("y1", this.yScale(minTemp))
+            .attr("y2", this.yScale(minTemp))
+            .attr("stroke", "red")
+            .attr("stroke-width", 3)
+            .attr("opacity", 0.8);
+            
+        this.mainG.append("line")
+            .attr("class", "temp-axis-marker")
+            .attr("x1", -10)
+            .attr("x2", this.config.mainWidth + 10)
+            .attr("y1", this.yScale(maxTemp))
+            .attr("y2", this.yScale(maxTemp))
+            .attr("stroke", "blue")
+            .attr("stroke-width", 3)
+            .attr("opacity", 0.8);
+        
+        console.log('🎯 MARKERS ADDED:');
+        console.log('🔴 RED = Min temperature position');
+        console.log('🔵 BLUE = Max temperature position');
+        console.log('📍 Histogram min temp at X:', this.histXScale(minTemp));
+        console.log('📍 Histogram max temp at X:', this.histXScale(maxTemp));
+        console.log('📍 Main chart min temp at Y:', this.yScale(minTemp), '(becomes horizontal after rotation)');
+        console.log('📍 Main chart max temp at Y:', this.yScale(maxTemp), '(becomes horizontal after rotation)');
     }
 
     // Get y-axis label based on current metric
@@ -109,10 +184,13 @@ class ChartRenderer {
             this.histYScale.range([this.mobileHistHeight, 0]);
             this.histYScale.domain([0, d3.max(bins, d => d.length)]);
             
-            console.log('🎯 ALIGNMENT CHECK:');
+            console.log('🎯 ALIGNMENT TEST: Adding visual markers');
+            
+            // TEST: Add visual markers at temperature axis endpoints
+            this.addTemperatureAxisMarkers();
+            
             console.log('📊 Main chart temp axis (Y, becomes horizontal after rotation):', this.yScale.range());
             console.log('📊 Histogram temp axis (X, horizontal):', this.histXScale.range());
-            console.log('✅ Should be identical for perfect alignment');
         } else {
             // Desktop: X = count, Y = temperature (horizontal bars) - use full height
             this.histXScale.domain([0, d3.max(bins, d => d.length)]);  // count domain
