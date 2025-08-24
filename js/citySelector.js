@@ -31,7 +31,6 @@ class CitySelector {
             });
             
             this.populateSelect();
-            this.setDefaultCity();
             
         } catch (error) {
             console.error('Error loading city mapping:', error);
@@ -58,12 +57,38 @@ class CitySelector {
     }
 
     /**
-     * Set default city to Tel Aviv if available
+     * Auto-select closest city based on location detection
      */
-    setDefaultCity() {
-        const telAvivCity = this.cities.find(city => city.name.includes('Tel Aviv'));
-        if (telAvivCity) {
-            this.citySelect.value = `${telAvivCity.lat},${telAvivCity.lon}`;
+    async setClosestCity(locationDetector) {
+        try {
+            this.citySelect.innerHTML = '<option value="">Detecting your location...</option>';
+            
+            const result = await locationDetector.detectClosestCity();
+            
+            if (result && result.closestCity) {
+                // First repopulate the dropdown with cities
+                this.populateSelect();
+                
+                const optionValue = `${result.closestCity.lat},${result.closestCity.lon}`;
+                
+                // Find and select the closest city
+                for (let i = 0; i < this.citySelect.options.length; i++) {
+                    if (this.citySelect.options[i].value === optionValue) {
+                        this.citySelect.selectedIndex = i;
+                        return true;
+                    }
+                }
+            }
+            
+            // If detection failed, repopulate with default message
+            this.populateSelect();
+            return false;
+            
+        } catch (error) {
+            // If anything fails, just show the select city option
+            this.citySelect.innerHTML = '<option value="">Select a city...</option>';
+            this.populateSelect();
+            return false;
         }
     }
 

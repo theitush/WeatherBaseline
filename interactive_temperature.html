@@ -709,7 +709,7 @@
                 <label for="city-select">City*:</label>
                 <div style="position: relative; display: inline-block;">
                     <select id="city-select" style="width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer;">
-                        <option value="">Select a city...</option>
+                        <option value="">Detecting your location...</option>
                     </select>
                 </div>
                 
@@ -829,6 +829,7 @@
 
     <!-- Load modules -->
     <script src="js/config.js"></script>
+    <script src="js/locationDetector.js"></script>
     <script src="js/citySelector.js"></script>
     <script src="js/apiDataFetcher.js"></script>
     <script src="js/dataProcessor.js"></script>
@@ -842,6 +843,7 @@
         let uiController;
         let apiDataFetcher;
         let citySelector;
+        let locationDetector;
 
         // Set today's date as default and configure date picker limits
         function setDefaultDate() {
@@ -898,6 +900,15 @@
         // Initialize city selector with cached cities from JSON
         async function initializeCitySelector() {
             return citySelector.initialize();
+        }
+
+        // Auto-detect and set closest city on page load
+        async function autoDetectLocation() {
+            try {
+                await citySelector.setClosestCity(locationDetector);
+            } catch (error) {
+                console.error('Auto-location on page load failed:', error);
+            }
         }
 
         // Show comprehensive error popup and update display
@@ -1082,6 +1093,10 @@
                 // Set default date
                 setDefaultDate();
 
+                // Initialize location detector
+                locationDetector = new LocationDetector();
+                await locationDetector.initialize();
+
                 // Initialize city selector
                 citySelector = new CitySelector();
 
@@ -1103,6 +1118,9 @@
                 // Initialize city selector with cached cities
                 await initializeCitySelector();
                 
+                // Auto-detect and select closest city
+                await autoDetectLocation();
+                
                 // Show orientation popup for mobile portrait users
                 showOrientationPopup();
                 
@@ -1114,6 +1132,7 @@
                         setTimeout(showOrientationPopup, 100);
                     }
                 });
+                
                 
                 // Add orientation popup event listeners
                 document.getElementById('orientation-continue-btn').addEventListener('click', hideOrientationPopup);
