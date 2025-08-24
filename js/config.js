@@ -88,10 +88,23 @@ const CONFIG = {
         transition: 500
     },
     
+    // Font sizes for consistent typography
+    fontSizes: {
+        axisLabels: 15,        // Axis titles (e.g., "Year", "Maximum Temperature", "Count")
+        tickLabels: 12,        // Axis tick numbers
+        currentTempDate: 15,   // Current temperature and date indicators
+        brackets: 13           // Percentile bracket labels
+    },
+    
+    // Spacing settings
+    spacing: {
+        histogramXAxisLabelDistance: 30  // Distance from histogram bottom to x-axis label
+    },
+
     // Chart settings
     chart: {
         windowSize: 5, // Moving average window
-        histogramThresholds: 30,
+        histogramThresholds: 35,
         tempMargin: 2 // Temperature scale margin
     },
 

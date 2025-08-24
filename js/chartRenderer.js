@@ -436,13 +436,13 @@ class ChartRenderer {
             .attr("x", 0 - (this.config.mainHeight / 2))
             .attr("dy", "1em")
             .style("text-anchor", "middle")
-            .style("font-size", "12px")
+            .style("font-size", `${this.config.fontSizes.axisLabels}px`)
             .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
         
         this.mainG.append("text")
             .attr("transform", `translate(${this.config.mainWidth / 2}, ${this.config.mainHeight + this.config.mainMargin.bottom - 5})`)
             .style("text-anchor", "middle")
-            .style("font-size", "12px")
+            .style("font-size", `${this.config.fontSizes.axisLabels}px`)
             .text("Year");
     }
 
@@ -648,7 +648,7 @@ class ChartRenderer {
                 .attr("y", topY - bracketHeight - 8)
                 .attr("dy", "0.35em")
                 .attr("text-anchor", "middle")
-                .style("font-size", "13px")
+                .style("font-size", `${this.config.fontSizes.brackets}px`)
                 .style("font-weight", "normal")
                 .style("fill", "#555")
                 .text(percentLower + '%');
@@ -671,7 +671,7 @@ class ChartRenderer {
                 .attr("y", topY - bracketHeight - 8)
                 .attr("dy", "0.35em")
                 .attr("text-anchor", "middle")
-                .style("font-size", "13px")
+                .style("font-size", `${this.config.fontSizes.brackets}px`)
                 .style("font-weight", "normal")
                 .style("fill", "#555")
                 .text(percentHigher + '%');
@@ -702,7 +702,7 @@ class ChartRenderer {
                 .attr("y", (yTop + yMid - 10) / 2)
                 .attr("dy", "0.35em")
                 .attr("text-anchor", "start")
-                .style("font-size", "13px")
+                .style("font-size", `${this.config.fontSizes.brackets}px`)
                 .style("font-weight", "normal")
                 .style("fill", "#555")
                 .text(percentHigher + '%');
@@ -725,7 +725,7 @@ class ChartRenderer {
                 .attr("y", (yMid + 10 + yBottom) / 2)
                 .attr("dy", "0.35em")
                 .attr("text-anchor", "start")
-                .style("font-size", "13px")
+                .style("font-size", `${this.config.fontSizes.brackets}px`)
                 .style("font-weight", "normal")
                 .style("fill", "#555")
                 .text(percentLower + '%');
@@ -737,13 +737,33 @@ class ChartRenderer {
         const histDims = this.getHistogramDimensions();
         
         if (this.isMobile()) {
-            // Update SVG viewBox and dimensions for mobile
+            // For mobile, the SVG should fill the container width
+            // But we need to center the actual histogram drawing area
+            const actualSVGWidth = Math.max(400, window.innerWidth - 40);
+            
             this.histSvg
-                .attr("viewBox", `0 0 ${histDims.svgWidth} ${histDims.svgHeight}`);
+                .attr("viewBox", `0 0 ${actualSVGWidth} 400`);
+            
+            // Center the histogram drawing area within this wide SVG
+            const drawingAreaWidth = histDims.width + this.config.histMargin.left + this.config.histMargin.right;
+            const centerX = (actualSVGWidth - drawingAreaWidth) / 2 + this.config.histMargin.left;
+            
+            this.histG
+                .attr("transform", `translate(${centerX},${this.config.histMargin.top})`);
+                
+            console.log('Mobile histogram centering:', {
+                windowWidth: window.innerWidth,
+                actualSVGWidth,
+                drawingAreaWidth,
+                centerX,
+                histWidth: histDims.width
+            });
         } else {
-            // Reset to desktop dimensions
+            // Reset to desktop dimensions and positioning
             this.histSvg
                 .attr("viewBox", `0 0 420 400`);
+            this.histG
+                .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
         }
     }
 
@@ -760,6 +780,8 @@ class ChartRenderer {
         // Clear non-data elements thoroughly
         this.histG.selectAll(".axis").remove();
         this.histG.selectAll(".current-temp-line").remove();
+        this.histG.selectAll(".current-temp-label").remove();
+        this.histG.selectAll(".current-date-label").remove();
         this.histG.selectAll(".upper-bracket").remove();
         this.histG.selectAll(".lower-bracket").remove();
         this.histG.selectAll("text").remove();
@@ -791,6 +813,45 @@ class ChartRenderer {
                     .attr("x2", this.histXScale(currentTemp))
                     .attr("y1", 0)
                     .attr("y2", histDims.height);
+                
+                // Text labels to the right of the dashed line
+                const pointX = this.histXScale(currentTemp);
+                
+                const currentDateData = this.dataProcessor.getCurrentDateData(this.dataProcessor.getFullData());
+                if (currentDateData.length > 0) {
+                    const dateStr = currentDateData[0].date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+                    const tempStr = currentTemp.toFixed(1) + '°C';
+                    
+                    // Position labels to the right of the dashed line, middle height
+                    const labelX = pointX + 10; // 10px to the right of the line
+                    const labelY = histDims.height / 2;
+                    
+                    // Date above temp
+                    this.histG.append("text")
+                        .attr("class", "current-date-label")
+                        .attr("x", labelX)
+                        .attr("y", labelY - 8)
+                        .attr("text-anchor", "start")
+                        .attr("fill", "#333")
+                        .attr("font-size", `${this.config.fontSizes.currentTempDate}px`)
+                        .attr("font-weight", "bold")
+                        .text(dateStr);
+                    
+                    // Temp below date
+                    this.histG.append("text")
+                        .attr("class", "current-temp-label")
+                        .attr("x", labelX)
+                        .attr("y", labelY + 8)
+                        .attr("text-anchor", "start")
+                        .attr("fill", "#333")
+                        .attr("font-size", `${this.config.fontSizes.currentTempDate}px`)
+                        .attr("font-weight", "bold")
+                        .text(`${tempStr}`);
+                }
             } else {
                 // Desktop: horizontal line
                 const histDims = this.getHistogramDimensions();
@@ -818,23 +879,23 @@ class ChartRenderer {
                 .attr("class", "axis")
                 .call(d3.axisLeft(this.histYScale).ticks(3));
             
-            // Add x-axis label
+            // Add x-axis label (temperature metric)
             const histDims = this.getHistogramDimensions();
             this.histG.append("text")
-                .attr("transform", `translate(${histDims.width / 2}, ${histDims.height + 35})`)
+                .attr("transform", `translate(${histDims.width / 2}, ${histDims.height + this.config.spacing.histogramXAxisLabelDistance})`)
                 .style("text-anchor", "middle")
-                .style("font-size", "12px")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
                 .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
             
             // Add y-axis label
             const histDimsForYLabel = this.getHistogramDimensions();
             this.histG.append("text")
                 .attr("transform", "rotate(-90)")
-                .attr("y", 0 - this.config.histMargin.left)
+                .attr("y", 0 - this.config.histMargin.left - 30)
                 .attr("x", 0 - (histDimsForYLabel.height / 2))
                 .attr("dy", "1em")
                 .style("text-anchor", "middle")
-                .style("font-size", "12px")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
                 .text("Count");
         } else {
             // Desktop: horizontal bars - count on x-axis, temperature on y-axis
@@ -849,7 +910,7 @@ class ChartRenderer {
             this.histG.append("text")
                 .attr("transform", `translate(${histDimsDesktop.width / 2}, ${histDimsDesktop.height + 35})`)
                 .style("text-anchor", "middle")
-                .style("font-size", "12px")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
                 .text("Count");
         }
         
