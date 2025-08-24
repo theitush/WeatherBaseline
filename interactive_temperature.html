@@ -531,6 +531,8 @@
                 padding: 15px;
                 position: relative;
                 overflow-x: hidden;
+                display: flex;
+                flex-direction: column;
             }
             
             .chart-controls {
@@ -565,6 +567,7 @@
                 width: 100%;
                 max-width: 100vw;
                 overflow-x: hidden;
+                order: 2;
             }
             
             .histogram-chart {
@@ -573,6 +576,8 @@
                 width: 100%;
                 max-width: 100vw;
                 overflow-x: hidden;
+                order: 1;
+                margin-bottom: 20px;
             }
             
             #main-svg {
@@ -1146,6 +1151,13 @@
                 window.addEventListener('resize', () => {
                     if (!isPortrait() || !isMobile()) {
                         hideOrientationPopup();
+                    }
+                    
+                    // Re-render charts on resize to handle mobile/desktop orientation changes
+                    if (dataProcessor && dataProcessor.getFullData() && dataProcessor.getFullData().length > 0) {
+                        setTimeout(() => {
+                            uiController.updateCharts();
+                        }, 300); // Small delay to let resize complete
                     }
                 });
                 

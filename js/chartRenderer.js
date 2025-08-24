@@ -43,11 +43,38 @@ class ChartRenderer {
         return window.innerWidth <= 768;
     }
 
+    // Get dynamic histogram dimensions based on screen size
+    getHistogramDimensions() {
+        if (this.isMobile()) {
+            // Mobile: use most of screen width
+            const screenWidth = window.innerWidth;
+            const padding = 40; // Total padding (20px each side)
+            const availableWidth = screenWidth - padding;
+            const histWidth = Math.max(280, availableWidth); // Minimum 280px
+            
+            return {
+                width: histWidth - this.config.histMargin.left - this.config.histMargin.right,
+                height: this.config.histHeight,
+                svgWidth: histWidth,
+                svgHeight: 400
+            };
+        } else {
+            // Desktop: use original config dimensions
+            return {
+                width: this.config.histWidth,
+                height: this.config.histHeight,
+                svgWidth: 420,
+                svgHeight: 400
+            };
+        }
+    }
+
     initializeScales() {
         // Scales
         this.xScale = d3.scaleTime().range([0, this.config.mainWidth]);
         this.yScale = d3.scaleLinear().range([this.config.mainHeight, 0]);
-        this.histXScale = d3.scaleLinear().range([0, this.config.histWidth]);
+        const histDims = this.getHistogramDimensions();
+        this.histXScale = d3.scaleLinear().range([0, histDims.width]);
         this.histYScale = d3.scaleLinear().range([this.config.histHeight, 0]);
         this.colorScale = d3.scaleSequential(d3.interpolateViridis);
         
@@ -104,16 +131,20 @@ class ChartRenderer {
             .thresholds(30)
             (this.dataProcessor.getFilteredData().map(d => d[this.dataProcessor.currentMetric]));
         
+        const histDims = this.getHistogramDimensions();
+        
         if (this.isMobile()) {
             // Mobile: vertical bars (temperature on x-axis, count on y-axis)
             this.histXScale.domain(this.yScale.domain());
+            this.histXScale.range([0, histDims.width]);
             this.histYScale.domain([0, d3.max(bins, d => d.length)]);
-            this.histYScale.range([this.config.histHeight, 0]);
+            this.histYScale.range([histDims.height, 0]);
         } else {
             // Desktop: horizontal bars (count on x-axis, temperature on y-axis)
             this.histXScale.domain([0, d3.max(bins, d => d.length)]);
+            this.histXScale.range([0, histDims.width]);
             this.histYScale.domain(this.yScale.domain());
-            this.histYScale.range([this.config.histHeight, 0]);
+            this.histYScale.range([histDims.height, 0]);
         }
         
         // Track year range change for animation direction
@@ -592,11 +623,12 @@ class ChartRenderer {
         
         if (this.isMobile()) {
             // Mobile: vertical histogram - brackets at top
+            const histDims = this.getHistogramDimensions();
             const topY = -15;
             const bracketHeight = 18;
             const xMid = this.histXScale(currentTemp);
             const xLeft = 15;
-            const xRight = this.config.histWidth - 15;
+            const xRight = histDims.width - 15;
             
             // Left bracket (lower percentile)
             const leftBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
@@ -645,11 +677,12 @@ class ChartRenderer {
                 .text(percentHigher + '%');
         } else {
             // Desktop: horizontal histogram - brackets on right side
-            const rightX = this.config.histWidth + 15;
+            const histDims = this.getHistogramDimensions();
+            const rightX = histDims.width + 15;
             const bracketWidth = 18;
             const yMid = this.histYScale(currentTemp);
             const yTop = 15;
-            const yBottom = this.config.histHeight - 15;
+            const yBottom = histDims.height - 15;
             
             // Upper bracket
             const upperBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
@@ -699,8 +732,25 @@ class ChartRenderer {
         }
     }
 
+    // Update histogram SVG dimensions for mobile
+    updateHistogramSVGDimensions() {
+        const histDims = this.getHistogramDimensions();
+        
+        if (this.isMobile()) {
+            // Update SVG viewBox and dimensions for mobile
+            this.histSvg
+                .attr("viewBox", `0 0 ${histDims.svgWidth} ${histDims.svgHeight}`);
+        } else {
+            // Reset to desktop dimensions
+            this.histSvg
+                .attr("viewBox", `0 0 420 400`);
+        }
+    }
+
     // Draw histogram
     drawHistogram() {
+        // Update SVG dimensions first
+        this.updateHistogramSVGDimensions();
         const filteredData = this.dataProcessor.getFilteredData();
         if (filteredData.length === 0) {
             this.histG.selectAll("*").remove();
@@ -734,18 +784,20 @@ class ChartRenderer {
             
             if (this.isMobile()) {
                 // Mobile: vertical line
+                const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
                     .attr("x1", this.histXScale(currentTemp))
                     .attr("x2", this.histXScale(currentTemp))
                     .attr("y1", 0)
-                    .attr("y2", this.config.histHeight);
+                    .attr("y2", histDims.height);
             } else {
                 // Desktop: horizontal line
+                const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
                     .attr("x1", 0)
-                    .attr("x2", this.config.histWidth)
+                    .attr("x2", histDims.width)
                     .attr("y1", this.histYScale(currentTemp))
                     .attr("y2", this.histYScale(currentTemp));
             }
@@ -767,17 +819,19 @@ class ChartRenderer {
                 .call(d3.axisLeft(this.histYScale).ticks(3));
             
             // Add x-axis label
+            const histDims = this.getHistogramDimensions();
             this.histG.append("text")
-                .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
+                .attr("transform", `translate(${histDims.width / 2}, ${histDims.height + 35})`)
                 .style("text-anchor", "middle")
                 .style("font-size", "12px")
                 .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
             
             // Add y-axis label
+            const histDimsForYLabel = this.getHistogramDimensions();
             this.histG.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("y", 0 - this.config.histMargin.left)
-                .attr("x", 0 - (this.config.histHeight / 2))
+                .attr("x", 0 - (histDimsForYLabel.height / 2))
                 .attr("dy", "1em")
                 .style("text-anchor", "middle")
                 .style("font-size", "12px")
@@ -785,14 +839,15 @@ class ChartRenderer {
         } else {
             // Desktop: horizontal bars - count on x-axis, temperature on y-axis
             // Add x-axis (count)
+            const histDimsDesktop = this.getHistogramDimensions();
             this.histG.append("g")
                 .attr("class", "axis")
-                .attr("transform", `translate(0,${this.config.histHeight})`)
+                .attr("transform", `translate(0,${histDimsDesktop.height})`)
                 .call(d3.axisBottom(this.histXScale).ticks(3));
             
             // Add x-axis label
             this.histG.append("text")
-                .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
+                .attr("transform", `translate(${histDimsDesktop.width / 2}, ${histDimsDesktop.height + 35})`)
                 .style("text-anchor", "middle")
                 .style("font-size", "12px")
                 .text("Count");
