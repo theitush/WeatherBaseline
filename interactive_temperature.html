@@ -1127,10 +1127,6 @@
                 // Add event listeners
                 document.getElementById('fetch-data-btn').addEventListener('click', () => {
                     fetchApiData();
-                    // Show orientation popup again when they try to fetch data
-                    if (isMobile() && isPortrait()) {
-                        setTimeout(showOrientationPopup, 100);
-                    }
                 });
                 
                 
@@ -1150,9 +1146,6 @@
                 window.addEventListener('resize', () => {
                     if (!isPortrait() || !isMobile()) {
                         hideOrientationPopup();
-                    } else if (isMobile() && isPortrait()) {
-                        // Only show if user hasn't dismissed it yet
-                        setTimeout(showOrientationPopup, 100);
                     }
                 });
                 
