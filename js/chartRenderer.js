@@ -38,6 +38,11 @@ class ChartRenderer {
             .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
     }
 
+    // Check if we're on mobile (matches CSS breakpoint)
+    isMobile() {
+        return window.innerWidth <= 768;
+    }
+
     initializeScales() {
         // Scales
         this.xScale = d3.scaleTime().range([0, this.config.mainWidth]);
@@ -93,13 +98,23 @@ class ChartRenderer {
         this.histYScale.domain(this.yScale.domain());
         this.colorScale.domain([startYear, endYear]);
         
-        // Update histogram x scale
+        // Update histogram scales based on orientation
         const bins = d3.histogram()
             .domain(this.yScale.domain())
             .thresholds(30)
             (this.dataProcessor.getFilteredData().map(d => d[this.dataProcessor.currentMetric]));
         
-        this.histXScale.domain([0, d3.max(bins, d => d.length)]);
+        if (this.isMobile()) {
+            // Mobile: vertical bars (temperature on x-axis, count on y-axis)
+            this.histXScale.domain(this.yScale.domain());
+            this.histYScale.domain([0, d3.max(bins, d => d.length)]);
+            this.histYScale.range([this.config.histHeight, 0]);
+        } else {
+            // Desktop: horizontal bars (count on x-axis, temperature on y-axis)
+            this.histXScale.domain([0, d3.max(bins, d => d.length)]);
+            this.histYScale.domain(this.yScale.domain());
+            this.histYScale.range([this.config.histHeight, 0]);
+        }
         
         // Track year range change for animation direction
         const currentYearRange = endYear - startYear + 1;
@@ -512,26 +527,57 @@ class ChartRenderer {
             .remove();
         
         // Update existing bars
-        bars.transition()
-            .duration(500)
-            .attr("y", d => this.histYScale(d.x1))
-            .attr("width", d => this.histXScale(d.length))
-            .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
+        if (this.isMobile()) {
+            // Mobile: vertical bars
+            bars.transition()
+                .duration(500)
+                .attr("x", d => this.histXScale(d.x0))
+                .attr("y", d => this.histYScale(d.length))
+                .attr("width", d => this.histXScale(d.x1) - this.histXScale(d.x0))
+                .attr("height", d => this.config.histHeight - this.histYScale(d.length))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
+        } else {
+            // Desktop: horizontal bars
+            bars.transition()
+                .duration(500)
+                .attr("x", 0)
+                .attr("y", d => this.histYScale(d.x1))
+                .attr("width", d => this.histXScale(d.length))
+                .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
+        }
         
         // Add new bars
-        bars.enter()
-            .append("rect")
-            .attr("class", "bar")
-            .attr("x", 0)
-            .attr("y", d => this.histYScale(d.x1))
-            .attr("width", 0)
-            .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
-            .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
-            .attr("opacity", 1)
-            .transition()
-            .duration(500)
-            .attr("width", d => this.histXScale(d.length));
+        if (this.isMobile()) {
+            // Mobile: vertical bars
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", d => this.histXScale(d.x0))
+                .attr("y", this.config.histHeight)
+                .attr("width", d => this.histXScale(d.x1) - this.histXScale(d.x0))
+                .attr("height", 0)
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
+                .attr("opacity", 1)
+                .transition()
+                .duration(500)
+                .attr("y", d => this.histYScale(d.length))
+                .attr("height", d => this.config.histHeight - this.histYScale(d.length));
+        } else {
+            // Desktop: horizontal bars
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", 0)
+                .attr("y", d => this.histYScale(d.x1))
+                .attr("width", 0)
+                .attr("height", d => this.histYScale(d.x0) - this.histYScale(d.x1))
+                .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
+                .attr("opacity", 1)
+                .transition()
+                .duration(500)
+                .attr("width", d => this.histXScale(d.length));
+        }
     }
 
     // Draw histogram percentile brackets
@@ -544,58 +590,113 @@ class ChartRenderer {
         const percentHigher = (higherCount / totalCount * 100).toFixed(1);
         const percentLower = (100 - parseFloat(percentHigher)).toFixed(1);
         
-        // Bracket dimensions
-        const rightX = this.config.histWidth + 15;
-        const bracketWidth = 18;
-        const yMid = this.histYScale(currentTemp);
-        const yTop = 15;
-        const yBottom = this.config.histHeight - 15;
-        
-        // Upper bracket
-        const upperBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
-        
-        upperBracketGroup.append("path")
-            .attr("d", `M ${rightX} ${yTop} 
-                       L ${rightX + bracketWidth * 0.5} ${yTop}
-                       Q ${rightX + bracketWidth * 0.8} ${yTop + 10} ${rightX + bracketWidth * 0.5} ${yTop + 20}
-                       L ${rightX + bracketWidth * 0.5} ${yMid - 25}
-                       Q ${rightX + bracketWidth * 0.8} ${yMid - 15} ${rightX + bracketWidth * 0.5} ${yMid - 5}`)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "none");
-        
-        upperBracketGroup.append("text")
-            .attr("x", rightX + bracketWidth + 8)
-            .attr("y", (yTop + yMid - 10) / 2)
-            .attr("dy", "0.35em")
-            .attr("text-anchor", "start")
-            .style("font-size", "13px")
-            .style("font-weight", "normal")
-            .style("fill", "#555")
-            .text(percentHigher + '%');
-        
-        // Lower bracket
-        const lowerBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
-        
-        lowerBracketGroup.append("path")
-            .attr("d", `M ${rightX + bracketWidth * 0.5} ${yMid + 5}
-                       Q ${rightX + bracketWidth * 0.8} ${yMid + 15} ${rightX + bracketWidth * 0.5} ${yMid + 25}
-                       L ${rightX + bracketWidth * 0.5} ${yBottom - 20}
-                       Q ${rightX + bracketWidth * 0.8} ${yBottom - 10} ${rightX + bracketWidth * 0.5} ${yBottom}
-                       L ${rightX} ${yBottom}`)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 1.5)
-            .attr("fill", "none");
-        
-        lowerBracketGroup.append("text")
-            .attr("x", rightX + bracketWidth + 8)
-            .attr("y", (yMid + 10 + yBottom) / 2)
-            .attr("dy", "0.35em")
-            .attr("text-anchor", "start")
-            .style("font-size", "13px")
-            .style("font-weight", "normal")
-            .style("fill", "#555")
-            .text(percentLower + '%');
+        if (this.isMobile()) {
+            // Mobile: vertical histogram - brackets at top
+            const topY = -15;
+            const bracketHeight = 18;
+            const xMid = this.histXScale(currentTemp);
+            const xLeft = 15;
+            const xRight = this.config.histWidth - 15;
+            
+            // Left bracket (lower percentile)
+            const leftBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
+            
+            leftBracketGroup.append("path")
+                .attr("d", `M ${xLeft} ${topY} 
+                           L ${xLeft} ${topY - bracketHeight * 0.5}
+                           Q ${xLeft + 10} ${topY - bracketHeight * 0.8} ${xLeft + 20} ${topY - bracketHeight * 0.5}
+                           L ${xMid - 25} ${topY - bracketHeight * 0.5}
+                           Q ${xMid - 15} ${topY - bracketHeight * 0.8} ${xMid - 5} ${topY - bracketHeight * 0.5}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            leftBracketGroup.append("text")
+                .attr("x", (xLeft + xMid - 10) / 2)
+                .attr("y", topY - bracketHeight - 8)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "middle")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentLower + '%');
+            
+            // Right bracket (higher percentile)
+            const rightBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
+            
+            rightBracketGroup.append("path")
+                .attr("d", `M ${xMid + 5} ${topY - bracketHeight * 0.5}
+                           Q ${xMid + 15} ${topY - bracketHeight * 0.8} ${xMid + 25} ${topY - bracketHeight * 0.5}
+                           L ${xRight - 20} ${topY - bracketHeight * 0.5}
+                           Q ${xRight - 10} ${topY - bracketHeight * 0.8} ${xRight} ${topY - bracketHeight * 0.5}
+                           L ${xRight} ${topY}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            rightBracketGroup.append("text")
+                .attr("x", (xMid + 10 + xRight) / 2)
+                .attr("y", topY - bracketHeight - 8)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "middle")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentHigher + '%');
+        } else {
+            // Desktop: horizontal histogram - brackets on right side
+            const rightX = this.config.histWidth + 15;
+            const bracketWidth = 18;
+            const yMid = this.histYScale(currentTemp);
+            const yTop = 15;
+            const yBottom = this.config.histHeight - 15;
+            
+            // Upper bracket
+            const upperBracketGroup = this.histG.append("g").attr("class", "upper-bracket");
+            
+            upperBracketGroup.append("path")
+                .attr("d", `M ${rightX} ${yTop} 
+                           L ${rightX + bracketWidth * 0.5} ${yTop}
+                           Q ${rightX + bracketWidth * 0.8} ${yTop + 10} ${rightX + bracketWidth * 0.5} ${yTop + 20}
+                           L ${rightX + bracketWidth * 0.5} ${yMid - 25}
+                           Q ${rightX + bracketWidth * 0.8} ${yMid - 15} ${rightX + bracketWidth * 0.5} ${yMid - 5}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            upperBracketGroup.append("text")
+                .attr("x", rightX + bracketWidth + 8)
+                .attr("y", (yTop + yMid - 10) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentHigher + '%');
+            
+            // Lower bracket
+            const lowerBracketGroup = this.histG.append("g").attr("class", "lower-bracket");
+            
+            lowerBracketGroup.append("path")
+                .attr("d", `M ${rightX + bracketWidth * 0.5} ${yMid + 5}
+                           Q ${rightX + bracketWidth * 0.8} ${yMid + 15} ${rightX + bracketWidth * 0.5} ${yMid + 25}
+                           L ${rightX + bracketWidth * 0.5} ${yBottom - 20}
+                           Q ${rightX + bracketWidth * 0.8} ${yBottom - 10} ${rightX + bracketWidth * 0.5} ${yBottom}
+                           L ${rightX} ${yBottom}`)
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1.5)
+                .attr("fill", "none");
+            
+            lowerBracketGroup.append("text")
+                .attr("x", rightX + bracketWidth + 8)
+                .attr("y", (yMid + 10 + yBottom) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .style("font-size", "13px")
+                .style("font-weight", "normal")
+                .style("fill", "#555")
+                .text(percentLower + '%');
+        }
     }
 
     // Draw histogram
@@ -631,28 +732,71 @@ class ChartRenderer {
         if (currentDateData.length > 0 && filteredData.length > 0) {
             const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
             
-            this.histG.append("line")
-                .attr("class", "current-temp-line")
-                .attr("x1", 0)
-                .attr("x2", this.config.histWidth)
-                .attr("y1", this.histYScale(currentTemp))
-                .attr("y2", this.histYScale(currentTemp));
+            if (this.isMobile()) {
+                // Mobile: vertical line
+                this.histG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", this.histXScale(currentTemp))
+                    .attr("x2", this.histXScale(currentTemp))
+                    .attr("y1", 0)
+                    .attr("y2", this.config.histHeight);
+            } else {
+                // Desktop: horizontal line
+                this.histG.append("line")
+                    .attr("class", "current-temp-line")
+                    .attr("x1", 0)
+                    .attr("x2", this.config.histWidth)
+                    .attr("y1", this.histYScale(currentTemp))
+                    .attr("y2", this.histYScale(currentTemp));
+            }
             
             this.drawHistogramBrackets(currentTemp);
         }
         
-        // Add x-axis
-        this.histG.append("g")
-            .attr("class", "axis")
-            .attr("transform", `translate(0,${this.config.histHeight})`)
-            .call(d3.axisBottom(this.histXScale).ticks(3));
-        
-        // Add x-axis label
-        this.histG.append("text")
-            .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
-            .style("text-anchor", "middle")
-            .style("font-size", "12px")
-            .text("Count");
+        if (this.isMobile()) {
+            // Mobile: vertical bars - temperature on x-axis, count on y-axis
+            // Add x-axis (temperature values)
+            this.histG.append("g")
+                .attr("class", "axis")
+                .attr("transform", `translate(0,${this.config.histHeight})`)
+                .call(d3.axisBottom(this.histXScale).ticks(5));
+            
+            // Add y-axis (count)
+            this.histG.append("g")
+                .attr("class", "axis")
+                .call(d3.axisLeft(this.histYScale).ticks(3));
+            
+            // Add x-axis label
+            this.histG.append("text")
+                .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
+            
+            // Add y-axis label
+            this.histG.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - this.config.histMargin.left)
+                .attr("x", 0 - (this.config.histHeight / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("Count");
+        } else {
+            // Desktop: horizontal bars - count on x-axis, temperature on y-axis
+            // Add x-axis (count)
+            this.histG.append("g")
+                .attr("class", "axis")
+                .attr("transform", `translate(0,${this.config.histHeight})`)
+                .call(d3.axisBottom(this.histXScale).ticks(3));
+            
+            // Add x-axis label
+            this.histG.append("text")
+                .attr("transform", `translate(${this.config.histWidth / 2}, ${this.config.histHeight + 35})`)
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("Count");
+        }
         
         // Draw legend
         this.drawLegend();
