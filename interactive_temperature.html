@@ -90,6 +90,29 @@
             cursor: not-allowed;
         }
         
+        /* Temperature unit toggle styling */
+        #temp-unit-toggle {
+            margin-left: 10px;
+        }
+        
+        #temp-unit-toggle button {
+            transition: all 0.2s ease;
+        }
+        
+        #temp-unit-toggle button:hover {
+            opacity: 0.8;
+        }
+        
+        #temp-unit-toggle button.active {
+            background: #1976d2 !important;
+            color: white !important;
+        }
+        
+        #temp-unit-toggle button.inactive {
+            background: transparent !important;
+            color: #666 !important;
+        }
+        
         .year-info {
             margin-left: 15px;
             color: #666;
@@ -524,6 +547,12 @@
                 width: 100% !important;
             }
             
+            /* Mobile temperature toggle adjustments */
+            .chart-controls .year-range-control div[style*="gap: 15px"] {
+                gap: 10px !important;
+                flex-wrap: wrap;
+            }
+            
             .charts-container {
                 width: 100%;
                 height: auto;
@@ -756,6 +785,11 @@
                             <select id="metric-select">
                                 <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
                             </select>
+                            <label for="temp-unit-toggle">Unit:</label>
+                            <div id="temp-unit-toggle" style="display: inline-flex; background: #f0f0f0; border-radius: 4px; padding: 2px;">
+                                <button id="temp-celsius" style="padding: 6px 12px; border: none; border-radius: 2px; background: #1976d2; color: white; cursor: pointer; font-size: 12px; font-weight: bold;">°C</button>
+                                <button id="temp-fahrenheit" style="padding: 6px 12px; border: none; border-radius: 2px; background: transparent; color: #666; cursor: pointer; font-size: 12px; font-weight: bold;">°F</button>
+                            </div>
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
                             *Limited metrics available in alpha version
@@ -913,7 +947,20 @@
         // Auto-detect and set closest city on page load
         async function autoDetectLocation() {
             try {
-                await citySelector.setClosestCity(locationDetector);
+                const detectionResult = await citySelector.setClosestCity(locationDetector);
+                
+                // Auto-set temperature unit based on USA detection
+                if (detectionResult && detectionResult.isUSA) {
+                    console.log('🇺🇸 USA user detected, setting temperature unit to Fahrenheit');
+                    CONFIG.autoSetTemperatureUnit(true);
+                    // Update toggle button states if UI controller is initialized
+                    if (uiController) {
+                        uiController.updateToggleButtonStates();
+                    }
+                } else {
+                    console.log('🌍 Non-USA user detected, keeping temperature unit as Celsius');
+                    CONFIG.autoSetTemperatureUnit(false);
+                }
             } catch (error) {
                 console.error('Auto-location on page load failed:', error);
             }
@@ -1122,7 +1169,7 @@
                     // Re-render charts on resize to handle mobile/desktop orientation changes
                     if (dataProcessor && dataProcessor.getFullData() && dataProcessor.getFullData().length > 0) {
                         setTimeout(() => {
-                            uiController.updateCharts();
+                            uiController.updateChartsWithResize();
                         }, 300); // Small delay to let resize complete
                     }
                 });

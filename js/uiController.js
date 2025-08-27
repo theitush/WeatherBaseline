@@ -45,6 +45,9 @@ class UIController {
         // 🎛️ Populate metric selector with only active metrics
         this.initializeMetricSelector();
         
+        // Initialize temperature unit toggle
+        this.initializeTemperatureUnitToggle();
+        
         this.updateYearInfo();
     }
 
@@ -96,6 +99,43 @@ class UIController {
             this.dataProcessor.setCurrentMetric(newMetric);
             this.updateCharts(); // This will recalculate domains and update everything
         });
+    }
+
+    // Initialize temperature unit toggle
+    initializeTemperatureUnitToggle() {
+        const celsiusBtn = d3.select("#temp-celsius");
+        const fahrenheitBtn = d3.select("#temp-fahrenheit");
+        
+        // Set initial state
+        this.updateToggleButtonStates();
+        
+        // Add event listeners
+        celsiusBtn.on("click", () => {
+            CONFIG.setTemperatureUnit('C');
+            this.updateToggleButtonStates();
+            this.updateCharts(); // Need to redraw axes with new tick labels
+        });
+        
+        fahrenheitBtn.on("click", () => {
+            CONFIG.setTemperatureUnit('F');
+            this.updateToggleButtonStates();
+            this.updateCharts(); // Need to redraw axes with new tick labels
+        });
+    }
+
+    // Update toggle button visual states
+    updateToggleButtonStates() {
+        const celsiusBtn = d3.select("#temp-celsius");
+        const fahrenheitBtn = d3.select("#temp-fahrenheit");
+        const currentUnit = CONFIG.getTemperatureUnit();
+        
+        if (currentUnit === 'C') {
+            celsiusBtn.classed("active", true).classed("inactive", false);
+            fahrenheitBtn.classed("active", false).classed("inactive", true);
+        } else {
+            celsiusBtn.classed("active", false).classed("inactive", true);
+            fahrenheitBtn.classed("active", true).classed("inactive", false);
+        }
     }
 
     // Update year range information
@@ -150,6 +190,19 @@ class UIController {
         this.chartRenderer.updateDomains(this.startYear, this.endYear);
         this.chartRenderer.updateCharts();
         this.updateTemperatureContext();
+    }
+
+    // Update function for window resize events
+    updateChartsWithResize() {
+        this.dataProcessor.filterData(this.startYear, this.endYear);
+        this.chartRenderer.updateDomains(this.startYear, this.endYear);
+        this.chartRenderer.updateChartsWithResize();
+        this.updateTemperatureContext();
+    }
+
+    // Update only temperature unit labels without touching chart positioning
+    updateTemperatureLabelsOnly() {
+        this.chartRenderer.updateTemperatureLabelsOnly();
     }
 
     // Get current year range

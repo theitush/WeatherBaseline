@@ -75,20 +75,20 @@ class CitySelector {
                 for (let i = 0; i < this.citySelect.options.length; i++) {
                     if (this.citySelect.options[i].value === optionValue) {
                         this.citySelect.selectedIndex = i;
-                        return true;
+                        return result; // Return the full result including USA detection
                     }
                 }
             }
             
             // If detection failed, repopulate with default message
             this.populateSelect();
-            return false;
+            return null;
             
         } catch (error) {
             // If anything fails, just show the select city option
             this.citySelect.innerHTML = '<option value="">Select a city...</option>';
             this.populateSelect();
-            return false;
+            return null;
         }
     }
 

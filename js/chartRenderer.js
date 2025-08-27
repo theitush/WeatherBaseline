@@ -93,25 +93,38 @@ class ChartRenderer {
             'precipitation_sum': 'Precipitation Sum (mm)',
             'wind_speed_10m_max': 'Maximum Wind Speed (km/h)'
         };
-        return labels[metric] || 'Value';
+        const baseLabel = labels[metric] || 'Value';
+        
+        // Use CONFIG to get the proper temperature unit for temperature metrics
+        if (metric.includes('temperature') && this.config) {
+            return this.config.getTemperatureAxisLabel(baseLabel);
+        }
+        
+        return baseLabel;
     }
 
     // Format tooltip value based on current metric
     formatTooltipValue(metric, value) {
-        const units = {
-            'max_temperature': '°C',
-            'min_temperature': '°C',
-            'precipitation_sum': 'mm',
-            'wind_speed_10m_max': 'km/h'
-        };
         const labels = {
             'max_temperature': 'Max Temperature (UTCI)',
             'min_temperature': 'Min Temperature (UTCI)',
             'precipitation_sum': 'Precipitation',
             'wind_speed_10m_max': 'Max Wind Speed'
         };
-        const unit = units[metric] || '';
         const label = labels[metric] || 'Value';
+        
+        // For temperature metrics, use CONFIG to format with correct unit
+        if (metric.includes('temperature') && this.config) {
+            const formattedTemp = this.config.formatTemperatureForDisplay(value);
+            return `${label}: ${formattedTemp}`;
+        }
+        
+        // For non-temperature metrics, use original formatting
+        const units = {
+            'precipitation_sum': 'mm',
+            'wind_speed_10m_max': 'km/h'
+        };
+        const unit = units[metric] || '';
         return `${label}: ${value.toFixed(1)}${unit}`;
     }
 
@@ -121,11 +134,15 @@ class ChartRenderer {
         if (!extents) return;
         
         this.xScale.domain(extents.dateExtent);
+        
+        // ALWAYS keep domains in Celsius for consistent positioning
+        // Only the tick labels will show Fahrenheit when needed
         this.yScale.domain([extents.tempExtent[0] - 2, extents.tempExtent[1] + 2]);
         this.histYScale.domain(this.yScale.domain());
         this.colorScale.domain([startYear, endYear]);
         
         // Update histogram scales based on orientation
+        // Keep everything in Celsius coordinates for consistent positioning
         const bins = d3.histogram()
             .domain(this.yScale.domain())
             .thresholds(30)
@@ -186,6 +203,7 @@ class ChartRenderer {
 
         console.log('Drawing percentile bands for', yearlyAggregates.length, 'years');
         
+        // Keep positioning in Celsius for consistent charts
         const area90 = d3.area()
             .x(d => this.xScale(d.date))
             .y0(d => this.yScale(d.p10 || d.moving10))
@@ -285,6 +303,7 @@ class ChartRenderer {
             .attr("opacity", 0)
             .remove();
         
+        // Keep positioning in Celsius - only tooltips will show Fahrenheit
         // Update existing points
         circles.transition()
             .duration(500)
@@ -328,6 +347,7 @@ class ChartRenderer {
         if (currentDateData.length > 0) {
             const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
             
+            // Keep positioning in Celsius
             // Current temperature horizontal dashed line
             this.mainG.append("line")
                 .attr("class", "current-temp-line")
@@ -402,7 +422,15 @@ class ChartRenderer {
     drawAxesAndGrid() {
         // Add grid
         const xAxis = d3.axisBottom(this.xScale).tickFormat(d3.timeFormat("%Y"));
-        const yAxis = d3.axisLeft(this.yScale);
+        
+        // Custom tick formatter for Y-axis to show Fahrenheit when needed
+        const yAxis = d3.axisLeft(this.yScale).tickFormat(d => {
+            if (this.dataProcessor.currentMetric.includes('temperature') && this.config.getTemperatureUnit() === 'F') {
+                const fahrenheit = this.config.celsiusToFahrenheitLabel(d);
+                return fahrenheit.toFixed(0);
+            }
+            return d.toFixed(0);
+        });
         
         this.mainG.append("g")
             .attr("class", "grid")
@@ -615,7 +643,7 @@ class ChartRenderer {
     drawHistogramBrackets(currentTemp) {
         const filteredData = this.dataProcessor.getFilteredData();
         
-        // Calculate percentiles
+        // Calculate percentiles using original Celsius temperatures
         const higherCount = filteredData.filter(d => d[this.dataProcessor.currentMetric] > currentTemp).length;
         const totalCount = filteredData.length;
         const percentHigher = (higherCount / totalCount * 100).toFixed(1);
@@ -769,8 +797,8 @@ class ChartRenderer {
 
     // Draw histogram
     drawHistogram() {
-        // Update SVG dimensions first
-        this.updateHistogramSVGDimensions();
+        // Don't update SVG dimensions here - it causes positioning issues
+        // SVG dimensions should only be updated on window resize
         const filteredData = this.dataProcessor.getFilteredData();
         if (filteredData.length === 0) {
             this.histG.selectAll("*").remove();
@@ -789,6 +817,7 @@ class ChartRenderer {
         this.histG.selectAll("g.lower-bracket").remove();
         this.histG.selectAll("g").selectAll("text").remove();
         
+        // Keep all data in Celsius for consistent positioning
         // Create histogram data
         const bins = d3.histogram()
             .domain(this.yScale.domain())
@@ -805,7 +834,7 @@ class ChartRenderer {
             const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
             
             if (this.isMobile()) {
-                // Mobile: vertical line
+                // Mobile: vertical line (keep in Celsius coordinates)
                 const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
@@ -824,7 +853,7 @@ class ChartRenderer {
                         day: 'numeric',
                         year: 'numeric'
                     });
-                    const tempStr = currentTemp.toFixed(1) + '°C';
+                    const tempStr = this.config.formatTemperatureForDisplay(currentTemp);
                     
                     // Position labels to the right of the dashed line, middle height
                     const labelX = pointX + 10; // 10px to the right of the line
@@ -853,7 +882,7 @@ class ChartRenderer {
                         .text(`${tempStr}`);
                 }
             } else {
-                // Desktop: horizontal line
+                // Desktop: horizontal line (keep in Celsius coordinates)
                 const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
@@ -868,11 +897,19 @@ class ChartRenderer {
         
         if (this.isMobile()) {
             // Mobile: vertical bars - temperature on x-axis, count on y-axis
-            // Add x-axis (temperature values)
+            // Add x-axis (temperature values) with custom formatter
+            const histXAxis = d3.axisBottom(this.histXScale).ticks(5).tickFormat(d => {
+                if (this.dataProcessor.currentMetric.includes('temperature') && this.config.getTemperatureUnit() === 'F') {
+                    const fahrenheit = this.config.celsiusToFahrenheitLabel(d);
+                    return fahrenheit.toFixed(0);
+                }
+                return d.toFixed(0);
+            });
+            
             this.histG.append("g")
                 .attr("class", "axis")
                 .attr("transform", `translate(0,${this.config.histHeight})`)
-                .call(d3.axisBottom(this.histXScale).ticks(5));
+                .call(histXAxis);
             
             // Add y-axis (count)
             this.histG.append("g")
@@ -922,5 +959,54 @@ class ChartRenderer {
     updateCharts() {
         this.drawMainChart();
         this.drawHistogram();
+    }
+
+    // Update charts with dimension recalculation (for resize events)
+    updateChartsWithResize() {
+        this.updateHistogramSVGDimensions();
+        this.drawMainChart();
+        this.drawHistogram();
+    }
+
+    // Update only temperature labels without moving anything
+    updateTemperatureLabelsOnly() {
+        // Only update axis labels on both charts
+        this.updateAxisLabels();
+        this.updateHistogramAxisLabels();
+        
+        // Update current temperature labels in histogram
+        this.updateHistogramCurrentTempLabels();
+    }
+
+    // Update only the axis labels on main chart
+    updateAxisLabels() {
+        // Update Y-axis label
+        this.mainG.select("text").filter(function() {
+            return d3.select(this).attr("transform") && d3.select(this).attr("transform").includes("rotate(-90)");
+        }).text(this.getYAxisLabel(this.dataProcessor.currentMetric));
+    }
+
+    // Update only the axis labels on histogram
+    updateHistogramAxisLabels() {
+        if (this.isMobile()) {
+            // Mobile: update x-axis label (temperature axis)
+            this.histG.selectAll("text").filter(function() {
+                const transform = d3.select(this).attr("transform");
+                return transform && transform.includes("translate") && !transform.includes("rotate");
+            }).text(this.getYAxisLabel(this.dataProcessor.currentMetric));
+        }
+    }
+
+    // Update current temperature labels in histogram
+    updateHistogramCurrentTempLabels() {
+        const currentDateData = this.dataProcessor.getCurrentDateData(this.dataProcessor.getFullData());
+        
+        if (currentDateData.length > 0) {
+            const currentTemp = currentDateData[0][this.dataProcessor.currentMetric];
+            const tempStr = this.config.formatTemperatureForDisplay(currentTemp);
+            
+            // Update the temperature label text only
+            this.histG.select(".current-temp-label").text(tempStr);
+        }
     }
 }

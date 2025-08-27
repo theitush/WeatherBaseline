@@ -134,5 +134,63 @@ const CONFIG = {
     // Check if a metric is active
     isMetricActive(metric) {
         return this.ACTIVE_METRICS[metric] === true;
+    },
+
+    // ==========================================
+    // 🌡️ TEMPERATURE UNIT MANAGEMENT
+    // ==========================================
+    
+    // Current temperature unit ('C' for Celsius, 'F' for Fahrenheit)
+    temperatureUnit: 'C',
+    
+    // Set temperature unit
+    setTemperatureUnit(unit) {
+        if (unit === 'C' || unit === 'F') {
+            this.temperatureUnit = unit;
+            console.log(`🌡️ Temperature unit set to: ${unit === 'C' ? 'Celsius' : 'Fahrenheit'}`);
+        } else {
+            console.warn('Invalid temperature unit. Use "C" or "F"');
+        }
+    },
+    
+    // Get current temperature unit
+    getTemperatureUnit() {
+        return this.temperatureUnit;
+    },
+    
+    // Convert Celsius value to Fahrenheit for display (label only)
+    celsiusToFahrenheitLabel(celsius) {
+        return (celsius * 9/5) + 32;
+    },
+    
+    // Format temperature value for display with correct unit
+    formatTemperatureForDisplay(celsiusValue, precision = 1) {
+        if (this.temperatureUnit === 'F') {
+            const fahrenheit = this.celsiusToFahrenheitLabel(celsiusValue);
+            return `${fahrenheit.toFixed(precision)}°F`;
+        } else {
+            return `${celsiusValue.toFixed(precision)}°C`;
+        }
+    },
+    
+    // Get temperature unit symbol
+    getTemperatureUnitSymbol() {
+        return this.temperatureUnit === 'F' ? '°F' : '°C';
+    },
+    
+    // Get axis label for temperature with current unit
+    getTemperatureAxisLabel(baseLabel = 'Temperature') {
+        const unit = this.getTemperatureUnitSymbol();
+        if (baseLabel.includes('UTCI')) {
+            return baseLabel.replace('°C', unit);
+        }
+        return `${baseLabel} (${unit})`;
+    },
+    
+    // Auto-set temperature unit based on USA detection
+    autoSetTemperatureUnit(isUSA) {
+        const newUnit = isUSA ? 'F' : 'C';
+        this.setTemperatureUnit(newUnit);
+        return newUnit;
     }
 };

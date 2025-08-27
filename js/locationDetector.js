@@ -135,6 +135,21 @@ class LocationDetector {
     }
 
     /**
+     * Check if user is from USA based on location data
+     */
+    isUserFromUSA() {
+        if (!this.userLocation || !this.userLocation.country) {
+            return false;
+        }
+        
+        const country = this.userLocation.country.toLowerCase();
+        return country.includes('united states') || 
+               country.includes('usa') || 
+               country === 'us' ||
+               country === 'united states of america';
+    }
+
+    /**
      * Detect user location and find closest available city
      * Returns the closest city or null if detection fails
      */
@@ -149,7 +164,8 @@ class LocationDetector {
             return {
                 userLocation,
                 closestCity,
-                distance: Math.round(closestCity.distance)
+                distance: Math.round(closestCity.distance),
+                isUSA: this.isUserFromUSA()
             };
             
         } catch (error) {
