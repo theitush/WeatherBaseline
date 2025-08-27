@@ -144,23 +144,11 @@ app.get('/api/archive', async (req, res) => {
     } catch (error) {
         console.error('Archive API Error:', error);
         
-        // Provide user-friendly error messages
-        let userMessage = error.message;
-        if (error.message.includes('status 400')) {
-            userMessage = 'Invalid request parameters. The requested date range or location might not be available in the historical database.';
-        } else if (error.message.includes('status 404')) {
-            userMessage = 'No historical data available for this location and date range.';
-        } else if (error.message.includes('status 429')) {
-            userMessage = 'Too many requests. Please wait a moment and try again.';
-        } else if (error.message.includes('status 503') || error.message.includes('status 504')) {
-            userMessage = 'Weather service is temporarily unavailable. Please try again later.';
-        }
-        
         res.status(500).json({
-            error: 'Failed to fetch historical weather data',
-            message: userMessage,
-            technical: error.message,
-            suggestion: 'Try selecting a more recent start year (e.g., 1959) or check if data is available for this location.'
+            error: 'Archive API Error',
+            message: error.message,
+            stack: error.stack,
+            type: error.constructor.name
         });
     }
 });
@@ -235,20 +223,11 @@ app.get('/api/forecast', async (req, res) => {
     } catch (error) {
         console.error('Forecast API Error:', error);
         
-        // Provide user-friendly error messages
-        let userMessage = error.message;
-        if (error.message.includes('status 400')) {
-            userMessage = 'Invalid request parameters. Please check the date and location.';
-        } else if (error.message.includes('status 429')) {
-            userMessage = 'Too many requests. Please wait a moment and try again.';
-        } else if (error.message.includes('status 503') || error.message.includes('status 504')) {
-            userMessage = 'Weather service is temporarily unavailable. Please try again later.';
-        }
-        
         res.status(500).json({
-            error: 'Failed to fetch forecast weather data',
-            message: userMessage,
-            technical: error.message
+            error: 'Forecast API Error',
+            message: error.message,
+            stack: error.stack,
+            type: error.constructor.name
         });
     }
 });
@@ -270,8 +249,10 @@ app.get('/api/cache-status', async (req, res) => {
         res.json(stats);
     } catch (error) {
         res.status(500).json({
-            error: 'Failed to get cache status',
-            message: error.message
+            error: 'Cache Status Error',
+            message: error.message,
+            stack: error.stack,
+            type: error.constructor.name
         });
     }
 });

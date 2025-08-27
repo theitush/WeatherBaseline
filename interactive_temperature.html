@@ -919,49 +919,12 @@
             }
         }
 
-        // Show comprehensive error popup and update display
+        // Show error popup and update display
         function showError(errorMessage, errorDetails = {}) {
-            // Build comprehensive error message
-            let popupMessage = `🚨 ERROR FETCHING WEATHER DATA\n\n`;
-            popupMessage += `ERROR MESSAGE:\n${errorMessage}\n\n`;
+            alert(`ERROR: ${errorMessage}`);
             
-            // Add technical details if available
-            if (errorDetails.status) {
-                popupMessage += `HTTP STATUS: ${errorDetails.status}\n`;
-            }
-            if (errorDetails.url) {
-                popupMessage += `FAILED URL: ${errorDetails.url}\n`;
-            }
-            if (errorDetails.technical) {
-                popupMessage += `TECHNICAL DETAILS:\n${errorDetails.technical}\n`;
-            }
-            if (errorDetails.timestamp) {
-                popupMessage += `TIME: ${errorDetails.timestamp}\n`;
-            }
-            if (errorDetails.location) {
-                popupMessage += `LOCATION: ${errorDetails.location}\n`;
-            }
-            if (errorDetails.dateRange) {
-                popupMessage += `DATE RANGE: ${errorDetails.dateRange}\n`;
-            }
-            
-            popupMessage += `\n💡 SUGGESTIONS:\n`;
-            popupMessage += `• Try a different location\n`;
-            popupMessage += `• Check your internet connection\n`;
-            popupMessage += `• Wait a moment and try again\n`;
-            popupMessage += `• Try a more recent date if using historical data`;
-            
-            // Always show popup alert with all details
-            alert(popupMessage);
-            
-            // Also update the context display with error message
-            d3.select("#temperature-context")
-                .html(`❌ Error: ${errorMessage}`);
-                
-            // Hide chart controls on error
+            d3.select("#temperature-context").html(`❌ ${errorMessage}`);
             document.querySelector('.chart-controls').classList.remove('show');
-            
-            // Clear chart title on error
             document.getElementById('chart-title').textContent = '';
         }
 
@@ -1055,7 +1018,7 @@
                     errorDetails.technical = error.serverDetails + '\n\n' + errorDetails.technical;
                 }
                 
-                showError(error.message || 'Unknown error occurred', errorDetails);
+                showError(error.message || `API Error: ${error.toString()}`, errorDetails);
             } finally {
                 // Remove loading overlay in case of error
                 let finalLoadingOverlay = document.querySelector('.temperature-loading-overlay');
@@ -1188,7 +1151,7 @@
                 
             } catch (error) {
                 console.error('Error initializing visualization:', error);
-                d3.select("#temperature-context").html("❌ Error initializing application. Check console for details.");
+                d3.select("#temperature-context").html(`❌ Initialization Error: ${error.message || error.toString()}`);
             }
         }
 
