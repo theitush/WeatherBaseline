@@ -192,5 +192,32 @@ const CONFIG = {
         const newUnit = isUSA ? 'F' : 'C';
         this.setTemperatureUnit(newUnit);
         return newUnit;
+    },
+
+    // ==========================================
+    // 📊 LEGEND INFORMATION (SINGLE SOURCE OF TRUTH)
+    // ==========================================
+    
+    LEGEND_INFO: {
+        percentileBand90: {
+            label: "10th-90th percentile",
+            tooltip: "Contains 80% of all historical temperatures - shows the broad range of typical values for this date"
+        },
+        percentileBand75: {
+            label: "25th-75th percentile", 
+            tooltip: "Contains 50% of all historical temperatures (interquartile range) - shows the most common temperature range for this date"
+        },
+        trendLine: {
+            label: "Rolling median (±2 years)",
+            tooltip: "Shows typical temperature trend using a 5-year window median. Smooths out year-to-year variability while preserving climate trends"
+        },
+        dataPoints: {
+            label: "Historical data",
+            tooltip: "Individual daily temperature readings for your selected date range across all available years"
+        },
+        currentDate: {
+            label: "Current Date Indicator",
+            tooltip: "Dashed line and point showing your target date's temperature"
+        }
     }
 };

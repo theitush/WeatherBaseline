@@ -513,26 +513,30 @@ class ChartRenderer {
             {
                 type: "rect",
                 color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand90'),
-                label: "10th-90th percentile",
-                opacity: 0.2
+                label: this.config.LEGEND_INFO.percentileBand90.label,
+                opacity: 0.2,
+                tooltip: this.config.LEGEND_INFO.percentileBand90.tooltip
             },
             {
                 type: "rect", 
                 color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'percentileBand75'),
-                label: "25th-75th percentile",
-                opacity: 0.2
+                label: this.config.LEGEND_INFO.percentileBand75.label,
+                opacity: 0.2,
+                tooltip: this.config.LEGEND_INFO.percentileBand75.tooltip
             },
             {
                 type: "line",
                 color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'trendLine'),
-                label: "Rolling median (±2 years)",
-                opacity: 1
+                label: this.config.LEGEND_INFO.trendLine.label,
+                opacity: 1,
+                tooltip: this.config.LEGEND_INFO.trendLine.tooltip
             },
             {
                 type: "circle",
                 color: this.config.getColorForElement(this.dataProcessor.currentMetric, 'dataPoints'),
-                label: "Historical data",
-                opacity: 1
+                label: this.config.LEGEND_INFO.dataPoints.label,
+                opacity: 1,
+                tooltip: this.config.LEGEND_INFO.dataPoints.tooltip
             }
         ];
         
@@ -564,6 +568,10 @@ class ChartRenderer {
             
             const legendLabel = document.createElement('span');
             legendLabel.textContent = item.label;
+            
+            // Add tooltip functionality
+            legendItem.title = item.tooltip;
+            legendItem.style.cursor = 'help';
             
             legendItem.appendChild(legendIcon);
             legendItem.appendChild(legendLabel);
