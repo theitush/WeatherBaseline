@@ -548,9 +548,45 @@
             }
             
             /* Mobile temperature toggle adjustments */
-            .chart-controls .year-range-control div[style*="gap: 15px"] {
-                gap: 10px !important;
-                flex-wrap: wrap;
+            .chart-controls .year-range-control div[style*="gap: 12px"] {
+                gap: 6px !important;
+                flex-wrap: nowrap !important;
+                align-items: center;
+            }
+            
+            /* Make metric selector and toggle more compact on mobile */
+            .chart-controls .year-range-control select {
+                min-width: 0 !important;
+                flex-shrink: 1;
+                font-size: 13px !important;
+                padding: 6px 8px !important;
+            }
+            
+            .chart-controls .year-range-control label {
+                font-size: 13px !important;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            
+            /* Make temperature toggle more compact on mobile */
+            #temp-unit-toggle {
+                flex-shrink: 0;
+                background: #f0f0f0 !important;
+                border-radius: 4px !important;
+                padding: 1px !important;
+                overflow: hidden;
+            }
+            
+            #temp-unit-toggle button {
+                padding: 4px 8px !important;
+                font-size: 11px !important;
+                border: none !important;
+                border-radius: 2px !important;
+                margin: 0 !important;
+                outline: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+                appearance: none !important;
             }
             
             .charts-container {
@@ -780,15 +816,14 @@
                 </div>
                 <div class="year-range-control">
                     <div style="display: flex; flex-direction: column;">
-                        <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
                             <label for="metric-select">Metric:</label>
-                            <select id="metric-select">
+                            <select id="metric-select" style="min-width: 200px;">
                                 <!-- 🎛️ Options will be populated dynamically based on CONFIG.ACTIVE_METRICS -->
                             </select>
-                            <label for="temp-unit-toggle">Unit:</label>
-                            <div id="temp-unit-toggle" style="display: inline-flex; background: #f0f0f0; border-radius: 4px; padding: 2px;">
-                                <button id="temp-celsius" style="padding: 6px 12px; border: none; border-radius: 2px; background: #1976d2; color: white; cursor: pointer; font-size: 12px; font-weight: bold;">°C</button>
-                                <button id="temp-fahrenheit" style="padding: 6px 12px; border: none; border-radius: 2px; background: transparent; color: #666; cursor: pointer; font-size: 12px; font-weight: bold;">°F</button>
+                            <div id="temp-unit-toggle" style="display: inline-flex; background: #f0f0f0; border-radius: 4px; padding: 1px;">
+                                <button id="temp-celsius" style="padding: 5px 10px; border: none; border-radius: 2px; background: #1976d2; color: white; cursor: pointer; font-size: 12px; font-weight: bold;">°C</button>
+                                <button id="temp-fahrenheit" style="padding: 5px 10px; border: none; border-radius: 2px; background: transparent; color: #666; cursor: pointer; font-size: 12px; font-weight: bold;">°F</button>
                             </div>
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 5px; margin-left: 0; font-style: italic;" class="metric-disclaimer">
