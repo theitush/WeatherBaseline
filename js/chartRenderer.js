@@ -9,8 +9,8 @@ class ChartRenderer {
         this.initializeElements();
         this.initializeScales();
         
-        // Set initial CSS properties for mobile
-        this.updateMobileCSSProperties();
+        // Set initial viewBox for mobile
+        this.updateViewBoxes();
     }
 
     initializeElements() {
@@ -34,17 +34,19 @@ class ChartRenderer {
             .attr("stroke", "none");
         
         // Create chart groups
+        const dimensions = this.getChartDimensions();
         this.mainG = this.mainSvg.append("g")
             .attr("transform", 
                 this.isMobile()
-                    ? `translate(0, 0)` // NO MARGINS - full width
+                    ? `translate(${dimensions.chartMargin}, ${dimensions.chartMargin})` // Calculated margins for mobile
                     : `translate(${this.config.mainMargin.left}, ${this.config.mainMargin.top})`
             );
             
+        const histBracketSpace = 70; // Space for percentile brackets
         this.histG = this.histSvg.append("g")
             .attr("transform", 
                 this.isMobile() 
-                    ? `translate(0, 70)` // NO MARGINS - just bracket space
+                    ? `translate(${dimensions.chartMargin}, ${histBracketSpace})` // Calculated margins + bracket space
                     : `translate(${this.config.histMargin.left}, ${this.config.histMargin.top})`
             );
     }
@@ -54,49 +56,66 @@ class ChartRenderer {
         return window.innerWidth <= 768;
     }
 
-    // Get dynamic mobile chart width for responsive design (FULL WIDTH)
-    getMobileChartWidth() {
-        const screenWidth = window.innerWidth;
-        const padding = 20; // Minimal padding for screen edges
-        return Math.min(400, Math.max(280, screenWidth - padding));
-    }
-
-    // Get mobile full-width dimensions (NO MARGINS for perfect alignment)
-    getMobileFullWidthDimensions() {
-        const chartWidth = this.getMobileChartWidth();
-        return {
-            svgWidth: chartWidth,
-            drawingWidth: chartWidth, // FULL width - no margins
-            drawingHeight: this.isMobile() ? 300 : this.config.mainHeight
-        };
-    }
-
-    // Update CSS custom properties for responsive sizing
-    updateMobileCSSProperties() {
+    // Get actual chart container dimensions for responsive design
+    getChartDimensions() {
         if (this.isMobile()) {
-            const chartWidth = this.getMobileChartWidth();
-            document.documentElement.style.setProperty('--chart-width', chartWidth + 'px');
+            const container = document.querySelector('.charts-container');
+            const containerWidth = container ? container.clientWidth : window.innerWidth;
+            const containerPadding = 30; // CSS container padding (15px * 2)
+            const chartMargin = 20; // Internal chart margins for labels/axes
+            const axisLabelSpace = 40; // Extra space for axis labels
+            const availableWidth = Math.min(400, Math.max(280, containerWidth - containerPadding));
             
-            // Set main SVG viewBox for mobile full-width
-            const dimensions = this.getMobileFullWidthDimensions();
-            this.mainSvg.attr("viewBox", `0 0 ${dimensions.svgWidth} ${dimensions.drawingHeight}`);
+            return {
+                svgWidth: availableWidth,
+                svgHeight: availableWidth + axisLabelSpace, // Taller to prevent clipping
+                drawingWidth: availableWidth - chartMargin,
+                drawingHeight: availableWidth - chartMargin, // Square for rotation (matches width)
+                chartMargin: chartMargin / 2 // 10px margin on each side
+            };
+        } else {
+            return {
+                svgWidth: 720,
+                svgHeight: 400,
+                drawingWidth: this.config.mainWidth,
+                drawingHeight: this.config.mainHeight,
+                chartMargin: 0
+            };
+        }
+    }
+
+    // Update viewBox for responsive sizing
+    updateViewBoxes() {
+        const dimensions = this.getChartDimensions();
+        const histDims = this.getHistogramDimensions();
+        
+        if (this.isMobile()) {
+            // Set responsive viewBox for main chart
+            this.mainSvg.attr("viewBox", `0 0 ${dimensions.svgWidth} ${dimensions.svgHeight}`);
+            
+            // Set responsive viewBox for histogram
+            this.histSvg.attr("viewBox", `0 0 ${histDims.svgWidth} ${histDims.svgHeight}`);
         } else {
             // Reset to desktop viewBox
             this.mainSvg.attr("viewBox", "0 0 720 400");
+            this.histSvg.attr("viewBox", "0 0 420 400");
         }
     }
 
     // Get dynamic histogram dimensions based on screen size
     getHistogramDimensions() {
         if (this.isMobile()) {
-            // Mobile: FULL WIDTH - no margins for perfect alignment
-            const fullWidth = this.getMobileFullWidthDimensions();
+            // Mobile: systematic dimensions with calculated margins
+            const chartDims = this.getChartDimensions();
+            const bracketSpace = 70; // Space for percentile brackets
+            const axisLabelSpace = 40; // Space for axis labels at bottom
+            
             return {
-                width: fullWidth.drawingWidth,  // FULL width
-                height: 180,                    // chart area  
-                svgWidth: fullWidth.svgWidth,   // responsive width
-                svgHeight: 250,                 // +70px for bracket space
-                bracketSpace: 70                // top reserved area
+                width: chartDims.drawingWidth,  // Drawing area width
+                height: 180,                    // Chart drawing area height
+                svgWidth: chartDims.svgWidth,   // Full SVG width
+                svgHeight: bracketSpace + 180 + axisLabelSpace, // Total height with margins
+                bracketSpace: bracketSpace      // Top reserved area
             };
         } else {
             // Desktop: use original config dimensions
@@ -111,14 +130,12 @@ class ChartRenderer {
 
     initializeScales() {
         // Get dynamic dimensions for mobile (FULL WIDTH)
-        const dimensions = this.isMobile() 
-            ? this.getMobileFullWidthDimensions()
-            : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+        const dimensions = this.getChartDimensions();
             
         // Scales - for mobile, BOTH axes need flipping for rotation
         if (this.isMobile()) {
             this.xScale = d3.scaleTime().range([dimensions.drawingWidth, 0]); // FLIP: latest year at top after rotation
-            this.yScale = d3.scaleLinear().range([0, dimensions.drawingHeight]); // cold→hot
+            this.yScale = d3.scaleLinear().range([dimensions.drawingHeight, 0]); // hot→cold (matches histogram after rotation)
         } else {
             this.xScale = d3.scaleTime().range([0, dimensions.drawingWidth]);
             this.yScale = d3.scaleLinear().range([dimensions.drawingHeight, 0]); // standard SVG
@@ -205,7 +222,7 @@ class ChartRenderer {
         if (this.isMobile()) {
             // Mobile: vertical bars, EXACT SAME scale as main chart yScale
             this.histXScale.domain(this.yScale.domain());
-            this.histXScale.range([histDims.width, 0]); // HOT→COLD to match main chart
+            this.histXScale.range([0, histDims.width]); // HOT→COLD to match main chart after rotation
             this.histYScale.domain([0, d3.max(bins, d => d.length)]);
             this.histYScale.range([histDims.height, 0]);
         } else {
@@ -401,9 +418,7 @@ class ChartRenderer {
             
             // Keep positioning in Celsius
             // Current temperature horizontal dashed line
-            const dimensions = this.isMobile() 
-                ? this.getMobileFullWidthDimensions()
-                : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+            const dimensions = this.getChartDimensions();
                 
             this.mainG.append("line")
                 .attr("class", "current-temp-line")
@@ -477,9 +492,7 @@ class ChartRenderer {
     // Draw main chart axes and grid
     drawAxesAndGrid() {
         // Get dimensions for mobile full-width
-        const dimensions = this.isMobile() 
-            ? this.getMobileFullWidthDimensions()
-            : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+        const dimensions = this.getChartDimensions();
 
         // Add grid
         const xAxis = d3.axisBottom(this.xScale).tickFormat(d3.timeFormat("%Y"));
@@ -740,7 +753,7 @@ class ChartRenderer {
         if (this.isMobile()) {
             // Mobile: vertical histogram - brackets at top (within bracket space)
             const histDims = this.getHistogramDimensions();
-            const topY = -60; // Within the 70px bracket space
+            const topY = -40; // Positioned safely within the 70px bracket space
             const bracketHeight = 18;
             const xMid = this.histXScale(currentTemp);
             const xLeft = 15;
@@ -848,24 +861,16 @@ class ChartRenderer {
         }
     }
 
-    // Update histogram SVG dimensions for mobile
-    updateHistogramSVGDimensions() {
-        const histDims = this.getHistogramDimensions();
-        
+    // Update histogram group positioning (viewBox is handled by updateViewBoxes)
+    updateHistogramGroupPosition() {
         if (this.isMobile()) {
-            // Mobile: Use dynamic dimensions with bracket space (FULL WIDTH)
-            this.histSvg
-                .attr("viewBox", `0 0 ${histDims.svgWidth} ${histDims.svgHeight}`);
-            
-            // Position group with NO MARGINS and bracket space offset  
-            this.histG
-                .attr("transform", `translate(0, 70)`);
+            const dimensions = this.getChartDimensions();
+            const histBracketSpace = 70; // Space for percentile brackets
+            // Mobile: Position group with calculated margins + bracket space offset  
+            this.histG.attr("transform", `translate(${dimensions.chartMargin}, ${histBracketSpace})`);
         } else {
-            // Reset to desktop dimensions and positioning
-            this.histSvg
-                .attr("viewBox", `0 0 420 400`);
-            this.histG
-                .attr("transform", `translate(${this.config.histMargin.left}, ${this.config.histMargin.top})`);
+            // Desktop: Use config margins
+            this.histG.attr("transform", `translate(${this.config.histMargin.left}, ${this.config.histMargin.top})`);
         }
     }
 
@@ -1033,8 +1038,8 @@ class ChartRenderer {
 
     // Update both charts
     updateCharts() {
-        // Update CSS properties for responsive sizing
-        this.updateMobileCSSProperties();
+        // Update viewBox for responsive sizing
+        this.updateViewBoxes();
         
         this.drawMainChart();
         this.drawHistogram();
@@ -1042,10 +1047,12 @@ class ChartRenderer {
 
     // Update charts with dimension recalculation (for resize events)
     updateChartsWithResize() {
-        // Update CSS properties for responsive sizing
-        this.updateMobileCSSProperties();
+        // Update viewBox for responsive sizing
+        this.updateViewBoxes();
         
-        this.updateHistogramSVGDimensions();
+        // Update histogram group positioning
+        this.updateHistogramGroupPosition();
+        
         this.drawMainChart();
         this.drawHistogram();
     }

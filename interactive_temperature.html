@@ -125,10 +125,9 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
-            height: 580px;
             max-width: 950px;
             margin: 0 auto;
-            overflow-x: hidden;
+            min-height: 450px;
         }
         
         /* Desktop SVG sizing - maintain original dimensions */
@@ -162,7 +161,7 @@
         
         .histogram-chart {
             position: absolute;
-            left: 715px;
+            right: 25px;
             top: 20px;
             transition: top 0.3s ease;
         }
@@ -403,9 +402,9 @@
         
         .chart-legend {
             position: absolute;
-            bottom: 50px;
-            left:   -220px;
-            right: -60px;
+            bottom: 10px;
+            left: 20px;
+            right: 20px;
             display: flex;
             flex-direction: row;
             flex-wrap: wrap;
@@ -604,7 +603,7 @@
                 appearance: none !important;
             }
             
-            /* MOBILE LAYOUT - Flexbox for proper ordering */
+            /* MOBILE LAYOUT - Clean flexbox implementation */
             .charts-container {
                 display: flex;
                 flex-direction: column;
@@ -612,7 +611,6 @@
                 width: 100%;
                 padding: 15px;
                 position: relative;
-                overflow-x: hidden;
             }
             
             .chart-controls {
@@ -627,45 +625,46 @@
                 margin-left: 0;
                 font-size: 16px;
                 padding: 10px 0;
-                margin-bottom: 10px;
+                margin-bottom: 15px;
             }
             
             /* Histogram: FIRST (top) - FULL WIDTH */
             .histogram-chart {
                 position: static;
-                width: var(--chart-width, 320px); /* Dynamic FULL width from JS */
-                height: 250px;
-                margin: 0 auto -10px auto; /* NEGATIVE margin to close gap */
-                order: 1; /* FIRST */
-                background: rgba(255,0,0,0.1); /* DEBUG: red background */
+                width: 100%;
+                max-width: 400px;
+                height: 290px; /* Match SVG height to prevent clipping */
+                margin: 0 auto 10px auto;
+                order: 1;
             }
             
             #histogram-svg {
-                width: var(--chart-width, 320px);
-                height: 250px;
+                width: 100%;
+                height: 100%;
             }
             
             /* Main chart: SECOND (bottom) - FULL WIDTH + rotated 90° */
             .main-chart {
                 position: static;
-                width: var(--chart-width, 320px); /* Dynamic FULL width from JS */
-                height: var(--chart-width, 320px); /* Square for rotation */
-                margin: 25px auto; /* Reduced margin to close gap */
-                order: 2; /* SECOND */
+                width: 100%;
+                max-width: 400px;
+                height: 440px; /* Taller to prevent clipping of axis labels */
+                margin: 10px auto 20px auto;
+                order: 2;
                 transform: rotate(90deg);
                 transform-origin: center center;
-                background: rgba(0,255,0,0.1); /* DEBUG: green background */
             }
             
             #main-svg {
-                width: var(--chart-width, 320px);
-                height: var(--chart-width, 320px);
+                width: 100%;
+                height: 100%;
             }
             
             .chart-legend {
                 position: static;
                 margin: 20px 0;
                 padding: 10px;
+                order: 3;
             }
             
             .chart-controls.show ~ .chart-title ~ .main-chart,
