@@ -8,6 +8,9 @@ class ChartRenderer {
         // Initialize SVG elements and scales
         this.initializeElements();
         this.initializeScales();
+        
+        // Set initial CSS properties for mobile
+        this.updateMobileCSSProperties();
     }
 
     initializeElements() {
@@ -32,10 +35,18 @@ class ChartRenderer {
         
         // Create chart groups
         this.mainG = this.mainSvg.append("g")
-            .attr("transform", `translate(${this.config.mainMargin.left},${this.config.mainMargin.top})`);
+            .attr("transform", 
+                this.isMobile()
+                    ? `translate(0, 0)` // NO MARGINS - full width
+                    : `translate(${this.config.mainMargin.left}, ${this.config.mainMargin.top})`
+            );
             
         this.histG = this.histSvg.append("g")
-            .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
+            .attr("transform", 
+                this.isMobile() 
+                    ? `translate(0, 70)` // NO MARGINS - just bracket space
+                    : `translate(${this.config.histMargin.left}, ${this.config.histMargin.top})`
+            );
     }
 
     // Check if we're on mobile (matches CSS breakpoint)
@@ -43,20 +54,49 @@ class ChartRenderer {
         return window.innerWidth <= 768;
     }
 
+    // Get dynamic mobile chart width for responsive design (FULL WIDTH)
+    getMobileChartWidth() {
+        const screenWidth = window.innerWidth;
+        const padding = 20; // Minimal padding for screen edges
+        return Math.min(400, Math.max(280, screenWidth - padding));
+    }
+
+    // Get mobile full-width dimensions (NO MARGINS for perfect alignment)
+    getMobileFullWidthDimensions() {
+        const chartWidth = this.getMobileChartWidth();
+        return {
+            svgWidth: chartWidth,
+            drawingWidth: chartWidth, // FULL width - no margins
+            drawingHeight: this.isMobile() ? 300 : this.config.mainHeight
+        };
+    }
+
+    // Update CSS custom properties for responsive sizing
+    updateMobileCSSProperties() {
+        if (this.isMobile()) {
+            const chartWidth = this.getMobileChartWidth();
+            document.documentElement.style.setProperty('--chart-width', chartWidth + 'px');
+            
+            // Set main SVG viewBox for mobile full-width
+            const dimensions = this.getMobileFullWidthDimensions();
+            this.mainSvg.attr("viewBox", `0 0 ${dimensions.svgWidth} ${dimensions.drawingHeight}`);
+        } else {
+            // Reset to desktop viewBox
+            this.mainSvg.attr("viewBox", "0 0 720 400");
+        }
+    }
+
     // Get dynamic histogram dimensions based on screen size
     getHistogramDimensions() {
         if (this.isMobile()) {
-            // Mobile: use most of screen width
-            const screenWidth = window.innerWidth;
-            const padding = 40; // Total padding (20px each side)
-            const availableWidth = screenWidth - padding;
-            const histWidth = Math.max(280, availableWidth); // Minimum 280px
-            
+            // Mobile: FULL WIDTH - no margins for perfect alignment
+            const fullWidth = this.getMobileFullWidthDimensions();
             return {
-                width: histWidth - this.config.histMargin.left - this.config.histMargin.right,
-                height: this.config.histHeight,
-                svgWidth: histWidth,
-                svgHeight: 400
+                width: fullWidth.drawingWidth,  // FULL width
+                height: 180,                    // chart area  
+                svgWidth: fullWidth.svgWidth,   // responsive width
+                svgHeight: 250,                 // +70px for bracket space
+                bracketSpace: 70                // top reserved area
             };
         } else {
             // Desktop: use original config dimensions
@@ -70,12 +110,23 @@ class ChartRenderer {
     }
 
     initializeScales() {
-        // Scales
-        this.xScale = d3.scaleTime().range([0, this.config.mainWidth]);
-        this.yScale = d3.scaleLinear().range([this.config.mainHeight, 0]);
+        // Get dynamic dimensions for mobile (FULL WIDTH)
+        const dimensions = this.isMobile() 
+            ? this.getMobileFullWidthDimensions()
+            : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+            
+        // Scales - for mobile, BOTH axes need flipping for rotation
+        if (this.isMobile()) {
+            this.xScale = d3.scaleTime().range([dimensions.drawingWidth, 0]); // FLIP: latest year at top after rotation
+            this.yScale = d3.scaleLinear().range([0, dimensions.drawingHeight]); // cold→hot
+        } else {
+            this.xScale = d3.scaleTime().range([0, dimensions.drawingWidth]);
+            this.yScale = d3.scaleLinear().range([dimensions.drawingHeight, 0]); // standard SVG
+        }
+        
         const histDims = this.getHistogramDimensions();
         this.histXScale = d3.scaleLinear().range([0, histDims.width]);
-        this.histYScale = d3.scaleLinear().range([this.config.histHeight, 0]);
+        this.histYScale = d3.scaleLinear().range([histDims.height, 0]);
         this.colorScale = d3.scaleSequential(d3.interpolateViridis);
         
         // Line generator
@@ -133,6 +184,7 @@ class ChartRenderer {
         const extents = this.dataProcessor.getDataExtents();
         if (!extents) return;
         
+        // Set domain but preserve range direction (especially flipped mobile xScale)
         this.xScale.domain(extents.dateExtent);
         
         // ALWAYS keep domains in Celsius for consistent positioning
@@ -151,9 +203,9 @@ class ChartRenderer {
         const histDims = this.getHistogramDimensions();
         
         if (this.isMobile()) {
-            // Mobile: vertical bars (temperature on x-axis, count on y-axis)
+            // Mobile: vertical bars, EXACT SAME scale as main chart yScale
             this.histXScale.domain(this.yScale.domain());
-            this.histXScale.range([0, histDims.width]);
+            this.histXScale.range([histDims.width, 0]); // HOT→COLD to match main chart
             this.histYScale.domain([0, d3.max(bins, d => d.length)]);
             this.histYScale.range([histDims.height, 0]);
         } else {
@@ -349,10 +401,14 @@ class ChartRenderer {
             
             // Keep positioning in Celsius
             // Current temperature horizontal dashed line
+            const dimensions = this.isMobile() 
+                ? this.getMobileFullWidthDimensions()
+                : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+                
             this.mainG.append("line")
                 .attr("class", "current-temp-line")
                 .attr("x1", 0)
-                .attr("x2", this.config.mainWidth)
+                .attr("x2", dimensions.drawingWidth)
                 .attr("y1", this.yScale(currentTemp))
                 .attr("y2", this.yScale(currentTemp))
                 .attr("stroke", "#333")
@@ -420,6 +476,11 @@ class ChartRenderer {
 
     // Draw main chart axes and grid
     drawAxesAndGrid() {
+        // Get dimensions for mobile full-width
+        const dimensions = this.isMobile() 
+            ? this.getMobileFullWidthDimensions()
+            : {drawingWidth: this.config.mainWidth, drawingHeight: this.config.mainHeight};
+
         // Add grid
         const xAxis = d3.axisBottom(this.xScale).tickFormat(d3.timeFormat("%Y"));
         
@@ -434,44 +495,63 @@ class ChartRenderer {
         
         this.mainG.append("g")
             .attr("class", "grid")
-            .attr("transform", `translate(0,${this.config.mainHeight})`)
+            .attr("transform", `translate(0,${dimensions.drawingHeight})`)
             .call(d3.axisBottom(this.xScale)
-                .tickSize(-this.config.mainHeight)
+                .tickSize(-dimensions.drawingHeight)
                 .tickFormat("")
             );
         
         this.mainG.append("g")
             .attr("class", "grid")
             .call(d3.axisLeft(this.yScale)
-                .tickSize(-this.config.mainWidth)
+                .tickSize(-dimensions.drawingWidth)
                 .tickFormat("")
             );
-        
+
         // Add axes
         this.mainG.append("g")
             .attr("class", "axis")
-            .attr("transform", `translate(0,${this.config.mainHeight})`)
+            .attr("transform", `translate(0,${dimensions.drawingHeight})`)
             .call(xAxis);
         
         this.mainG.append("g")
             .attr("class", "axis")
             .call(yAxis);
         
-        // Add axis labels
-        this.mainG.append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 0 - this.config.mainMargin.left)
-            .attr("x", 0 - (this.config.mainHeight / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .style("font-size", `${this.config.fontSizes.axisLabels}px`)
-            .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
-        
-        this.mainG.append("text")
-            .attr("transform", `translate(${this.config.mainWidth / 2}, ${this.config.mainHeight + this.config.mainMargin.bottom - 5})`)
-            .style("text-anchor", "middle")
-            .style("font-size", `${this.config.fontSizes.axisLabels}px`)
-            .text("Year");
+        // Add axis labels (positioned inside drawing area for mobile)
+        if (this.isMobile()) {
+            // Mobile: position labels inside drawing area
+            this.mainG.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 15) // Inside drawing area
+                .attr("x", 0 - (dimensions.drawingHeight / 2))
+                .attr("dy", "0.35em")
+                .style("text-anchor", "middle")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
+                .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
+            
+            this.mainG.append("text")
+                .attr("transform", `translate(${dimensions.drawingWidth / 2}, ${dimensions.drawingHeight - 10})`)
+                .style("text-anchor", "middle")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
+                .text("Year");
+        } else {
+            // Desktop: use original margin-based positioning
+            this.mainG.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - this.config.mainMargin.left)
+                .attr("x", 0 - (this.config.mainHeight / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
+                .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
+            
+            this.mainG.append("text")
+                .attr("transform", `translate(${this.config.mainWidth / 2}, ${this.config.mainHeight + this.config.mainMargin.bottom - 5})`)
+                .style("text-anchor", "middle")
+                .style("font-size", `${this.config.fontSizes.axisLabels}px`)
+                .text("Year");
+        }
     }
 
     // Draw main chart
@@ -595,13 +675,13 @@ class ChartRenderer {
         
         // Update existing bars
         if (this.isMobile()) {
-            // Mobile: vertical bars
+            // Mobile: vertical bars with flipped scale handling
             bars.transition()
                 .duration(500)
-                .attr("x", d => this.histXScale(d.x0))
+                .attr("x", d => Math.min(this.histXScale(d.x0), this.histXScale(d.x1)))
                 .attr("y", d => this.histYScale(d.length))
-                .attr("width", d => this.histXScale(d.x1) - this.histXScale(d.x0))
-                .attr("height", d => this.config.histHeight - this.histYScale(d.length))
+                .attr("width", d => Math.abs(this.histXScale(d.x1) - this.histXScale(d.x0)))
+                .attr("height", d => this.getHistogramDimensions().height - this.histYScale(d.length))
                 .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'));
         } else {
             // Desktop: horizontal bars
@@ -616,20 +696,20 @@ class ChartRenderer {
         
         // Add new bars
         if (this.isMobile()) {
-            // Mobile: vertical bars
+            // Mobile: vertical bars with flipped scale handling
             bars.enter()
                 .append("rect")
                 .attr("class", "bar")
-                .attr("x", d => this.histXScale(d.x0))
-                .attr("y", this.config.histHeight)
-                .attr("width", d => this.histXScale(d.x1) - this.histXScale(d.x0))
+                .attr("x", d => Math.min(this.histXScale(d.x0), this.histXScale(d.x1)))
+                .attr("y", this.getHistogramDimensions().height)
+                .attr("width", d => Math.abs(this.histXScale(d.x1) - this.histXScale(d.x0)))
                 .attr("height", 0)
                 .attr("fill", this.config.getColorForElement(this.dataProcessor.currentMetric, 'histogramBars'))
                 .attr("opacity", 1)
                 .transition()
                 .duration(500)
                 .attr("y", d => this.histYScale(d.length))
-                .attr("height", d => this.config.histHeight - this.histYScale(d.length));
+                .attr("height", d => this.getHistogramDimensions().height - this.histYScale(d.length));
         } else {
             // Desktop: horizontal bars
             bars.enter()
@@ -658,9 +738,9 @@ class ChartRenderer {
         const percentLower = (100 - parseFloat(percentHigher)).toFixed(1);
         
         if (this.isMobile()) {
-            // Mobile: vertical histogram - brackets at top
+            // Mobile: vertical histogram - brackets at top (within bracket space)
             const histDims = this.getHistogramDimensions();
-            const topY = -15;
+            const topY = -60; // Within the 70px bracket space
             const bracketHeight = 18;
             const xMid = this.histXScale(currentTemp);
             const xLeft = 15;
@@ -773,33 +853,19 @@ class ChartRenderer {
         const histDims = this.getHistogramDimensions();
         
         if (this.isMobile()) {
-            // For mobile, the SVG should fill the container width
-            // But we need to center the actual histogram drawing area
-            const actualSVGWidth = Math.max(400, window.innerWidth - 40);
-            
+            // Mobile: Use dynamic dimensions with bracket space (FULL WIDTH)
             this.histSvg
-                .attr("viewBox", `0 0 ${actualSVGWidth} 400`);
+                .attr("viewBox", `0 0 ${histDims.svgWidth} ${histDims.svgHeight}`);
             
-            // Center the histogram drawing area within this wide SVG
-            const drawingAreaWidth = histDims.width + this.config.histMargin.left + this.config.histMargin.right;
-            const centerX = (actualSVGWidth - drawingAreaWidth) / 2 + this.config.histMargin.left;
-            
+            // Position group with NO MARGINS and bracket space offset  
             this.histG
-                .attr("transform", `translate(${centerX},${this.config.histMargin.top})`);
-                
-            console.log('Mobile histogram centering:', {
-                windowWidth: window.innerWidth,
-                actualSVGWidth,
-                drawingAreaWidth,
-                centerX,
-                histWidth: histDims.width
-            });
+                .attr("transform", `translate(0, 70)`);
         } else {
             // Reset to desktop dimensions and positioning
             this.histSvg
                 .attr("viewBox", `0 0 420 400`);
             this.histG
-                .attr("transform", `translate(${this.config.histMargin.left},${this.config.histMargin.top})`);
+                .attr("transform", `translate(${this.config.histMargin.left}, ${this.config.histMargin.top})`);
         }
     }
 
@@ -812,6 +878,9 @@ class ChartRenderer {
             this.histG.selectAll("*").remove();
             return;
         }
+        
+        // Declare histDims once for the entire function
+        const histDims = this.getHistogramDimensions();
         
         // Clear non-data elements thoroughly
         this.histG.selectAll(".axis").remove();
@@ -843,7 +912,6 @@ class ChartRenderer {
             
             if (this.isMobile()) {
                 // Mobile: vertical line (keep in Celsius coordinates)
-                const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
                     .attr("x1", this.histXScale(currentTemp))
@@ -891,7 +959,6 @@ class ChartRenderer {
                 }
             } else {
                 // Desktop: horizontal line (keep in Celsius coordinates)
-                const histDims = this.getHistogramDimensions();
                 this.histG.append("line")
                     .attr("class", "current-temp-line")
                     .attr("x1", 0)
@@ -914,9 +981,10 @@ class ChartRenderer {
                 return d.toFixed(0);
             });
             
+            const histDims = this.getHistogramDimensions();
             this.histG.append("g")
                 .attr("class", "axis")
-                .attr("transform", `translate(0,${this.config.histHeight})`)
+                .attr("transform", `translate(0,${histDims.height})`)
                 .call(histXAxis);
             
             // Add y-axis (count)
@@ -925,7 +993,7 @@ class ChartRenderer {
                 .call(d3.axisLeft(this.histYScale).ticks(3));
             
             // Add x-axis label (temperature metric)
-            const histDims = this.getHistogramDimensions();
+            // histDims already declared above
             this.histG.append("text")
                 .attr("transform", `translate(${histDims.width / 2}, ${histDims.height + this.config.spacing.histogramXAxisLabelDistance})`)
                 .style("text-anchor", "middle")
@@ -933,11 +1001,11 @@ class ChartRenderer {
                 .text(this.getYAxisLabel(this.dataProcessor.currentMetric));
             
             // Add y-axis label
-            const histDimsForYLabel = this.getHistogramDimensions();
+            // Reuse histDims from above
             this.histG.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("y", 0 - this.config.histMargin.left - 30)
-                .attr("x", 0 - (histDimsForYLabel.height / 2))
+                .attr("x", 0 - (histDims.height / 2))
                 .attr("dy", "1em")
                 .style("text-anchor", "middle")
                 .style("font-size", `${this.config.fontSizes.axisLabels}px`)
@@ -965,12 +1033,18 @@ class ChartRenderer {
 
     // Update both charts
     updateCharts() {
+        // Update CSS properties for responsive sizing
+        this.updateMobileCSSProperties();
+        
         this.drawMainChart();
         this.drawHistogram();
     }
 
     // Update charts with dimension recalculation (for resize events)
     updateChartsWithResize() {
+        // Update CSS properties for responsive sizing
+        this.updateMobileCSSProperties();
+        
         this.updateHistogramSVGDimensions();
         this.drawMainChart();
         this.drawHistogram();
