@@ -1,6 +1,7 @@
 // Data processing utilities
 import * as d3 from 'd3';
-import CONFIG, { MetricKey } from './config';
+import CONFIG from './config';
+import type { MetricKey } from './config';
 import type { WeatherDataPoint, YearlyAggregate, TemperatureContext, DataExtents } from '../types';
 
 /**
