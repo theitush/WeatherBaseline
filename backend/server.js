@@ -12,9 +12,9 @@ const cacheManager = new CacheManager();
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from both current directory (vanilla) and dist (React build)
-app.use(express.static(__dirname));
-app.use(express.static(path.join(__dirname, 'dist')));
+// Serve static files from both parent directory (vanilla) and dist (React build)
+app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // Proxy endpoint for Open-Meteo Archive API with caching
 app.get('/api/archive', async (req, res) => {
@@ -409,8 +409,8 @@ function formatApiResponse(filteredData, latitude, longitude, daily, apiData) {
 
 // Serve vanilla HTML version at root (if exists)
 app.get('/', (_req, res) => {
-    const vanillaHtml = path.join(__dirname, 'interactive_temperature.html');
-    const reactHtml = path.join(__dirname, 'dist', 'index.html');
+    const vanillaHtml = path.join(__dirname, '..', 'interactive_temperature.html');
+    const reactHtml = path.join(__dirname, '..', 'dist', 'index.html');
 
     // Try vanilla first, fall back to React build
     const fs = require('fs');
@@ -426,7 +426,7 @@ app.get('/', (_req, res) => {
 // Catch-all route to serve React app for client-side routing (for non-root routes)
 // This must be AFTER all other routes
 app.get('*', (_req, res) => {
-    const reactHtml = path.join(__dirname, 'dist', 'index.html');
+    const reactHtml = path.join(__dirname, '..', 'dist', 'index.html');
     const fs = require('fs');
 
     if (fs.existsSync(reactHtml)) {
