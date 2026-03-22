@@ -56,9 +56,8 @@ body {
 .controls-row {
   display: flex;
   align-items: flex-end;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
+  gap: 15px;
+  flex-wrap: nowrap;
 }
 
 .fetch-button {
@@ -71,6 +70,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s;
+  white-space: nowrap;
 }
 
 .fetch-button:hover:not(:disabled) {
@@ -115,16 +115,34 @@ body {
   color: #666;
 }
 
+.charts-section {
+  margin: 20px 0;
+}
+
+.charts-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.charts-container {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.charts-controls {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .charts-placeholder {
   background-color: #f0f0f0;
   border: 2px dashed #ccc;
   border-radius: 8px;
   padding: 40px;
   text-align: center;
-  margin: 20px 0;
-}
-
-.charts-placeholder h3 {
-  margin: 0 0 10px 0;
-  color: #999;
 }

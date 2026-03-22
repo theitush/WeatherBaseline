@@ -69,10 +69,6 @@ const AppContent: React.FC = () => {
             />
 
             <DateSelector currentDate={currentDate} onChange={handleDateChange} />
-          </div>
-
-          <div className="controls-row">
-            <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
 
             <button className="fetch-button" onClick={handleFetch} disabled={loading}>
               {loading ? 'Loading...' : 'Fetch Data'}
@@ -93,11 +89,18 @@ const AppContent: React.FC = () => {
               currentTemp={getCurrentTemp()}
             />
 
-            <div className="charts-placeholder">
+            <div className="charts-section">
               <h3>Charts</h3>
-              <p style={{ color: '#666', fontSize: '14px' }}>
-                Charts will be implemented next...
-              </p>
+              <div className="charts-container">
+                <div className="charts-controls">
+                  <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
+                </div>
+                <div className="charts-placeholder">
+                  <p style={{ color: '#666', fontSize: '14px' }}>
+                    Charts will be implemented next...
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
