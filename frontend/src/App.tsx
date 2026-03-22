@@ -20,7 +20,6 @@ const AppContent: React.FC = () => {
     loading,
     error,
     fetchData,
-    availableYears,
   } = useApp();
 
   const handleLocationChange = (name: string, lat: number, lon: number) => {

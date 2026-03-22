@@ -1,0 +1,42 @@
+.temperature-context {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.temperature-context h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.context-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.temp-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #4A90E2;
+}
+
+.context-description {
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}
+
+.context-percentile {
+  font-size: 14px;
+  color: #666;
+}
+
+.context-ranking {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+}

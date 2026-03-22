@@ -1,6 +1,6 @@
 // Type definitions for the application
 
-import { MetricKey } from '../utils/config';
+export type { MetricKey } from '../utils/config';
 
 export interface WeatherDataPoint {
   date: Date;

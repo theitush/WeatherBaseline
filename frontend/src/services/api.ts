@@ -115,9 +115,9 @@ async function fetchHistoricalData(
       // Only require active temperature metrics to be non-null
       const hasRequiredData =
         (!CONFIG.isMetricActive('max_temperature') ||
-          (maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
+          (maxTemps && maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
         (!CONFIG.isMetricActive('min_temperature') ||
-          (minTemps[i] !== null && minTemps[i] !== undefined));
+          (minTemps && minTemps[i] !== null && minTemps[i] !== undefined));
 
       if (hasRequiredData) {
         const dateDt = parseDate(dates[i]);
@@ -135,17 +135,17 @@ async function fetchHistoricalData(
           };
 
           // Only include active metrics in the data row
-          if (CONFIG.isMetricActive('min_temperature')) {
+          if (CONFIG.isMetricActive('min_temperature') && minTemps) {
             row.min_temperature = minTemps[i];
           }
-          if (CONFIG.isMetricActive('max_temperature')) {
+          if (CONFIG.isMetricActive('max_temperature') && maxTemps) {
             row.max_temperature = maxTemps[i];
           }
-          if (CONFIG.isMetricActive('precipitation_sum')) {
+          if (CONFIG.isMetricActive('precipitation_sum') && precipitation) {
             row.precipitation_sum =
               precipitation.length > i && precipitation[i] !== null ? precipitation[i] : 0;
           }
-          if (CONFIG.isMetricActive('wind_speed_10m_max')) {
+          if (CONFIG.isMetricActive('wind_speed_10m_max') && windSpeed) {
             row.wind_speed_10m_max =
               windSpeed.length > i && windSpeed[i] !== null ? windSpeed[i] : 0;
           }
@@ -235,9 +235,9 @@ async function fetchForecastData(
       // Only require active temperature metrics to be non-null
       const hasRequiredData =
         (!CONFIG.isMetricActive('max_temperature') ||
-          (maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
+          (maxTemps && maxTemps[i] !== null && maxTemps[i] !== undefined)) &&
         (!CONFIG.isMetricActive('min_temperature') ||
-          (minTemps[i] !== null && minTemps[i] !== undefined));
+          (minTemps && minTemps[i] !== null && minTemps[i] !== undefined));
 
       if (hasRequiredData) {
         const row: Partial<WeatherDataPoint> = {
@@ -246,16 +246,16 @@ async function fetchForecastData(
         };
 
         // Only include active metrics in the data row
-        if (CONFIG.isMetricActive('min_temperature')) {
+        if (CONFIG.isMetricActive('min_temperature') && minTemps) {
           row.min_temperature = minTemps[i];
         }
-        if (CONFIG.isMetricActive('max_temperature')) {
+        if (CONFIG.isMetricActive('max_temperature') && maxTemps) {
           row.max_temperature = maxTemps[i];
         }
-        if (CONFIG.isMetricActive('precipitation_sum')) {
+        if (CONFIG.isMetricActive('precipitation_sum') && precipitation) {
           row.precipitation_sum = precipitation[i] || 0;
         }
-        if (CONFIG.isMetricActive('wind_speed_10m_max')) {
+        if (CONFIG.isMetricActive('wind_speed_10m_max') && windSpeed) {
           row.wind_speed_10m_max = windSpeed[i] || 0;
         }
 
@@ -286,7 +286,7 @@ export async function getTemperatureHistory(
   latitude: number,
   longitude: number,
   targetDate: string,
-  startYear: number = 1940,
+  _startYear: number = 1940,
   daysRange: number = 7
 ): Promise<WeatherDataPoint[]> {
   console.log(`Getting ${targetDate} ±${daysRange} days data for ${latitude}, ${longitude}`);

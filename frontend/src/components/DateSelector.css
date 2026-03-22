@@ -1,0 +1,25 @@
+.date-selector {
+  display: flex;
+  flex-direction: column;
+}
+
+.date-selector label {
+  display: inline-block;
+  margin-right: 10px;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+#target-date {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 180px;
+}
+
+#target-date:focus {
+  outline: none;
+  border-color: #4A90E2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}

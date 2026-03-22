@@ -1,0 +1,103 @@
+.location-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.city-search-container {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.city-search-container label {
+  display: inline-block;
+  margin-right: 10px;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+#city-search {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 300px;
+}
+
+#city-search:focus {
+  outline: none;
+  border-color: #4A90E2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.city-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 90px;
+  width: 300px;
+  background: white;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 250px;
+  overflow-y: auto;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.city-suggestion {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.city-suggestion:last-child {
+  border-bottom: none;
+}
+
+.city-suggestion:hover,
+.city-suggestion.selected {
+  background-color: #e3f2fd;
+}
+
+.city-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.city-details {
+  font-size: 12px;
+  color: #666;
+}
+
+.coordinates {
+  display: flex;
+  gap: 20px;
+}
+
+.coordinate-input {
+  display: flex;
+  align-items: center;
+}
+
+.coordinate-input label {
+  display: inline-block;
+  margin-right: 10px;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.coordinate-input input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 140px;
+}
+
+.coordinate-input input:focus {
+  outline: none;
+  border-color: #4A90E2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
