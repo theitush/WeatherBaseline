@@ -57,7 +57,7 @@ Migrate vanilla JavaScript frontend to React with TypeScript, maintaining deskto
   - ✅ Autocomplete with Nominatim API
   - ✅ Keyboard navigation (arrows, enter, escape)
   - ✅ Lat/lon inputs
-  - ❌ city selector should be in the same row as lat, lon and date
+  - ✅ City label inline with input (flex layout fix)
 
 - [x] **Step 8: DateSelector Component** → `/src/components/DateSelector.tsx`
   - ✅ Date picker input
@@ -273,6 +273,9 @@ App ✅
 - ✅ **Data summary removed** per user request
 - ✅ **Layout fixed** to horizontal rows
 - ✅ **Auto-fetch disabled** - waits for user click
+- ✅ **City label inline** - flex layout fix on `.city-search-container`
+- ✅ **Fetch Data button** - `white-space: nowrap` prevents text wrapping
+- ⚠️ **Backend server** - must be running fresh; stale node process can lose external network connectivity (restart with `node backend/server.js`)
 - 📝 Mobile support is planned but NOT implemented yet
 - 📝 Focus on desktop (1024px+) functionality
 - 📝 Structure code to be mobile-ready for future enhancement
