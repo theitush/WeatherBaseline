@@ -73,32 +73,24 @@ Migrate vanilla JavaScript frontend to React with TypeScript, maintaining deskto
   - ✅ Context text generation (fun phrases)
   - ✅ **TESTED WITH REAL DATA** - Percentile calculations verified across 85 years of data
 
-### ❌ Phase 5: D3 Chart Components (NOT STARTED)
-- [ ] **Step 11: Create useResizeObserver Hook** → `/src/hooks/useResizeObserver.ts`
-  - ❌ NOT IMPLEMENTED
-  - Monitor container size
-  - Trigger re-renders on resize
+### ✅ Phase 5: D3 Chart Components (COMPLETED)
+- [x] **Step 11: MainChart Component** → `/src/components/MainChart.tsx`
+  - ✅ D3 integration with React refs
+  - ✅ Fixed 720px width (no resize observer needed)
+  - ✅ Percentile bands (10-90th, 25-75th)
+  - ✅ Rolling median trend line
+  - ✅ Scatter plot with tooltips
+  - ✅ Current temperature dashed line + target dot
+  - ✅ Legend in top-right corner
 
-- [ ] **Step 12: ChartContainer Component** → `/src/components/ChartContainer.tsx`
-  - ❌ NOT IMPLEMENTED
-  - Wrapper for both charts
-  - Responsive SVG containers
+- [x] **Step 12: HistogramChart Component** → `/src/components/HistogramChart.tsx`
+  - ✅ D3 histogram (30 bins)
+  - ✅ Y-axis (temperature) + X-axis (count)
+  - ✅ Current temperature indicator line
+  - ✅ Percentile brackets (% above/below)
 
-- [ ] **Step 13: MainChart Component** → `/src/components/MainChart.tsx`
-  - ❌ NOT IMPLEMENTED
-  - Need to migrate chartRenderer.js main chart logic
-  - D3 integration with React refs
-  - Percentile bands (10-90th, 25-75th)
-  - Rolling median trend line
-  - Scatter plot with tooltips
-  - Current temperature indicators
-  - Interactive legend
-
-- [ ] **Step 14: HistogramChart Component** → `/src/components/HistogramChart.tsx`
-  - ❌ NOT IMPLEMENTED
-  - Need to migrate histogram logic from chartRenderer.js
-  - D3 histogram generation
-  - Current temperature indicator
+### Future / Nice-to-Have
+- [ ] **useResizeObserver** — watch container and redraw charts on window resize (adds complexity, low priority)
 
 ### ✅ Phase 6: Styling (COMPLETED)
 - [x] **Step 15: Extract and Migrate CSS**
@@ -199,9 +191,6 @@ App ✅
 - ✅ No auto-fetch (waits for button click)
 - ✅ TypeScript compiles without errors
 - ✅ Vite dev server runs
-
-**What Doesn't Work Yet:**
-- ❌ Charts (completely missing - Phase 5 not implemented)
 
 **What Works Now:**
 - ✅ Backend server running with real cached data (30,763+ records)

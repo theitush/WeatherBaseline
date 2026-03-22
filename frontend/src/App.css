@@ -130,10 +130,14 @@ body {
   border: 1px solid #dee2e6;
   border-radius: 8px;
   padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
 }
 
 .charts-controls {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 10px;

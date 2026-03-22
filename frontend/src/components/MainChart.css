@@ -1,0 +1,45 @@
+.main-chart-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.main-chart-svg .grid line {
+  stroke: #e0e0e0;
+  stroke-opacity: 0.7;
+}
+
+.main-chart-svg .grid path {
+  stroke-width: 0;
+}
+
+.main-chart-svg .axis text {
+  font-size: 11px;
+  fill: #555;
+}
+
+.main-chart-svg .axis line,
+.main-chart-svg .axis path {
+  stroke: #aaa;
+}
+
+.main-chart-svg .data-point {
+  cursor: crosshair;
+}
+
+.main-chart-svg .current-temp-point {
+  cursor: pointer;
+}
+
+.chart-tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1000;
+  white-space: nowrap;
+  line-height: 1.5;
+}

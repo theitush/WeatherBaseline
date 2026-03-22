@@ -5,6 +5,8 @@ import DateSelector from './components/DateSelector';
 import MetricSelector from './components/MetricSelector';
 import TemperatureContextDisplay from './components/TemperatureContext';
 import LoadingOverlay from './components/LoadingOverlay';
+import MainChart from './components/MainChart';
+import HistogramChart from './components/HistogramChart';
 import './App.css';
 
 const AppContent: React.FC = () => {
@@ -16,6 +18,8 @@ const AppContent: React.FC = () => {
     currentMetric,
     setCurrentMetric,
     filteredData,
+    fullData,
+    yearlyAggregates,
     temperatureContext,
     loading,
     error,
@@ -90,16 +94,23 @@ const AppContent: React.FC = () => {
             />
 
             <div className="charts-section">
-              <h3>Charts</h3>
+              <div className="charts-controls">
+                <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
+              </div>
               <div className="charts-container">
-                <div className="charts-controls">
-                  <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
-                </div>
-                <div className="charts-placeholder">
-                  <p style={{ color: '#666', fontSize: '14px' }}>
-                    Charts will be implemented next...
-                  </p>
-                </div>
+                <MainChart
+                  filteredData={filteredData}
+                  yearlyAggregates={yearlyAggregates}
+                  currentMetric={currentMetric}
+                  currentDate={currentDate}
+                  fullData={fullData}
+                />
+                <HistogramChart
+                  filteredData={filteredData}
+                  currentMetric={currentMetric}
+                  currentDate={currentDate}
+                  fullData={fullData}
+                />
               </div>
             </div>
           </div>
