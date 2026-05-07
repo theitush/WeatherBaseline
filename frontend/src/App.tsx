@@ -42,6 +42,18 @@ const AppContent: React.FC = () => {
     fetchData();
   };
 
+  const formatChartTitle = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    const day = d.getDate();
+    const suffix =
+      day % 10 === 1 && day !== 11 ? 'st' :
+      day % 10 === 2 && day !== 12 ? 'nd' :
+      day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+    return `${months[d.getMonth()]} ${day}${suffix} ± 7 days`;
+  };
+
   // Get current date data for temperature context
   const getCurrentTemp = () => {
     const currentDateData = filteredData.filter(
@@ -59,7 +71,7 @@ const AppContent: React.FC = () => {
 
       <div className="app-container">
         <header className="app-header">
-          <h1>HowHotWasIt</h1>
+          <h1>How Hot Was It?</h1>
           <p className="subtitle">Explore historical weather patterns</p>
         </header>
 
@@ -97,6 +109,7 @@ const AppContent: React.FC = () => {
               <div className="charts-controls">
                 <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
               </div>
+              <div className="chart-title">{formatChartTitle(currentDate)}</div>
               <div className="charts-container">
                 <MainChart
                   filteredData={filteredData}

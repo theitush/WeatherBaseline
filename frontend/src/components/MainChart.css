@@ -5,7 +5,7 @@
 
 .main-chart-svg .grid line {
   stroke: #e0e0e0;
-  stroke-opacity: 0.7;
+  stroke-dasharray: 2, 2;
 }
 
 .main-chart-svg .grid path {

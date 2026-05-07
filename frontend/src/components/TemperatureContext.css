@@ -1,9 +1,10 @@
 .temperature-context {
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   padding: 20px;
   margin: 20px 0;
+  text-align: center;
 }
 
 .temperature-context h3 {

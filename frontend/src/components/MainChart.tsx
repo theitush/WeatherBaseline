@@ -117,13 +117,21 @@ const MainChart: React.FC<MainChartProps> = ({
         .datum(validAggs)
         .attr('class', 'percentile-band-90')
         .attr('fill', CONFIG.getColorForElement(currentMetric, 'percentileBand90'))
-        .attr('d', area90);
+        .attr('d', area90)
+        .style('opacity', 0)
+        .transition()
+        .duration(500)
+        .style('opacity', 1);
 
       g.append('path')
         .datum(validAggs)
         .attr('class', 'percentile-band-75')
         .attr('fill', CONFIG.getColorForElement(currentMetric, 'percentileBand75'))
-        .attr('d', area75);
+        .attr('d', area75)
+        .style('opacity', 0)
+        .transition()
+        .duration(500)
+        .style('opacity', 1);
 
       // Trend line (rolling median)
       const trendData = validAggs.filter((d) => d.movingMedian !== null);
@@ -140,7 +148,11 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('fill', 'none')
           .attr('stroke', CONFIG.getColorForElement(currentMetric, 'trendLine'))
           .attr('stroke-width', 2.5)
-          .attr('d', line);
+          .attr('d', line)
+          .style('opacity', 0)
+          .transition()
+          .duration(500)
+          .style('opacity', 1);
       }
     }
 
@@ -158,7 +170,7 @@ const MainChart: React.FC<MainChartProps> = ({
       wind_speed_10m_max: 'Max Wind Speed',
     };
 
-    g.selectAll('.data-point')
+    const dotSelection = g.selectAll('.data-point')
       .data(filteredData.filter((d) => d[currentMetric] !== undefined))
       .enter()
       .append('circle')
@@ -167,44 +179,21 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('cy', (d) => yScale(d[currentMetric] as number))
       .attr('r', 2)
       .attr('fill', CONFIG.getColorForElement(currentMetric, 'dataPoints'))
+      .style('opacity', 0);
+
+    dotSelection.transition().duration(500).style('opacity', 1);
+
+    dotSelection
       .on('mouseover', (event, d) => {
         tooltip
           .style('opacity', 1)
           .html(
             `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
           )
-          .style('left', event.pageX + 12 + 'px')
-          .style('top', event.pageY - 28 + 'px');
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
-
-    // Legend (top-right of chart area)
-    const legendData = [
-      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand90'), label: '10th–90th pct', opacity: 0.5 },
-      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand75'), label: '25th–75th pct', opacity: 0.7 },
-      { type: 'line', color: CONFIG.getColorForElement(currentMetric, 'trendLine'), label: 'Rolling median', opacity: 1 },
-      { type: 'circle', color: CONFIG.getColorForElement(currentMetric, 'dataPoints'), label: 'Historical data', opacity: 1 },
-      { type: 'target', color: '#333', label: 'Target date', opacity: 1 },
-    ];
-    const legend = g.append('g').attr('class', 'legend').attr('transform', `translate(${width - 130}, 4)`);
-    legendData.forEach((item, i) => {
-      const row = legend.append('g').attr('transform', `translate(0, ${i * 18})`);
-      if (item.type === 'rect') {
-        row.append('rect').attr('width', 12).attr('height', 12).attr('fill', item.color).attr('opacity', item.opacity);
-      } else if (item.type === 'line') {
-        row.append('line').attr('x1', 0).attr('x2', 12).attr('y1', 6).attr('y2', 6).attr('stroke', item.color).attr('stroke-width', 2.5);
-      } else if (item.type === 'circle') {
-        row.append('circle').attr('cx', 6).attr('cy', 6).attr('r', 2).attr('fill', item.color);
-      } else if (item.type === 'target') {
-        row.append('circle').attr('cx', 6).attr('cy', 6).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
-      }
-      row.append('text').attr('x', 16).attr('y', 6).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
-    });
-    const bbox = (legend.node() as SVGGElement).getBBox();
-    legend.insert('rect', ':first-child')
-      .attr('x', bbox.x - 4).attr('y', bbox.y - 4)
-      .attr('width', bbox.width + 8).attr('height', bbox.height + 8)
-      .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
 
     // Current date indicator
     const targetDate = new Date(currentDate + 'T12:00:00');

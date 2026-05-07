@@ -12,9 +12,9 @@ interface HistogramChartProps {
   fullData: WeatherDataPoint[];
 }
 
-const MARGIN = { top: 20, right: 70, bottom: 40, left: 40 };
+const MARGIN = { top: 20, right: 100, bottom: 40, left: 15 };
 const TOTAL_HEIGHT = 400;
-const TOTAL_WIDTH = 280;
+const TOTAL_WIDTH = 300;
 
 const HistogramChart: React.FC<HistogramChartProps> = ({
   filteredData,
@@ -63,7 +63,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .domain([0, d3.max(bins, (d) => d.length) as number])
       .range([0, width]);
 
-    // Bars
+    // Bars (animate width from 0 on enter, like the vanilla)
     g.selectAll('.bar')
       .data(bins)
       .enter()
@@ -71,9 +71,12 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .attr('class', 'bar')
       .attr('x', 0)
       .attr('y', (d) => yScale(d.x1 as number))
-      .attr('width', (d) => xScale(d.length))
+      .attr('width', 0)
       .attr('height', (d) => yScale(d.x0 as number) - yScale(d.x1 as number))
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
+      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'))
+      .transition()
+      .duration(500)
+      .attr('width', (d) => xScale(d.length));
 
     // X axis (count)
     g.append('g')
@@ -88,10 +91,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .style('fill', '#555')
       .text('Count');
 
-    // Y axis (temperature)
-    g.append('g')
-      .attr('class', 'axis')
-      .call(d3.axisLeft(yScale).ticks(6));
+    // (No y-axis — visually shares the main chart's temperature scale, matching vanilla)
 
     // Current date temperature line + brackets
     const targetDate = new Date(currentDate + 'T12:00:00');
@@ -175,6 +175,35 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .text(pctLower + '%');
     }
 
+    // Legend (to the right of histogram, matching vanilla)
+    const legendData = [
+      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
+      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
+      { type: 'line', color: CONFIG.getColorForElement(currentMetric, 'trendLine'), label: 'Rolling median' },
+      { type: 'circle', color: CONFIG.getColorForElement(currentMetric, 'dataPoints'), label: 'Historical data' },
+      { type: 'target', color: '#333', label: 'Target date' },
+    ];
+    // Overlay legend at top-right of histogram bars area
+    const legend = g.append('g').attr('class', 'legend')
+      .attr('transform', `translate(${width - 110}, 0)`);
+    legendData.forEach((item, i) => {
+      const row = legend.append('g').attr('transform', `translate(0, ${i * 16})`);
+      if (item.type === 'rect') {
+        row.append('rect').attr('width', 14).attr('height', 14).attr('fill', item.color).attr('opacity', (item as any).op ?? 0.4);
+      } else if (item.type === 'line') {
+        row.append('line').attr('x1', 0).attr('x2', 14).attr('y1', 7).attr('y2', 7).attr('stroke', item.color).attr('stroke-width', 2.5);
+      } else if (item.type === 'circle') {
+        row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 2).attr('fill', item.color);
+      } else if (item.type === 'target') {
+        row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
+      }
+      row.append('text').attr('x', 20).attr('y', 7).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
+    });
+    const lbox = (legend.node() as SVGGElement).getBBox();
+    legend.insert('rect', ':first-child')
+      .attr('x', lbox.x - 4).attr('y', lbox.y - 4)
+      .attr('width', lbox.width + 8).attr('height', lbox.height + 8)
+      .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
 
   }, [filteredData, currentMetric, currentDate, fullData, width, height]);
 

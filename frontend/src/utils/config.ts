@@ -122,8 +122,8 @@ const CONFIG: Config = {
   // Opacity levels for different chart elements
   opacityLevels: {
     trendLine: 1.0,
-    percentileBand90: 0.5,
-    percentileBand75: 0.7,
+    percentileBand90: 0.2,
+    percentileBand75: 0.4,
     dataPoints: 0.2,
     histogramBars: 0.7
   },
