@@ -15,18 +15,26 @@ A web application for visualizing historical and current weather data using the 
 
 ## Quick Start
 
-### 1. Install Dependencies
+You need **two terminals** for development: one for the backend, one for the Vite dev server (hot-reload).
+
+### Terminal 1 — Backend (Node 18)
 ```bash
 npm install
+npm run dev
 ```
+The backend script auto-switches to Node 18 via nvm. Node 20+ has a TLS issue under WSL2 that breaks outbound calls to the Open-Meteo API, so we pin to 18.
 
-### 2. Start the Server
+### Terminal 2 — Frontend (Node 22)
 ```bash
-npm start
+cd frontend && npm install   # first time only
+cd ..
+npm run dev:frontend
 ```
+This script auto-switches to Node 22 (required by Vite 6) and starts the dev server.
 
-### 3. Open Your Browser
-Visit: http://localhost:3000
+### Open Your Browser
+- **Development:** http://localhost:5173 (Vite, hot-reload, proxies `/api/*` to the backend)
+- **Production build:** http://localhost:3000 (backend serves the built `dist/` — run `npm run build` in `frontend/` first)
 
 ## How to Use
 

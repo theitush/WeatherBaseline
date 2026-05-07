@@ -60,6 +60,11 @@ body {
   flex-wrap: nowrap;
 }
 
+.controls-row > .location-selector {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .fetch-button {
   padding: 10px 24px;
   font-size: 16px;

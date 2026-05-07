@@ -3,6 +3,8 @@
   flex-direction: row;
   gap: 15px;
   align-items: flex-end;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .city-search-container {
@@ -22,7 +24,7 @@
   font-size: 14px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  width: 200px;
+  width: 160px;
 }
 
 #city-search:focus {
@@ -74,7 +76,7 @@
 
 .coordinates {
   display: flex;
-  gap: 20px;
+  gap: 12px;
 }
 
 .coordinate-input {
@@ -84,9 +86,9 @@
 
 .coordinate-input label {
   display: inline-block;
-  margin-right: 10px;
+  margin-right: 8px;
   font-weight: 500;
-  min-width: 70px;
+  white-space: nowrap;
 }
 
 .coordinate-input input {
@@ -94,7 +96,7 @@
   font-size: 14px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  width: 120px;
+  width: 90px;
 }
 
 .coordinate-input input:focus {
