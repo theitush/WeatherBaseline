@@ -5,24 +5,38 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import './HistogramChart.css';
 
+export type Orientation = 'horizontal' | 'vertical';
+
 interface HistogramChartProps {
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
   currentDate: string;
   fullData: WeatherDataPoint[];
+  orientation?: Orientation;
+  width?: number;
+  height?: number;
 }
 
-const MARGIN = { top: 20, right: 100, bottom: 40, left: 15 };
-const TOTAL_HEIGHT = 400;
-const TOTAL_WIDTH = 300;
+// horizontal: temp on Y (shared with MainChart on the left), count on X, bars grow →
+// vertical:   temp on X (shared with MainChart below), count on Y, bars grow ↓ from top
+const MARGIN_H = { top: 20, right: 100, bottom: 40, left: 15 };
+const MARGIN_V = { top: 30, right: 20, bottom: 15, left: 55 };
 
 const HistogramChart: React.FC<HistogramChartProps> = ({
   filteredData,
   currentMetric,
   currentDate,
   fullData,
+  orientation = 'horizontal',
+  width: propWidth,
+  height: propHeight,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const isVertical = orientation === 'vertical';
+  const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
+  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 300);
+  const TOTAL_HEIGHT = propHeight ?? (isVertical ? 180 : 400);
 
   const width = TOTAL_WIDTH - MARGIN.left - MARGIN.right;
   const height = TOTAL_HEIGHT - MARGIN.top - MARGIN.bottom;
@@ -45,53 +59,80 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const [minVal, maxVal] = d3.extent(values) as [number, number];
 
-    // Y scale (temperature axis, vertical)
-    const yScale = d3
+    // Temp scale: vertical-orientation puts temp on X (left→right);
+    // horizontal-orientation keeps temp on Y (bottom→top, original).
+    const tempScale = d3
       .scaleLinear()
       .domain([minVal - 2, maxVal + 2])
-      .range([height, 0]);
+      .range(isVertical ? [0, width] : [height, 0]);
 
-    // Build histogram bins
     const bins = d3
       .bin()
-      .domain(yScale.domain() as [number, number])
+      .domain(tempScale.domain() as [number, number])
       .thresholds(30)(values);
 
-    // X scale (count axis, horizontal)
-    const xScale = d3
+    // Count scale: horizontal mode → X (0→width); vertical mode → Y (0 at top → max at bottom, bars hang down)
+    const countScale = d3
       .scaleLinear()
       .domain([0, d3.max(bins, (d) => d.length) as number])
-      .range([0, width]);
+      .range(isVertical ? [0, height] : [0, width]);
 
-    // Bars (animate width from 0 on enter, like the vanilla)
-    g.selectAll('.bar')
+    // Bars (animate count dimension from 0 on enter)
+    const barSel = g.selectAll('.bar')
       .data(bins)
       .enter()
       .append('rect')
       .attr('class', 'bar')
-      .attr('x', 0)
-      .attr('y', (d) => yScale(d.x1 as number))
-      .attr('width', 0)
-      .attr('height', (d) => yScale(d.x0 as number) - yScale(d.x1 as number))
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'))
-      .transition()
-      .duration(500)
-      .attr('width', (d) => xScale(d.length));
+      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
 
-    // X axis (count)
-    g.append('g')
-      .attr('class', 'axis')
-      .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(xScale).ticks(4));
+    if (isVertical) {
+      // Bars hang from the top: x is the temp bin span, y starts at 0, height grows to count.
+      barSel
+        .attr('x', (d) => tempScale(d.x0 as number))
+        .attr('y', 0)
+        .attr('width', (d) => tempScale(d.x1 as number) - tempScale(d.x0 as number))
+        .attr('height', 0)
+        .transition()
+        .duration(500)
+        .attr('height', (d) => countScale(d.length));
+    } else {
+      barSel
+        .attr('x', 0)
+        .attr('y', (d) => tempScale(d.x1 as number))
+        .attr('width', 0)
+        .attr('height', (d) => tempScale(d.x0 as number) - tempScale(d.x1 as number))
+        .transition()
+        .duration(500)
+        .attr('width', (d) => countScale(d.length));
+    }
 
-    g.append('text')
-      .attr('transform', `translate(${width / 2},${height + 35})`)
-      .style('text-anchor', 'middle')
-      .style('font-size', '12px')
-      .style('fill', '#555')
-      .text('Count');
-
-    // (No y-axis — visually shares the main chart's temperature scale, matching vanilla)
+    // Count axis
+    if (isVertical) {
+      // Count axis on the left (top=0, bottom=max). We label inline rather than a full axis to keep it tidy.
+      g.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(countScale).ticks(3));
+      g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('y', -MARGIN.left + 12)
+        .attr('x', -height / 2)
+        .attr('dy', '1em')
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#555')
+        .text('Count');
+    } else {
+      g.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(countScale).ticks(4));
+      g.append('text')
+        .attr('transform', `translate(${width / 2},${height + 35})`)
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#555')
+        .text('Count');
+    }
 
     // Current date temperature line + brackets
     const targetDate = new Date(currentDate + 'T12:00:00');
@@ -106,106 +147,166 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     if (currentDateData.length > 0) {
       const currentTemp = currentDateData[0][currentMetric] as number;
 
-      g.append('line')
+      // Line is perpendicular to the temp axis.
+      const tempLine = g.append('line')
         .attr('class', 'current-temp-line')
-        .attr('x1', 0)
-        .attr('x2', width)
-        .attr('y1', yScale(currentTemp))
-        .attr('y2', yScale(currentTemp))
         .attr('stroke', '#333')
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '4,3');
 
-      // Percentile brackets
+      if (isVertical) {
+        tempLine
+          .attr('x1', tempScale(currentTemp)).attr('x2', tempScale(currentTemp))
+          .attr('y1', 0).attr('y2', height);
+      } else {
+        tempLine
+          .attr('x1', 0).attr('x2', width)
+          .attr('y1', tempScale(currentTemp)).attr('y2', tempScale(currentTemp));
+      }
+
       const higherCount = values.filter((v) => v > currentTemp).length;
       const total = values.length;
       const pctHigher = ((higherCount / total) * 100).toFixed(1);
       const pctLower = (100 - parseFloat(pctHigher)).toFixed(1);
 
-      const rightX = width + 8;
-      const bw = 14;
-      const yMid = yScale(currentTemp);
-      const yTop = 10;
-      const yBottom = height - 10;
+      if (!isVertical) {
+        // Brackets to the right of bars, paired with the horizontal current-temp line.
+        const rightX = width + 8;
+        const bw = 14;
+        const yMid = tempScale(currentTemp);
+        const yTop = 10;
+        const yBottom = height - 10;
 
-      // Upper bracket
-      g.append('path')
-        .attr(
-          'd',
-          `M ${rightX} ${yTop}
-           L ${rightX + bw * 0.5} ${yTop}
-           Q ${rightX + bw * 0.8} ${yTop + 10} ${rightX + bw * 0.5} ${yTop + 18}
-           L ${rightX + bw * 0.5} ${yMid - 20}
-           Q ${rightX + bw * 0.8} ${yMid - 10} ${rightX + bw * 0.5} ${yMid - 4}`
-        )
-        .attr('stroke', '#666')
-        .attr('stroke-width', 1.5)
-        .attr('fill', 'none');
+        g.append('path')
+          .attr(
+            'd',
+            `M ${rightX} ${yTop}
+             L ${rightX + bw * 0.5} ${yTop}
+             Q ${rightX + bw * 0.8} ${yTop + 10} ${rightX + bw * 0.5} ${yTop + 18}
+             L ${rightX + bw * 0.5} ${yMid - 20}
+             Q ${rightX + bw * 0.8} ${yMid - 10} ${rightX + bw * 0.5} ${yMid - 4}`
+          )
+          .attr('stroke', '#666')
+          .attr('stroke-width', 1.5)
+          .attr('fill', 'none');
 
-      g.append('text')
-        .attr('x', rightX + bw + 6)
-        .attr('y', (yTop + yMid) / 2)
-        .attr('dy', '0.35em')
-        .attr('text-anchor', 'start')
-        .style('font-size', '12px')
-        .style('fill', '#555')
-        .text(pctHigher + '%');
+        g.append('text')
+          .attr('x', rightX + bw + 6)
+          .attr('y', (yTop + yMid) / 2)
+          .attr('dy', '0.35em')
+          .attr('text-anchor', 'start')
+          .style('font-size', '12px')
+          .style('fill', '#555')
+          .text(pctHigher + '%');
 
-      // Lower bracket
-      g.append('path')
-        .attr(
-          'd',
-          `M ${rightX + bw * 0.5} ${yMid + 4}
-           Q ${rightX + bw * 0.8} ${yMid + 10} ${rightX + bw * 0.5} ${yMid + 20}
-           L ${rightX + bw * 0.5} ${yBottom - 18}
-           Q ${rightX + bw * 0.8} ${yBottom - 10} ${rightX + bw * 0.5} ${yBottom}
-           L ${rightX} ${yBottom}`
-        )
-        .attr('stroke', '#666')
-        .attr('stroke-width', 1.5)
-        .attr('fill', 'none');
+        g.append('path')
+          .attr(
+            'd',
+            `M ${rightX + bw * 0.5} ${yMid + 4}
+             Q ${rightX + bw * 0.8} ${yMid + 10} ${rightX + bw * 0.5} ${yMid + 20}
+             L ${rightX + bw * 0.5} ${yBottom - 18}
+             Q ${rightX + bw * 0.8} ${yBottom - 10} ${rightX + bw * 0.5} ${yBottom}
+             L ${rightX} ${yBottom}`
+          )
+          .attr('stroke', '#666')
+          .attr('stroke-width', 1.5)
+          .attr('fill', 'none');
 
-      g.append('text')
-        .attr('x', rightX + bw + 6)
-        .attr('y', (yMid + yBottom) / 2)
-        .attr('dy', '0.35em')
-        .attr('text-anchor', 'start')
-        .style('font-size', '12px')
-        .style('fill', '#555')
-        .text(pctLower + '%');
+        g.append('text')
+          .attr('x', rightX + bw + 6)
+          .attr('y', (yMid + yBottom) / 2)
+          .attr('dy', '0.35em')
+          .attr('text-anchor', 'start')
+          .style('font-size', '12px')
+          .style('fill', '#555')
+          .text(pctLower + '%');
+      } else {
+        // Vertical mode: brackets above the bars, paired with the vertical current-temp line.
+        // Lower temps are to the LEFT of the line, higher temps to the RIGHT.
+        const topY = -8;
+        const bw = 14;
+        const xMid = tempScale(currentTemp);
+        const xLeft = 10;
+        const xRight = width - 10;
+
+        // Left bracket (lower%)
+        g.append('path')
+          .attr(
+            'd',
+            `M ${xLeft} ${topY}
+             L ${xLeft} ${topY - bw * 0.5}
+             Q ${xLeft + 10} ${topY - bw * 0.8} ${xLeft + 18} ${topY - bw * 0.5}
+             L ${xMid - 20} ${topY - bw * 0.5}
+             Q ${xMid - 10} ${topY - bw * 0.8} ${xMid - 4} ${topY - bw * 0.5}`
+          )
+          .attr('stroke', '#666')
+          .attr('stroke-width', 1.5)
+          .attr('fill', 'none');
+
+        g.append('text')
+          .attr('x', (xLeft + xMid) / 2)
+          .attr('y', topY - bw - 4)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .style('fill', '#555')
+          .text(pctLower + '%');
+
+        // Right bracket (higher%)
+        g.append('path')
+          .attr(
+            'd',
+            `M ${xMid + 4} ${topY - bw * 0.5}
+             Q ${xMid + 10} ${topY - bw * 0.8} ${xMid + 20} ${topY - bw * 0.5}
+             L ${xRight - 18} ${topY - bw * 0.5}
+             Q ${xRight - 10} ${topY - bw * 0.8} ${xRight} ${topY - bw * 0.5}
+             L ${xRight} ${topY}`
+          )
+          .attr('stroke', '#666')
+          .attr('stroke-width', 1.5)
+          .attr('fill', 'none');
+
+        g.append('text')
+          .attr('x', (xMid + xRight) / 2)
+          .attr('y', topY - bw - 4)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '12px')
+          .style('fill', '#555')
+          .text(pctHigher + '%');
+      }
     }
 
-    // Legend (to the right of histogram, matching vanilla)
-    const legendData = [
-      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
-      { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
-      { type: 'line', color: CONFIG.getColorForElement(currentMetric, 'trendLine'), label: 'Rolling median' },
-      { type: 'circle', color: CONFIG.getColorForElement(currentMetric, 'dataPoints'), label: 'Historical data' },
-      { type: 'target', color: '#333', label: 'Target date' },
-    ];
-    // Overlay legend at top-right of histogram bars area
-    const legend = g.append('g').attr('class', 'legend')
-      .attr('transform', `translate(${width - 110}, 0)`);
-    legendData.forEach((item, i) => {
-      const row = legend.append('g').attr('transform', `translate(0, ${i * 16})`);
-      if (item.type === 'rect') {
-        row.append('rect').attr('width', 14).attr('height', 14).attr('fill', item.color).attr('opacity', (item as any).op ?? 0.4);
-      } else if (item.type === 'line') {
-        row.append('line').attr('x1', 0).attr('x2', 14).attr('y1', 7).attr('y2', 7).attr('stroke', item.color).attr('stroke-width', 2.5);
-      } else if (item.type === 'circle') {
-        row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 2).attr('fill', item.color);
-      } else if (item.type === 'target') {
-        row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
-      }
-      row.append('text').attr('x', 20).attr('y', 7).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
-    });
-    const lbox = (legend.node() as SVGGElement).getBBox();
-    legend.insert('rect', ':first-child')
-      .attr('x', lbox.x - 4).attr('y', lbox.y - 4)
-      .attr('width', lbox.width + 8).attr('height', lbox.height + 8)
-      .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
+    // Legend (only in horizontal/desktop mode — mobile shows it elsewhere or hides for space)
+    if (!isVertical) {
+      const legendData = [
+        { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
+        { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
+        { type: 'line', color: CONFIG.getColorForElement(currentMetric, 'trendLine'), label: 'Rolling median' },
+        { type: 'circle', color: CONFIG.getColorForElement(currentMetric, 'dataPoints'), label: 'Historical data' },
+        { type: 'target', color: '#333', label: 'Target date' },
+      ];
+      const legend = g.append('g').attr('class', 'legend')
+        .attr('transform', `translate(${width - 110}, 0)`);
+      legendData.forEach((item, i) => {
+        const row = legend.append('g').attr('transform', `translate(0, ${i * 16})`);
+        if (item.type === 'rect') {
+          row.append('rect').attr('width', 14).attr('height', 14).attr('fill', item.color).attr('opacity', (item as any).op ?? 0.4);
+        } else if (item.type === 'line') {
+          row.append('line').attr('x1', 0).attr('x2', 14).attr('y1', 7).attr('y2', 7).attr('stroke', item.color).attr('stroke-width', 2.5);
+        } else if (item.type === 'circle') {
+          row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 2).attr('fill', item.color);
+        } else if (item.type === 'target') {
+          row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
+        }
+        row.append('text').attr('x', 20).attr('y', 7).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
+      });
+      const lbox = (legend.node() as SVGGElement).getBBox();
+      legend.insert('rect', ':first-child')
+        .attr('x', lbox.x - 4).attr('y', lbox.y - 4)
+        .attr('width', lbox.width + 8).attr('height', lbox.height + 8)
+        .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
+    }
 
-  }, [filteredData, currentMetric, currentDate, fullData, width, height]);
+  }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical]);
 
   return (
     <div className="histogram-chart-wrapper">

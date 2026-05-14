@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import LocationSelector from './components/LocationSelector';
 import DateSelector from './components/DateSelector';
@@ -41,6 +41,24 @@ const AppContent: React.FC = () => {
   const handleFetch = () => {
     fetchData();
   };
+
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const [mobileWidth, setMobileWidth] = useState(
+    typeof window !== 'undefined' ? Math.min(window.innerWidth - 60, 420) : 360
+  );
+  useEffect(() => {
+    const onResize = () => setMobileWidth(Math.min(window.innerWidth - 60, 420));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const formatChartTitle = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
@@ -110,20 +128,46 @@ const AppContent: React.FC = () => {
                 <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
               </div>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
-              <div className="charts-container">
-                <MainChart
-                  filteredData={filteredData}
-                  yearlyAggregates={yearlyAggregates}
-                  currentMetric={currentMetric}
-                  currentDate={currentDate}
-                  fullData={fullData}
-                />
-                <HistogramChart
-                  filteredData={filteredData}
-                  currentMetric={currentMetric}
-                  currentDate={currentDate}
-                  fullData={fullData}
-                />
+              <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
+                {isMobile ? (
+                  <>
+                    <HistogramChart
+                      filteredData={filteredData}
+                      currentMetric={currentMetric}
+                      currentDate={currentDate}
+                      fullData={fullData}
+                      orientation="vertical"
+                      width={mobileWidth}
+                      height={180}
+                    />
+                    <MainChart
+                      filteredData={filteredData}
+                      yearlyAggregates={yearlyAggregates}
+                      currentMetric={currentMetric}
+                      currentDate={currentDate}
+                      fullData={fullData}
+                      orientation="vertical"
+                      width={mobileWidth}
+                      height={460}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MainChart
+                      filteredData={filteredData}
+                      yearlyAggregates={yearlyAggregates}
+                      currentMetric={currentMetric}
+                      currentDate={currentDate}
+                      fullData={fullData}
+                    />
+                    <HistogramChart
+                      filteredData={filteredData}
+                      currentMetric={currentMetric}
+                      currentDate={currentDate}
+                      fullData={fullData}
+                    />
+                  </>
+                )}
               </div>
             </div>
           </div>

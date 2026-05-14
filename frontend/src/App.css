@@ -172,3 +172,90 @@ body {
   padding: 40px;
   text-align: center;
 }
+
+/* Mobile chart layout: histogram stacked above main chart, sharing the temp x-axis */
+.charts-container.mobile {
+  white-space: normal;
+  overflow-x: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.charts-container.mobile .main-chart-wrapper,
+.charts-container.mobile .histogram-chart-wrapper {
+  display: block;
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .app {
+    padding: 10px;
+  }
+  .app-container {
+    padding: 16px;
+  }
+  .app-header h1 {
+    font-size: 24px;
+  }
+  .app-header {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+  }
+  .controls-panel {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  .controls-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .controls-row > .location-selector {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .location-selector {
+    flex-wrap: wrap;
+  }
+  #city-search {
+    width: 100%;
+  }
+  .city-search-container {
+    flex: 1 1 100%;
+  }
+  .coordinates {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .coordinate-input {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  .coordinate-input input {
+    width: 100%;
+    min-width: 0;
+  }
+  .fetch-button {
+    flex: 1 1 100%;
+    padding: 12px;
+  }
+  .metric-selector {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .metric-selector label {
+    min-width: 0;
+  }
+  .metric-buttons {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .metric-button {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .charts-controls {
+    margin-bottom: 8px;
+  }
+}

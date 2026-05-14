@@ -5,15 +5,23 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import './MainChart.css';
 
+export type Orientation = 'horizontal' | 'vertical';
+
 interface MainChartProps {
   filteredData: WeatherDataPoint[];
   yearlyAggregates: YearlyAggregate[];
   currentMetric: MetricKey;
   currentDate: string;
   fullData: WeatherDataPoint[];
+  orientation?: Orientation;
+  width?: number;
+  height?: number;
 }
 
-const MARGIN = { top: 20, right: 30, bottom: 40, left: 55 };
+// horizontal: time on x, temp on y (desktop original)
+// vertical:   temp on x, time on y (mobile rotated)
+const MARGIN_H = { top: 20, right: 30, bottom: 40, left: 55 };
+const MARGIN_V = { top: 10, right: 20, bottom: 40, left: 55 };
 
 const MainChart: React.FC<MainChartProps> = ({
   filteredData,
@@ -21,12 +29,17 @@ const MainChart: React.FC<MainChartProps> = ({
   currentMetric,
   currentDate,
   fullData,
+  orientation = 'horizontal',
+  width: propWidth,
+  height: propHeight,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const totalWidth = 720;
-  const totalHeight = 400;
+  const isVertical = orientation === 'vertical';
+  const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
+  const totalWidth = propWidth ?? 720;
+  const totalHeight = propHeight ?? 400;
   const width = totalWidth - MARGIN.left - MARGIN.right;
   const height = totalHeight - MARGIN.top - MARGIN.bottom;
 
@@ -42,55 +55,98 @@ const MainChart: React.FC<MainChartProps> = ({
 
     const tooltip = d3.select(tooltipRef.current);
 
-    // Scales
     const dateExtent = d3.extent(filteredData, (d) => d.date) as [Date, Date];
     const allValues = filteredData
       .map((d) => d[currentMetric])
       .filter((v): v is number => v !== undefined);
     const [minVal, maxVal] = d3.extent(allValues) as [number, number];
 
-    const xScale = d3.scaleTime().domain(dateExtent).range([0, width]);
-    const yScale = d3
+    // timeScale maps date → its axis pixel; tempScale maps temp → its axis pixel.
+    // Orientation only changes which axis (x vs y) each one drives.
+    const timeScale = d3
+      .scaleTime()
+      .domain(dateExtent)
+      .range(isVertical ? [0, height] : [0, width]);
+    const tempScale = d3
       .scaleLinear()
       .domain([minVal - 2, maxVal + 2])
-      .range([height, 0]);
+      .range(isVertical ? [0, width] : [height, 0]);
+
+    const tx = (t: Date | number, kind: 'time' | 'temp') =>
+      isVertical
+        ? (kind === 'temp' ? tempScale(t as number) : timeScale(t as Date))
+        : (kind === 'time' ? timeScale(t as Date) : tempScale(t as number));
+    const ty = (t: Date | number, kind: 'time' | 'temp') =>
+      isVertical
+        ? (kind === 'time' ? timeScale(t as Date) : tempScale(t as number))
+        : (kind === 'temp' ? tempScale(t as number) : timeScale(t as Date));
 
     // Grid
     g.append('g')
       .attr('class', 'grid')
       .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(xScale).tickSize(-height).tickFormat(() => ''));
+      .call(
+        (isVertical
+          ? d3.axisBottom(tempScale)
+          : d3.axisBottom(timeScale)
+        ).tickSize(-height).tickFormat(() => '') as any
+      );
 
     g.append('g')
       .attr('class', 'grid')
-      .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(() => ''));
+      .call(
+        (isVertical
+          ? d3.axisLeft(timeScale)
+          : d3.axisLeft(tempScale)
+        ).tickSize(-width).tickFormat(() => '') as any
+      );
 
     // Axes
     g.append('g')
       .attr('class', 'axis')
       .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat('%Y') as any));
+      .call(
+        (isVertical
+          ? d3.axisBottom(tempScale)
+          : d3.axisBottom(timeScale).tickFormat(d3.timeFormat('%Y') as any)
+        ) as any
+      );
 
-    g.append('g').attr('class', 'axis').call(d3.axisLeft(yScale));
+    g.append('g').attr('class', 'axis').call(
+      (isVertical
+        ? d3.axisLeft(timeScale).tickFormat(d3.timeFormat('%Y') as any)
+        : d3.axisLeft(tempScale)
+      ) as any
+    );
 
-    // Y-axis label
-    const yLabels: Record<MetricKey, string> = {
+    // Axis label (the temp axis)
+    const tempLabels: Record<MetricKey, string> = {
       max_temperature: 'Max Apparent Temp (°C)',
       min_temperature: 'Min Apparent Temp (°C)',
       precipitation_sum: 'Precipitation (mm)',
       wind_speed_10m_max: 'Max Wind Speed (km/h)',
     };
-    g.append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('y', -MARGIN.left + 10)
-      .attr('x', -height / 2)
-      .attr('dy', '1em')
-      .style('text-anchor', 'middle')
-      .style('font-size', '12px')
-      .style('fill', '#555')
-      .text(yLabels[currentMetric]);
+    if (isVertical) {
+      g.append('text')
+        .attr('x', width / 2)
+        .attr('y', height + 32)
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#555')
+        .text(tempLabels[currentMetric]);
+    } else {
+      g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('y', -MARGIN.left + 10)
+        .attr('x', -height / 2)
+        .attr('dy', '1em')
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#555')
+        .text(tempLabels[currentMetric]);
+    }
 
-    // Percentile bands (only draw if we have valid aggregate data)
+    // Percentile bands
     const validAggs = yearlyAggregates.filter(
       (d) =>
         d.date &&
@@ -99,19 +155,34 @@ const MainChart: React.FC<MainChartProps> = ({
     );
 
     if (validAggs.length > 0) {
-      const area90 = d3
-        .area<YearlyAggregate>()
-        .x((d) => xScale(d.date))
-        .y0((d) => yScale((d.p10 ?? d.moving10) as number))
-        .y1((d) => yScale((d.p90 ?? d.moving90) as number))
-        .curve(d3.curveMonotoneX);
+      const makeArea = (
+        lo: (d: YearlyAggregate) => number,
+        hi: (d: YearlyAggregate) => number
+      ) => {
+        if (isVertical) {
+          return d3
+            .area<YearlyAggregate>()
+            .y((d) => timeScale(d.date))
+            .x0((d) => tempScale(lo(d)))
+            .x1((d) => tempScale(hi(d)))
+            .curve(d3.curveMonotoneY);
+        }
+        return d3
+          .area<YearlyAggregate>()
+          .x((d) => timeScale(d.date))
+          .y0((d) => tempScale(lo(d)))
+          .y1((d) => tempScale(hi(d)))
+          .curve(d3.curveMonotoneX);
+      };
 
-      const area75 = d3
-        .area<YearlyAggregate>()
-        .x((d) => xScale(d.date))
-        .y0((d) => yScale((d.p25 ?? d.moving25) as number))
-        .y1((d) => yScale((d.p75 ?? d.moving75) as number))
-        .curve(d3.curveMonotoneX);
+      const area90 = makeArea(
+        (d) => (d.p10 ?? d.moving10) as number,
+        (d) => (d.p90 ?? d.moving90) as number
+      );
+      const area75 = makeArea(
+        (d) => (d.p25 ?? d.moving25) as number,
+        (d) => (d.p75 ?? d.moving75) as number
+      );
 
       g.append('path')
         .datum(validAggs)
@@ -133,14 +204,19 @@ const MainChart: React.FC<MainChartProps> = ({
         .duration(500)
         .style('opacity', 1);
 
-      // Trend line (rolling median)
       const trendData = validAggs.filter((d) => d.movingMedian !== null);
       if (trendData.length > 0) {
-        const line = d3
-          .line<YearlyAggregate>()
-          .x((d) => xScale(d.date))
-          .y((d) => yScale(d.movingMedian as number))
-          .curve(d3.curveMonotoneX);
+        const line = isVertical
+          ? d3
+              .line<YearlyAggregate>()
+              .y((d) => timeScale(d.date))
+              .x((d) => tempScale(d.movingMedian as number))
+              .curve(d3.curveMonotoneY)
+          : d3
+              .line<YearlyAggregate>()
+              .x((d) => timeScale(d.date))
+              .y((d) => tempScale(d.movingMedian as number))
+              .curve(d3.curveMonotoneX);
 
         g.append('path')
           .datum(trendData)
@@ -175,8 +251,8 @@ const MainChart: React.FC<MainChartProps> = ({
       .enter()
       .append('circle')
       .attr('class', 'data-point')
-      .attr('cx', (d) => xScale(d.date))
-      .attr('cy', (d) => yScale(d[currentMetric] as number))
+      .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
+      .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
       .attr('r', 2)
       .attr('fill', CONFIG.getColorForElement(currentMetric, 'dataPoints'))
       .style('opacity', 0);
@@ -208,23 +284,28 @@ const MainChart: React.FC<MainChartProps> = ({
     if (currentDateData.length > 0) {
       const currentTemp = currentDateData[0][currentMetric] as number;
 
-      g.append('line')
-        .attr('class', 'current-temp-line')
-        .attr('x1', 0)
-        .attr('x2', width)
-        .attr('y1', yScale(currentTemp))
-        .attr('y2', yScale(currentTemp))
+      // Line is perpendicular to the temp axis: horizontal line in horizontal mode, vertical line in vertical mode.
+      const lineEl = g.append('line').attr('class', 'current-temp-line')
         .attr('stroke', '#333')
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '5,5');
+      if (isVertical) {
+        lineEl
+          .attr('x1', tempScale(currentTemp)).attr('x2', tempScale(currentTemp))
+          .attr('y1', 0).attr('y2', height);
+      } else {
+        lineEl
+          .attr('x1', 0).attr('x2', width)
+          .attr('y1', tempScale(currentTemp)).attr('y2', tempScale(currentTemp));
+      }
 
       g.selectAll('.current-temp-point')
         .data(currentDateData)
         .enter()
         .append('circle')
         .attr('class', 'current-temp-point')
-        .attr('cx', (d) => xScale(d.date))
-        .attr('cy', (d) => yScale(d[currentMetric] as number))
+        .attr('cx', (d) => isVertical ? tempScale(d[currentMetric] as number) : timeScale(d.date))
+        .attr('cy', (d) => isVertical ? timeScale(d.date) : tempScale(d[currentMetric] as number))
         .attr('r', 5)
         .attr('fill', '#333')
         .attr('stroke', 'white')
@@ -240,7 +321,7 @@ const MainChart: React.FC<MainChartProps> = ({
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
     }
-  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height]);
+  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical]);
 
   return (
     <div className="main-chart-wrapper">
