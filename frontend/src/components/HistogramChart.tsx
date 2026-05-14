@@ -21,7 +21,7 @@ interface HistogramChartProps {
 // horizontal: temp on Y (shared with MainChart on the left), count on X, bars grow →
 // vertical:   temp on X (shared with MainChart below), count on Y, bars grow ↓ from top
 const MARGIN_H = { top: 20, right: 100, bottom: 40, left: 15 };
-const MARGIN_V = { top: 30, right: 20, bottom: 15, left: 55 };
+const MARGIN_V = { top: 20, right: 20, bottom: 10, left: 55 };
 
 const HistogramChart: React.FC<HistogramChartProps> = ({
   filteredData,

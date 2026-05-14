@@ -9,7 +9,8 @@
 
 .temperature-context h3 {
   margin: 0 0 15px 0;
-  font-size: 18px;
+  font-size: 22px;
+  font-weight: 600;
   color: #333;
 }
 

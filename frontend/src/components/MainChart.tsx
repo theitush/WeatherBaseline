@@ -21,7 +21,7 @@ interface MainChartProps {
 // horizontal: time on x, temp on y (desktop original)
 // vertical:   temp on x, time on y (mobile rotated)
 const MARGIN_H = { top: 20, right: 30, bottom: 40, left: 55 };
-const MARGIN_V = { top: 10, right: 20, bottom: 40, left: 55 };
+const MARGIN_V = { top: 8, right: 20, bottom: 40, left: 55 };
 
 const MainChart: React.FC<MainChartProps> = ({
   filteredData,
