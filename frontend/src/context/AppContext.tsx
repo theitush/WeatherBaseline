@@ -215,10 +215,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [currentMetric, fullData, currentDate, filteredData, startYear, endYear]);
 
-  // Don't auto-fetch on mount - wait for user to click button
-  // useEffect(() => {
-  //   fetchData();
-  // }, []);
+  // Auto-fetch on mount and whenever location or target date changes.
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, currentDate]);
 
   const value: AppState = {
     location,

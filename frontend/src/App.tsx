@@ -24,7 +24,6 @@ const AppContent: React.FC = () => {
     temperatureContext,
     loading,
     error,
-    fetchData,
   } = useApp();
 
   const handleLocationChange = (name: string, lat: number, lon: number) => {
@@ -37,10 +36,6 @@ const AppContent: React.FC = () => {
 
   const handleMetricChange = (metric: any) => {
     setCurrentMetric(metric);
-  };
-
-  const handleFetch = () => {
-    fetchData();
   };
 
   const [isMobile, setIsMobile] = useState(
@@ -104,10 +99,6 @@ const AppContent: React.FC = () => {
             />
 
             <DateSelector currentDate={currentDate} onChange={handleDateChange} />
-
-            <button className="fetch-button" onClick={handleFetch} disabled={loading}>
-              {loading ? 'Loading...' : 'Fetch Data'}
-            </button>
           </div>
         </div>
 
