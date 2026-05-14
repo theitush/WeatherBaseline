@@ -158,6 +158,26 @@ body {
   margin: 8px 0 4px 0;
 }
 
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin: 6px 0 8px 0;
+  padding: 6px 8px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 10px;
+  color: #333;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .charts-controls {
   margin-bottom: 12px;
   display: flex;

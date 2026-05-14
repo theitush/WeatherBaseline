@@ -66,7 +66,7 @@ const MainChart: React.FC<MainChartProps> = ({
     const timeScale = d3
       .scaleTime()
       .domain(dateExtent)
-      .range(isVertical ? [0, height] : [0, width]);
+      .range(isVertical ? [height, 0] : [0, width]);
     const tempScale = d3
       .scaleLinear()
       .domain([minVal - 2, maxVal + 2])

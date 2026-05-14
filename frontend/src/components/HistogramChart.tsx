@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { getLegendData, drawLegendSwatch } from './Legend';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -75,7 +76,13 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const countScale = d3
       .scaleLinear()
       .domain([0, d3.max(bins, (d) => d.length) as number])
-      .range(isVertical ? [0, height] : [0, width]);
+      .range(isVertical ? [height, 0] : [0, width])
+      .clamp(true);
+    // Linear length used for bar sizing (always 0 → size).
+    const countLen = d3
+      .scaleLinear()
+      .domain([0, d3.max(bins, (d) => d.length) as number])
+      .range([0, isVertical ? height : width]);
 
     // Bars (animate count dimension from 0 on enter)
     const barSel = g.selectAll('.bar')
@@ -86,15 +93,16 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
 
     if (isVertical) {
-      // Bars hang from the top: x is the temp bin span, y starts at 0, height grows to count.
+      // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
       barSel
         .attr('x', (d) => tempScale(d.x0 as number))
-        .attr('y', 0)
+        .attr('y', height)
         .attr('width', (d) => tempScale(d.x1 as number) - tempScale(d.x0 as number))
         .attr('height', 0)
         .transition()
         .duration(500)
-        .attr('height', (d) => countScale(d.length));
+        .attr('y', (d) => height - countLen(d.length))
+        .attr('height', (d) => countLen(d.length));
     } else {
       barSel
         .attr('x', 0)
@@ -103,7 +111,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .attr('height', (d) => tempScale(d.x0 as number) - tempScale(d.x1 as number))
         .transition()
         .duration(500)
-        .attr('width', (d) => countScale(d.length));
+        .attr('width', (d) => countLen(d.length));
     }
 
     // Count axis
@@ -275,29 +283,14 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       }
     }
 
-    // Legend (only in horizontal/desktop mode — mobile shows it elsewhere or hides for space)
+    // Desktop-only in-SVG legend; mobile renders an HTML legend above the charts (see App.tsx).
     if (!isVertical) {
-      const legendData = [
-        { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
-        { type: 'rect', color: CONFIG.getColorForElement(currentMetric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
-        { type: 'line', color: CONFIG.getColorForElement(currentMetric, 'trendLine'), label: 'Rolling median' },
-        { type: 'circle', color: CONFIG.getColorForElement(currentMetric, 'dataPoints'), label: 'Historical data' },
-        { type: 'target', color: '#333', label: 'Target date' },
-      ];
       const legend = g.append('g').attr('class', 'legend')
         .attr('transform', `translate(${width - 110}, 0)`);
-      legendData.forEach((item, i) => {
-        const row = legend.append('g').attr('transform', `translate(0, ${i * 16})`);
-        if (item.type === 'rect') {
-          row.append('rect').attr('width', 14).attr('height', 14).attr('fill', item.color).attr('opacity', (item as any).op ?? 0.4);
-        } else if (item.type === 'line') {
-          row.append('line').attr('x1', 0).attr('x2', 14).attr('y1', 7).attr('y2', 7).attr('stroke', item.color).attr('stroke-width', 2.5);
-        } else if (item.type === 'circle') {
-          row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 2).attr('fill', item.color);
-        } else if (item.type === 'target') {
-          row.append('circle').attr('cx', 7).attr('cy', 7).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
-        }
-        row.append('text').attr('x', 20).attr('y', 7).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
+      getLegendData(currentMetric).forEach((item, i) => {
+        const row = legend.append('g').attr('transform', `translate(0, ${i * 16 + 7})`);
+        drawLegendSwatch(row, item);
+        row.append('text').attr('x', 18).attr('y', 0).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
       });
       const lbox = (legend.node() as SVGGElement).getBBox();
       legend.insert('rect', ':first-child')

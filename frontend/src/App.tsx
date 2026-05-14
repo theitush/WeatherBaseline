@@ -7,6 +7,7 @@ import TemperatureContextDisplay from './components/TemperatureContext';
 import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
+import { Legend } from './components/Legend';
 import './App.css';
 
 const AppContent: React.FC = () => {
@@ -128,6 +129,7 @@ const AppContent: React.FC = () => {
                 <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
               </div>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
+              {isMobile && <Legend metric={currentMetric} />}
               <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
                 {isMobile ? (
                   <>
