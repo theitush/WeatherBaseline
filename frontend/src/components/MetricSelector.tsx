@@ -32,13 +32,6 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
             key={metric}
             className={`metric-button ${currentMetric === metric ? 'active' : ''}`}
             onClick={() => onChange(metric)}
-            style={{
-              backgroundColor:
-                currentMetric === metric
-                  ? CONFIG.metricColors[metric].base
-                  : 'transparent',
-              color: currentMetric === metric ? 'white' : '#333',
-            }}
           >
             {metricLabels[metric]}
           </button>

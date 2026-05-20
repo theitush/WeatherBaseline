@@ -13,7 +13,7 @@ export const getLegendData = (metric: MetricKey): LegendItem[] => [
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
   { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Rolling median' },
   { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical data' },
-  { type: 'target', color: '#333', label: 'Target date' },
+  { type: 'target', color: 'var(--mark, #2d241c)', label: 'Target date' },
 ];
 
 // Draw a single legend swatch into a d3 selection (centered vertically on y=0).

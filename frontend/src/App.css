@@ -1,63 +1,62 @@
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
-}
+/* App shell — print-broadsheet shape. No cards, no shadows. */
 
 .app {
   min-height: 100vh;
-  padding: 20px;
+  background: var(--paper);
 }
 
 .app-container {
-  max-width: 1360px;
+  max-width: 72rem;
   margin: 0 auto;
-  background-color: white;
-  padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
 }
 
+/* Masthead — left-aligned, serif headline, hairline rule beneath. */
 .app-header {
-  text-align: center;
-  margin-bottom: 40px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 2rem;
 }
 
 .app-header h1 {
-  margin: 0 0 10px 0;
-  font-size: 36px;
-  color: #333;
+  font-size: var(--step-4);
+  line-height: 0.95;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--ink);
 }
 
-.subtitle {
-  margin: 0;
-  font-size: 16px;
-  color: #666;
+.app-header .subtitle {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.6875rem;
+  color: var(--ink-mute);
+  align-self: flex-end;
+  padding-bottom: 0.4rem;
 }
 
+/* Controls — read as the "filing card" of a research instrument.
+   Single horizontal strip on a tinted band, no rounded card. */
 .controls-panel {
-  background-color: #f8f9fa;
-  padding: 25px;
-  border-radius: 8px;
-  margin-bottom: 30px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 1rem 0;
+  margin-bottom: 2.5rem;
+  background: transparent;
 }
 
 .controls-row {
   display: flex;
   align-items: flex-end;
-  gap: 15px;
-  flex-wrap: nowrap;
+  gap: 2rem;
+  flex-wrap: wrap;
 }
 
 .controls-row > .location-selector {
@@ -65,75 +64,72 @@ body {
   min-width: 0;
 }
 
-.fetch-button {
-  padding: 10px 24px;
-  font-size: 16px;
-  font-weight: 500;
-  background-color: #4A90E2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.fetch-button:hover:not(:disabled) {
-  background-color: #357ABD;
-}
-
-.fetch-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
 .error-message {
-  background-color: #ffebee;
-  border: 1px solid #f44336;
-  border-radius: 4px;
-  padding: 15px;
-  margin-bottom: 20px;
-  color: #c62828;
+  border-left: none;
+  border-top: 1px solid var(--hot);
+  border-bottom: 1px solid var(--hot);
+  background: transparent;
+  color: var(--hot);
+  padding: 0.75rem 0;
+  margin: 1.5rem 0;
+  font-family: var(--mono);
+  font-size: var(--step--1);
 }
 
-.data-panel {
-  margin-top: 30px;
+.error-message strong {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.6875rem;
+  margin-right: 0.75rem;
 }
 
-.data-info {
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
+.data-panel { margin-top: 0; }
+
+.charts-section { margin: 1.5rem 0 0; }
+
+.charts-controls {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.data-info h3 {
-  margin: 0 0 15px 0;
-  font-size: 18px;
-  color: #333;
+.chart-title {
+  text-align: left;
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 1rem 0 0.5rem;
+  letter-spacing: -0.005em;
 }
 
-.data-info p {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #666;
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
 }
 
-.charts-section {
-  margin: 20px 0;
-}
-
-.charts-section h3 {
-  margin: 0 0 15px 0;
-  font-size: 20px;
-  color: #333;
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .charts-container {
-  background-color: white;
-  border-radius: 8px;
-  padding: 20px 0;
+  background: transparent;
+  padding: 0.5rem 0;
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
@@ -143,63 +139,17 @@ body {
 .charts-container .histogram-chart-wrapper {
   display: inline-block;
   vertical-align: top;
-  font-size: 14px;
+  font-size: var(--step-0);
 }
 
-.charts-container .histogram-chart-wrapper {
-  margin-left: -30px;
-}
+.charts-container .histogram-chart-wrapper { margin-left: -30px; }
 
-.chart-title {
-  text-align: center;
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-  margin: 8px 0 4px 0;
-}
-
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 12px;
-  margin: 6px 0 8px 0;
-  padding: 6px 8px;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  font-size: 10px;
-  color: #333;
-}
-
-.chart-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.charts-controls {
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.charts-placeholder {
-  background-color: #f0f0f0;
-  border: 2px dashed #ccc;
-  border-radius: 8px;
-  padding: 40px;
-  text-align: center;
-}
-
-/* Mobile chart layout: histogram stacked above main chart, sharing the temp x-axis */
 .charts-container.mobile {
   white-space: normal;
   overflow-x: visible;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 0;
 }
 
@@ -209,86 +159,23 @@ body {
   margin: 0;
 }
 
-.charts-container.mobile .main-chart-wrapper {
-  margin-top: -14px;
+.charts-container.mobile .main-chart-wrapper { margin-top: -14px; }
+
+.charts-placeholder {
+  border: 1px solid var(--rule);
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: var(--step--1);
 }
 
 @media (max-width: 767px) {
-  .app {
-    padding: 10px;
-  }
-  .app-container {
-    padding: 16px;
-  }
-  .app-header h1 {
-    font-size: 24px;
-  }
-  .app-header {
-    margin-bottom: 20px;
-    padding-bottom: 12px;
-  }
-  .controls-panel {
-    padding: 12px;
-    margin-bottom: 16px;
-  }
-  .controls-row {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .controls-row > .location-selector {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-  }
-  .location-selector {
-    flex-wrap: wrap;
-  }
-  #city-search {
-    width: 100%;
-  }
-  .city-search-container {
-    flex: 1 1 100%;
-  }
-  .coordinates {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-  }
-  .coordinate-input {
-    flex: 1 1 calc(50% - 6px);
-    min-width: 0;
-  }
-  .coordinate-input input {
-    width: 100%;
-    min-width: 0;
-  }
-  .fetch-button {
-    flex: 1 1 100%;
-    padding: 12px;
-  }
-  .date-selector {
-    flex: 1 1 100%;
-  }
-  #target-date {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 40px;
-    font-size: 16px;
-  }
-  .metric-selector {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .metric-selector label {
-    min-width: 0;
-  }
-  .metric-buttons {
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  .metric-button {
-    padding: 6px 10px;
-    font-size: 13px;
-  }
-  .charts-controls {
-    margin-bottom: 8px;
-  }
+  .app-container { padding: 1.25rem 1rem 3rem; }
+  .app-header { gap: 0.5rem; padding-bottom: 0.75rem; margin-bottom: 1.25rem; }
+  .app-header h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
+  .app-header .subtitle { align-self: flex-start; padding-bottom: 0; }
+  .controls-panel { padding: 0.75rem 0; margin-bottom: 1.5rem; }
+  .controls-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .charts-controls { margin-bottom: 0.5rem; }
 }

@@ -99,23 +99,25 @@ const CONFIG: Config = {
   get histHeight() { return 400 - this.histMargin.top - this.histMargin.bottom; },
 
   // Base colors for different metrics (all available, only active ones used)
+  // Derived from index.css OKLCH tokens (--hot / --cold). Keep these in sync
+  // with the design tokens if either palette ever moves. Hex form is required
+  // because d3 consumes the value.
   metricColors: {
     max_temperature: {
-      base: '#FF8C42',
-      name: 'Orange'
+      base: '#b94a2a',     // oklch(55% 0.16 35) — oxide red, the "hot" signal
+      name: 'Oxide'
     },
     min_temperature: {
-      base: '#4A90E2',
-      name: 'Blue'
+      base: '#3c6f9a',     // oklch(50% 0.09 240) — slate blue, the "cold" signal
+      name: 'Slate'
     },
-    // Keeping these for easy re-enabling
     precipitation_sum: {
-      base: '#B19CD9',
-      name: 'Pastel Purple'
+      base: '#6b6896',
+      name: 'Muted Iris'
     },
     wind_speed_10m_max: {
-      base: '#A8D8A8',
-      name: 'Pastel Green'
+      base: '#728c6e',
+      name: 'Sage'
     }
   },
 

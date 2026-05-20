@@ -3,19 +3,18 @@
 }
 
 .histogram-chart-svg .axis text {
-  font-size: 11px;
-  fill: #555;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink-mute);
 }
 
 .histogram-chart-svg .axis line,
 .histogram-chart-svg .axis path {
-  stroke: #aaa;
+  stroke: var(--rule-strong);
+  stroke-width: 0.75;
 }
 
-.histogram-chart-svg .bar {
-  opacity: 0.8;
-}
+.histogram-chart-svg .bar { opacity: 0.85; }
 
-.histogram-chart-svg {
-  overflow: visible;
-}
+.histogram-chart-svg { overflow: visible; }

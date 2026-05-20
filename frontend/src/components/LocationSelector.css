@@ -1,106 +1,111 @@
 .location-selector {
   display: flex;
   flex-direction: row;
-  gap: 15px;
+  gap: 1.5rem;
   align-items: flex-end;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
 .city-search-container {
   position: relative;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 12rem;
+  flex: 1 1 12rem;
 }
 
-.city-search-container label {
-  margin-right: 10px;
-  font-weight: 500;
-  white-space: nowrap;
+.city-search-container label,
+.coordinate-input label,
+.date-selector label,
+.metric-selector > label {
+  margin: 0;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.6875rem;
+  color: var(--ink-mute);
+  font-weight: 400;
 }
 
-#city-search {
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 160px;
+/* Inputs read as instrument readouts, not SaaS form fields:
+   no rounded corners, no border boxes, just a baseline rule. */
+#city-search,
+.coordinate-input input,
+#target-date {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.3rem 0;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-0);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  width: 100%;
+  transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-#city-search:focus {
+#city-search { font-family: var(--sans); }
+
+#city-search:focus,
+.coordinate-input input:focus,
+#target-date:focus {
   outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+  border-bottom-color: var(--hot);
 }
 
 .city-suggestions {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 0.25rem);
   left: 0;
-  width: 200px;
-  background: white;
-  border: 1px solid #ccc;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  max-height: 250px;
+  right: 0;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  max-height: 18rem;
   overflow-y: auto;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   z-index: 1000;
 }
 
 .city-suggestion {
-  padding: 10px 12px;
+  padding: 0.5rem 0.75rem;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--rule);
+  transition: background 120ms ease-out;
 }
 
-.city-suggestion:last-child {
-  border-bottom: none;
-}
+.city-suggestion:last-child { border-bottom: none; }
 
 .city-suggestion:hover,
 .city-suggestion.selected {
-  background-color: #e3f2fd;
+  background: var(--paper-deep);
 }
 
 .city-name {
   font-weight: 500;
-  color: #333;
-  margin-bottom: 2px;
+  color: var(--ink);
+  margin-bottom: 0.125rem;
+  font-size: var(--step-0);
 }
 
 .city-details {
-  font-size: 12px;
-  color: #666;
+  font-size: var(--step--1);
+  color: var(--ink-mute);
+  font-family: var(--mono);
 }
 
 .coordinates {
   display: flex;
-  gap: 12px;
+  gap: 1.5rem;
 }
 
 .coordinate-input {
   display: flex;
-  align-items: center;
-}
-
-.coordinate-input label {
-  display: inline-block;
-  margin-right: 8px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.coordinate-input input {
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 90px;
-}
-
-.coordinate-input input:focus {
-  outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 7rem;
 }

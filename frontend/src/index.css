@@ -1,111 +1,111 @@
+/* Design tokens — How Hot Was It
+   Register: brand. Reference lane: scientific print (Tufte).
+   See PRODUCT.md for the principles these tokens serve. */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Paper + ink. Neutrals tinted warm; never pure white or black. */
+  --paper: oklch(96.5% 0.012 70);
+  --paper-deep: oklch(93% 0.015 70);
+  --ink: oklch(22% 0.015 60);
+  --ink-mute: oklch(45% 0.012 60);
+  --ink-soft: oklch(60% 0.01 60);
+  --rule: oklch(85% 0.012 70);
+  --rule-strong: oklch(70% 0.014 70);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Data palette. Two committed hues; everything else derives. */
+  --hot: oklch(55% 0.16 35);     /* oxide / brick — heat */
+  --cold: oklch(50% 0.09 240);   /* slate blue — cold */
+  --mark: oklch(28% 0.025 50);   /* target date marker — warm near-black */
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  /* Focus ring — single, visible, non-blue. */
+  --focus: oklch(55% 0.16 35);
+
+  /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
+     None of these are on the impeccable reflex-reject list. */
+  --serif: 'Spectral', Georgia, 'Iowan Old Style', serif;
+  --sans: 'Geist', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Scale (≥1.25 between steps). */
+  --step--1: 0.8125rem;   /* 13px */
+  --step-0:  0.9375rem;   /* 15px */
+  --step-1:  1.125rem;    /* 18px */
+  --step-2:  1.5rem;      /* 24px */
+  --step-3:  2rem;        /* 32px */
+  --step-4: clamp(2.5rem, 6vw, 4.25rem); /* hero */
+
+  font-family: var(--sans);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  font-feature-settings: 'ss01', 'cv11';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+    --paper: oklch(18% 0.012 60);
+    --paper-deep: oklch(22% 0.014 60);
+    --ink: oklch(94% 0.012 70);
+    --ink-mute: oklch(72% 0.012 70);
+    --ink-soft: oklch(55% 0.01 70);
+    --rule: oklch(32% 0.014 60);
+    --rule-strong: oklch(45% 0.014 60);
+    --hot: oklch(68% 0.16 35);
+    --cold: oklch(70% 0.10 240);
+    --mark: oklch(92% 0.015 70);
+    color-scheme: dark;
   }
 }
 
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; background: var(--paper); }
+
+body { font-family: var(--sans); color: var(--ink); }
+
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
+h1, h2, h3, h4 {
+  font-family: var(--serif);
   font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+  color: var(--ink);
+  letter-spacing: -0.01em;
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+p { margin: 0; }
+
+button, input, select {
+  font: inherit;
+  color: inherit;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Tabular numerals everywhere a number lives. */
+.num, code, .mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
+/* Single focus ring across all interactive controls. */
+:where(button, input, select, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

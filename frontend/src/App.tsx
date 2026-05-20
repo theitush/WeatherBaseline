@@ -85,8 +85,8 @@ const AppContent: React.FC = () => {
 
       <div className="app-container">
         <header className="app-header">
-          <h1>How Hot Was It?</h1>
-          <p className="subtitle">Explore historical weather patterns</p>
+          <h1>How hot was it?</h1>
+          <p className="subtitle">A historical record</p>
         </header>
 
         <div className="controls-panel">

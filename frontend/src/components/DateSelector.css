@@ -1,25 +1,25 @@
 .date-selector {
   display: flex;
-  align-items: center;
-}
-
-.date-selector label {
-  display: inline-block;
-  margin-right: 10px;
-  font-weight: 500;
-  min-width: 50px;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  width: 10rem;
 }
 
 #target-date {
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 150px;
+  /* shared input styles come from LocationSelector.css */
+  width: 100%;
+  cursor: pointer;
 }
 
-#target-date:focus {
-  outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+#target-date::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  #target-date::-webkit-calendar-picker-indicator {
+    filter: invert(0.85);
+  }
 }
