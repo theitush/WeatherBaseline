@@ -79,14 +79,30 @@ const AppContent: React.FC = () => {
     return null;
   };
 
+  // ATMOSPHERE: drive the page gradient from the current temperature.
+  const temp = getCurrentTemp();
+  const skyGradient = (() => {
+    if (temp === null || temp === undefined) return undefined;
+    // Map -10..40°C onto a hue/lightness path: deep navy → cyan → ember → magenta.
+    const t = Math.max(0, Math.min(1, (temp + 10) / 50));
+    const topHue = 240 - t * 30;             // 240 cold → 210 warm
+    const topLight = 18 + t * 8;             // gets brighter as it warms
+    const baseHue = 280 - t * 270;           // 280 cold-violet → 10 ember-red
+    const baseLight = 28 + t * 18;
+    const baseChroma = 0.10 + t * 0.12;
+    return {
+      background: `radial-gradient(ellipse at 50% 115%, oklch(${baseLight}% ${baseChroma} ${baseHue}) 0%, oklch(${topLight}% 0.08 ${topHue}) 65%, oklch(${topLight - 6}% 0.05 ${topHue}) 100%)`,
+    };
+  })();
+
   return (
-    <div className="app">
+    <div className="app" style={skyGradient}>
       <LoadingOverlay show={loading} />
 
       <div className="app-container">
         <header className="app-header">
-          <h1>How hot was it?</h1>
-          <p className="subtitle">A historical record</p>
+          <h1>how hot was it</h1>
+          <p className="subtitle">Atmosphere ✕ Time</p>
         </header>
 
         <div className="controls-panel">

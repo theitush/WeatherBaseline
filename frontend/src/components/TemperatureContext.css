@@ -1,77 +1,57 @@
-/* The readout. Numbers ARE the typography here.
-   No card, no shadow — sits directly on the paper, framed by hairline rules. */
+/* ATMOSPHERE — the temperature is a monolith. The number IS the page. */
 
 .temperature-context {
   background: transparent;
-  padding: 1.5rem 0 1.25rem;
-  margin: 0 0 1.5rem;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  text-align: left;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: baseline;
-  gap: 0 2rem;
+  padding: clamp(2rem, 8vw, 5rem) 0 clamp(1.5rem, 4vw, 3rem);
+  margin: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.temp-value {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-style: italic;
+  font-size: var(--step-4);
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+  color: var(--ink);
+  text-shadow: 0 4px 60px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  /* Slight optical lift — the monolith hangs in space. */
+  margin-top: 0;
+  font-variant-numeric: lining-nums;
 }
 
 .context-description {
   font-family: var(--serif);
   font-style: italic;
-  font-size: var(--step-2);
-  font-weight: 500;
-  line-height: 1.15;
+  font-weight: 300;
+  font-size: clamp(1.25rem, 2.5vw, 2rem);
+  line-height: 1.2;
   color: var(--ink);
-  grid-column: 2;
-  grid-row: 1;
-  margin: 0;
-  max-width: 38ch;
+  max-width: 32ch;
+  text-align: center;
+  margin-top: 1rem;
 }
 
 .context-content {
-  display: contents;
-}
-
-.temp-value {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 1, 'ss01' 1;
-  font-size: clamp(2.75rem, 7vw, 4rem);
-  line-height: 0.95;
-  font-weight: 500;
-  letter-spacing: -0.04em;
-  color: var(--hot);
-  align-self: center;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .context-percentile,
 .context-ranking {
-  grid-column: 2;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.22em;
   color: var(--ink-mute);
   font-style: normal;
-  margin-top: 0.5rem;
-}
-
-.context-percentile { grid-row: 2; }
-.context-ranking { grid-row: 3; grid-column: 2; }
-
-@media (max-width: 480px) {
-  .temperature-context {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-  .temp-value,
-  .context-description,
-  .context-percentile,
-  .context-ranking {
-    grid-column: 1;
-    grid-row: auto;
-  }
-  .temp-value { align-self: start; }
+  margin-top: 0.25rem;
 }

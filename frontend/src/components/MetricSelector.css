@@ -5,10 +5,6 @@
   flex-wrap: wrap;
 }
 
-.metric-selector > label {
-  /* shared mono uppercase label from LocationSelector.css */
-}
-
 .metric-buttons {
   display: flex;
   gap: 0;
@@ -18,18 +14,17 @@
 .metric-button {
   padding: 0.35rem 0.85rem;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   border: 0;
   border-right: 1px solid var(--rule-strong);
   border-radius: 0;
   background: transparent;
   color: var(--ink-mute);
   cursor: pointer;
-  transition: color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-              background 160ms cubic-bezier(0.22, 1, 0.36, 1);
-  font-weight: 500;
+  transition: color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+              background 180ms cubic-bezier(0.22, 1, 0.36, 1);
   white-space: nowrap;
 }
 
@@ -39,5 +34,5 @@
 
 .metric-button.active {
   background: var(--ink);
-  color: var(--paper);
+  color: oklch(15% 0.04 250);
 }

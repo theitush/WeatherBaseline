@@ -1,55 +1,73 @@
-/* App shell — print-broadsheet shape. No cards, no shadows. */
+/* ATMOSPHERE — full-bleed gradient sky, temperature-monolith hero. */
 
 .app {
   min-height: 100vh;
-  background: var(--paper);
+  /* Default gradient — overridden inline by App.tsx based on current temp.
+     Cold pole: deep navy → cyan. Hot pole: ember → magenta. */
+  background:
+    radial-gradient(ellipse at 50% 110%, oklch(45% 0.18 30) 0%, oklch(22% 0.10 280) 70%, oklch(15% 0.05 260) 100%);
+  background-attachment: fixed;
+  transition: background 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle grain — keeps the gradient from looking like a Bootstrap hero. */
+.app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  z-index: 0;
 }
 
 .app-container {
-  max-width: 72rem;
+  position: relative;
+  z-index: 1;
+  max-width: 88rem;
   margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
+  padding: 1.25rem clamp(1.25rem, 4vw, 3rem) 4rem;
 }
 
-/* Masthead — left-aligned, serif headline, hairline rule beneath. */
+/* Masthead is a thin filing-card on glass. */
 .app-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  gap: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--ink);
-  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0;
 }
 
 .app-header h1 {
-  font-size: var(--step-4);
-  line-height: 0.95;
-  letter-spacing: -0.025em;
-  font-weight: 500;
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 300;
   font-style: italic;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
   color: var(--ink);
 }
 
 .app-header .subtitle {
   font-family: var(--mono);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  font-size: 0.625rem;
   color: var(--ink-mute);
-  align-self: flex-end;
-  padding-bottom: 0.4rem;
 }
 
-/* Controls — read as the "filing card" of a research instrument.
-   Single horizontal strip on a tinted band, no rounded card. */
+/* Controls strip — horizontal instrument bar directly under the masthead. */
 .controls-panel {
-  border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  padding: 1rem 0;
-  margin-bottom: 2.5rem;
-  background: transparent;
+  padding: 0.75rem 0;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(8px) saturate(110%);
+  -webkit-backdrop-filter: blur(8px) saturate(110%);
 }
 
 .controls-row {
@@ -65,22 +83,20 @@
 }
 
 .error-message {
-  border-left: none;
-  border-top: 1px solid var(--hot);
-  border-bottom: 1px solid var(--hot);
-  background: transparent;
-  color: var(--hot);
-  padding: 0.75rem 0;
-  margin: 1.5rem 0;
+  border: 1px solid var(--hot);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ink);
+  padding: 0.6rem 0.9rem;
+  margin: 1rem 0;
   font-family: var(--mono);
   font-size: var(--step--1);
 }
 
 .error-message strong {
+  color: var(--hot);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 0.6875rem;
-  margin-right: 0.75rem;
+  margin-right: 0.5rem;
 }
 
 .data-panel { margin-top: 0; }
@@ -96,13 +112,13 @@
 
 .chart-title {
   text-align: left;
-  font-family: var(--serif);
-  font-size: var(--step-2);
-  font-style: italic;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
   font-weight: 500;
-  color: var(--ink);
+  color: var(--ink-mute);
   margin: 1rem 0 0.5rem;
-  letter-spacing: -0.005em;
 }
 
 .chart-legend {
@@ -113,11 +129,10 @@
   padding: 0.5rem 0;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  background: transparent;
   font-family: var(--mono);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-mute);
 }
 
@@ -128,11 +143,14 @@
 }
 
 .charts-container {
-  background: transparent;
-  padding: 0.5rem 0;
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 1rem;
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
+  border: 1px solid var(--rule);
 }
 
 .charts-container .main-chart-wrapper,
@@ -161,21 +179,8 @@
 
 .charts-container.mobile .main-chart-wrapper { margin-top: -14px; }
 
-.charts-placeholder {
-  border: 1px solid var(--rule);
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: var(--step--1);
-}
-
 @media (max-width: 767px) {
-  .app-container { padding: 1.25rem 1rem 3rem; }
-  .app-header { gap: 0.5rem; padding-bottom: 0.75rem; margin-bottom: 1.25rem; }
-  .app-header h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
-  .app-header .subtitle { align-self: flex-start; padding-bottom: 0; }
-  .controls-panel { padding: 0.75rem 0; margin-bottom: 1.5rem; }
+  .app-container { padding: 1rem 1rem 3rem; }
+  .app-header { gap: 0.5rem; }
   .controls-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-  .charts-controls { margin-bottom: 0.5rem; }
 }

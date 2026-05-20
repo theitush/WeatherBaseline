@@ -1,71 +1,53 @@
-/* Design tokens — How Hot Was It
-   Register: brand. Reference lane: scientific print (Tufte).
-   See PRODUCT.md for the principles these tokens serve. */
+/* Variant: ATMOSPHERE — temperature-reactive vertical gradient, cinematic.
+   The page itself is the sky; the chart is the recorded history beneath it. */
 
 :root {
-  /* Paper + ink. Neutrals tinted warm; never pure white or black. */
-  --paper: oklch(96.5% 0.012 70);
-  --paper-deep: oklch(93% 0.015 70);
-  --ink: oklch(22% 0.015 60);
-  --ink-mute: oklch(45% 0.012 60);
-  --ink-soft: oklch(60% 0.01 60);
-  --rule: oklch(85% 0.012 70);
-  --rule-strong: oklch(70% 0.014 70);
+  /* The "sky" gradient is set by inline style on .app, driven by current temp.
+     These tokens are the ink that sits on top. */
+  --ink: oklch(98% 0.012 80);          /* warm near-white */
+  --ink-mute: oklch(82% 0.02 80);
+  --ink-soft: oklch(65% 0.02 80);
+  --rule: rgba(255, 240, 220, 0.18);
+  --rule-strong: rgba(255, 240, 220, 0.35);
+  --glass: rgba(20, 12, 8, 0.22);
 
-  /* Data palette. Two committed hues; everything else derives. */
-  --hot: oklch(55% 0.16 35);     /* oxide / brick — heat */
-  --cold: oklch(50% 0.09 240);   /* slate blue — cold */
-  --mark: oklch(28% 0.025 50);   /* target date marker — warm near-black */
+  /* Data palette — heat saturated, cold deep. */
+  --hot: oklch(72% 0.18 35);
+  --cold: oklch(78% 0.13 230);
+  --mark: oklch(98% 0.012 80);
+  --focus: oklch(85% 0.16 70);
 
-  /* Focus ring — single, visible, non-blue. */
-  --focus: oklch(55% 0.16 35);
+  --serif: 'Fraunces', 'Spectral', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sans: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; /* even UI is mono */
 
-  /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
-     None of these are on the impeccable reflex-reject list. */
-  --serif: 'Spectral', Georgia, 'Iowan Old Style', serif;
-  --sans: 'Geist', -apple-system, 'Segoe UI', system-ui, sans-serif;
-  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  /* Scale (≥1.25 between steps). */
-  --step--1: 0.8125rem;   /* 13px */
-  --step-0:  0.9375rem;   /* 15px */
-  --step-1:  1.125rem;    /* 18px */
-  --step-2:  1.5rem;      /* 24px */
-  --step-3:  2rem;        /* 32px */
-  --step-4: clamp(2.5rem, 6vw, 4.25rem); /* hero */
+  --step--1: 0.6875rem;   /* tiny mono caption */
+  --step-0:  0.8125rem;
+  --step-1:  1rem;
+  --step-2:  1.25rem;
+  --step-3:  2rem;
+  --step-4:  clamp(6rem, 22vw, 18rem);   /* the temperature monolith */
 
   font-family: var(--sans);
   font-size: var(--step-0);
   line-height: 1.5;
   color: var(--ink);
-  background: var(--paper);
-  font-feature-settings: 'ss01', 'cv11';
+  font-feature-settings: 'ss01';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: oklch(18% 0.012 60);
-    --paper-deep: oklch(22% 0.014 60);
-    --ink: oklch(94% 0.012 70);
-    --ink-mute: oklch(72% 0.012 70);
-    --ink-soft: oklch(55% 0.01 70);
-    --rule: oklch(32% 0.014 60);
-    --rule-strong: oklch(45% 0.014 60);
-    --hot: oklch(68% 0.16 35);
-    --cold: oklch(70% 0.10 240);
-    --mark: oklch(92% 0.015 70);
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 
-html, body { margin: 0; padding: 0; background: var(--paper); }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: oklch(18% 0.04 250);
+  min-height: 100%;
+}
 
 body { font-family: var(--sans); color: var(--ink); }
 
@@ -77,30 +59,25 @@ body { font-family: var(--sans); color: var(--ink); }
 
 h1, h2, h3, h4 {
   font-family: var(--serif);
-  font-weight: 500;
+  font-weight: 300;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
 p { margin: 0; }
 
-button, input, select {
-  font: inherit;
-  color: inherit;
-}
+button, input, select { font: inherit; color: inherit; }
 
-/* Tabular numerals everywhere a number lives. */
 .num, code, .mono {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1, 'zero' 1;
 }
 
-/* Single focus ring across all interactive controls. */
 :where(button, input, select, a, [tabindex]):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: 1px solid var(--focus);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

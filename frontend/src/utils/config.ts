@@ -104,12 +104,12 @@ const CONFIG: Config = {
   // because d3 consumes the value.
   metricColors: {
     max_temperature: {
-      base: '#b94a2a',     // oklch(55% 0.16 35) — oxide red, the "hot" signal
-      name: 'Oxide'
+      base: '#f59465',     // oklch(72% 0.18 35) — ember against night sky
+      name: 'Ember'
     },
     min_temperature: {
-      base: '#3c6f9a',     // oklch(50% 0.09 240) — slate blue, the "cold" signal
-      name: 'Slate'
+      base: '#7ec5e8',     // oklch(78% 0.13 230) — cyan against night sky
+      name: 'Cyan'
     },
     precipitation_sum: {
       base: '#6b6896',

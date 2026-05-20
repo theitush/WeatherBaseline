@@ -1,17 +1,17 @@
-.histogram-chart-wrapper {
-  display: inline-block;
-}
+.histogram-chart-wrapper { display: inline-block; }
 
 .histogram-chart-svg .axis text {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9px;
   font-variant-numeric: tabular-nums;
-  fill: var(--ink-mute);
+  fill: rgba(255, 240, 220, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .histogram-chart-svg .axis line,
 .histogram-chart-svg .axis path {
-  stroke: var(--rule-strong);
+  stroke: rgba(255, 240, 220, 0.3);
   stroke-width: 0.75;
 }
 

@@ -12,7 +12,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ show }) => {
     <div className="loading-overlay">
       <div className="loading-content">
         <div className="loading-spinner"></div>
-        <div className="loading-text">Reading the record</div>
+        <div className="loading-text">Sounding the atmosphere</div>
       </div>
     </div>
   );
