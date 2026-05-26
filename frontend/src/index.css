@@ -12,13 +12,12 @@
   --rule: oklch(85% 0.012 70);
   --rule-strong: oklch(70% 0.014 70);
 
-  /* Data palette. Two committed hues; everything else derives. */
-  --hot: oklch(55% 0.16 35);     /* oxide / brick — heat */
-  --cold: oklch(50% 0.09 240);   /* slate blue — cold */
-  --mark: oklch(28% 0.025 50);   /* target date marker — warm near-black */
+  /* Editorial: coral that prints heavy on cream; softened indigo cold. */
+  --hot: oklch(58% 0.18 25);
+  --cold: oklch(45% 0.10 250);
+  --mark: oklch(18% 0.02 50);
 
-  /* Focus ring — single, visible, non-blue. */
-  --focus: oklch(55% 0.16 35);
+  --focus: oklch(58% 0.18 25);
 
   /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
      None of these are on the impeccable reflex-reject list. */

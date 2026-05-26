@@ -1,4 +1,7 @@
-/* App shell — print-broadsheet shape. No cards, no shadows. */
+/* Variant: EDITORIAL FEATURE
+   A magazine feature article. Display lede, byline rule, sidebar
+   metadata column, chart as a numbered figure with caption.
+   Reading lane: NYT Magazine / The Atlantic feature spread. */
 
 .app {
   min-height: 100vh;
@@ -6,176 +9,205 @@
 }
 
 .app-container {
-  max-width: 72rem;
+  max-width: 78rem;
   margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 5vw, 4rem) 5rem;
 }
 
-/* Masthead — left-aligned, serif headline, hairline rule beneath. */
+/* MASTHEAD: tiny kicker over an oversized italic display title.
+   Right-aligned dateline mimics a magazine standfirst. */
 .app-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--ink);
-  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 1rem 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 3px double var(--ink);
+  margin-bottom: 0;
 }
 
 .app-header h1 {
-  font-size: var(--step-4);
-  line-height: 0.95;
-  letter-spacing: -0.025em;
-  font-weight: 500;
+  font-family: var(--serif);
+  font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  font-weight: 700;
   font-style: italic;
   color: var(--ink);
+  grid-column: 1;
+  position: relative;
+}
+
+.app-header h1::before {
+  content: 'Climate Feature · No. 01';
+  display: block;
+  font-family: var(--mono);
+  font-style: normal;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.6875rem;
+  color: var(--ink-mute);
+  margin-bottom: 1rem;
 }
 
 .app-header .subtitle {
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.6875rem;
+  grid-column: 2;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
   color: var(--ink-mute);
-  align-self: flex-end;
-  padding-bottom: 0.4rem;
+  max-width: 18ch;
+  text-align: right;
+  line-height: 1.35;
 }
 
-/* Controls — read as the "filing card" of a research instrument.
-   Single horizontal strip on a tinted band, no rounded card. */
+/* BYLINE STRIP — a thin rule under the head, with run-in metadata. */
 .controls-panel {
-  border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  padding: 1rem 0;
-  margin-bottom: 2.5rem;
+  padding: 0.75rem 0 1rem;
+  margin: 0 0 2.5rem;
   background: transparent;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-mute);
 }
 
 .controls-row {
   display: flex;
-  align-items: flex-end;
-  gap: 2rem;
+  align-items: center;
+  gap: 1.5rem 2.5rem;
   flex-wrap: wrap;
 }
 
-.controls-row > .location-selector {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+.controls-row > * { flex: 0 0 auto; }
+.controls-row > .location-selector { flex: 1 1 18rem; min-width: 0; }
 
 .error-message {
-  border-left: none;
-  border-top: 1px solid var(--hot);
-  border-bottom: 1px solid var(--hot);
+  border-left: 4px solid var(--hot);
   background: transparent;
   color: var(--hot);
-  padding: 0.75rem 0;
-  margin: 1.5rem 0;
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  margin: 1.25rem 0;
   font-family: var(--mono);
   font-size: var(--step--1);
 }
-
 .error-message strong {
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   font-size: 0.6875rem;
   margin-right: 0.75rem;
 }
 
-.data-panel { margin-top: 0; }
+/* BODY: two-column feature spread.
+   Left column = the lede + figure. Right column = sidebar metadata. */
+.data-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  gap: clamp(2rem, 4vw, 4rem);
+  align-items: start;
+}
 
-.charts-section { margin: 1.5rem 0 0; }
+.temperature-context {
+  grid-column: 1;
+}
+
+.charts-section {
+  grid-column: 1;
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--ink);
+  padding-top: 1.5rem;
+}
 
 .charts-controls {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
+/* The chart heading reads as a figure caption. */
 .chart-title {
-  text-align: left;
   font-family: var(--serif);
-  font-size: var(--step-2);
   font-style: italic;
-  font-weight: 500;
+  font-size: var(--step-1);
+  font-weight: 400;
   color: var(--ink);
-  margin: 1rem 0 0.5rem;
+  margin: 0 0 1rem;
   letter-spacing: -0.005em;
+  max-width: 60ch;
+}
+
+.chart-title::before {
+  content: 'Fig. 1 — ';
+  font-family: var(--mono);
+  font-style: normal;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.6875rem;
+  color: var(--ink-mute);
+  margin-right: 0.5rem;
+  vertical-align: 0.15em;
 }
 
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0.5rem 0 1rem;
-  padding: 0.5rem 0;
+  gap: 0.25rem 1.25rem;
+  margin: 0.25rem 0 1rem;
+  padding: 0.4rem 0;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  background: transparent;
   font-family: var(--mono);
   font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-mute);
 }
-
-.chart-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
+.chart-legend-item { display: flex; align-items: center; gap: 0.4rem; }
 
 .charts-container {
   background: transparent;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0 0;
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
 }
-
 .charts-container .main-chart-wrapper,
 .charts-container .histogram-chart-wrapper {
   display: inline-block;
   vertical-align: top;
   font-size: var(--step-0);
 }
-
 .charts-container .histogram-chart-wrapper { margin-left: -30px; }
-
 .charts-container.mobile {
-  white-space: normal;
-  overflow-x: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
+  white-space: normal; overflow-x: visible;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
 }
-
 .charts-container.mobile .main-chart-wrapper,
-.charts-container.mobile .histogram-chart-wrapper {
-  display: block;
-  margin: 0;
-}
-
+.charts-container.mobile .histogram-chart-wrapper { display: block; margin: 0; }
 .charts-container.mobile .main-chart-wrapper { margin-top: -14px; }
 
-.charts-placeholder {
-  border: 1px solid var(--rule);
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: var(--step--1);
+/* SIDEBAR column — uses MetricSelector + chart caption metadata.
+   We'll move .charts-controls into the sidebar visually using grid placement. */
+.charts-section .charts-controls {
+  /* Push metric selector to sidebar on desktop */
 }
 
+/* Mobile: collapse to single column, drop double rule down to single. */
+@media (max-width: 900px) {
+  .data-panel { grid-template-columns: 1fr; gap: 1.5rem; }
+}
 @media (max-width: 767px) {
-  .app-container { padding: 1.25rem 1rem 3rem; }
-  .app-header { gap: 0.5rem; padding-bottom: 0.75rem; margin-bottom: 1.25rem; }
-  .app-header h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
-  .app-header .subtitle { align-self: flex-start; padding-bottom: 0; }
-  .controls-panel { padding: 0.75rem 0; margin-bottom: 1.5rem; }
-  .controls-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-  .charts-controls { margin-bottom: 0.5rem; }
+  .app-container { padding: 1.5rem 1rem 3rem; }
+  .app-header { grid-template-columns: 1fr; padding-bottom: 0.75rem; border-bottom: 1px solid var(--ink); margin-bottom: 0; }
+  .app-header h1 { font-size: clamp(2.5rem, 12vw, 4rem); }
+  .app-header h1::before { margin-bottom: 0.5rem; }
+  .app-header .subtitle { grid-column: 1; text-align: left; max-width: none; }
+  .controls-panel { padding: 0.5rem 0 0.75rem; margin-bottom: 1.5rem; }
+  .controls-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .charts-section { margin-top: 1.5rem; padding-top: 1rem; }
 }

@@ -1,50 +1,52 @@
-/* The readout. Numbers ARE the typography here.
-   No card, no shadow — sits directly on the paper, framed by hairline rules. */
+/* Variant: EDITORIAL FEATURE — the lede.
+   The temperature becomes a magazine drop-folio. Serif italic description
+   wraps around the giant numeral, percentile + ranking sit as standfirst
+   metadata below a hairline. */
 
 .temperature-context {
   background: transparent;
-  padding: 1.5rem 0 1.25rem;
-  margin: 0 0 1.5rem;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  text-align: left;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: baseline;
-  gap: 0 2rem;
-}
-
-.context-description {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: var(--step-2);
-  font-weight: 500;
-  line-height: 1.15;
-  color: var(--ink);
-  grid-column: 2;
-  grid-row: 1;
+  padding: 2rem 0 1.5rem;
   margin: 0;
-  max-width: 38ch;
-}
-
-.context-content {
-  display: contents;
+  border: none;
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);
+  align-items: start;
+  column-gap: clamp(1.5rem, 3vw, 3rem);
+  row-gap: 0.75rem;
 }
 
 .temp-value {
   grid-column: 1;
-  grid-row: 1 / span 2;
-  font-family: var(--mono);
+  grid-row: 1 / span 3;
+  font-family: var(--serif);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 1, 'ss01' 1;
-  font-size: clamp(2.75rem, 7vw, 4rem);
-  line-height: 0.95;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
+  font-size: clamp(5rem, 14vw, 10rem);
+  line-height: 0.82;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: -0.05em;
   color: var(--hot);
-  align-self: center;
+  align-self: start;
   white-space: nowrap;
 }
+
+.context-content { display: contents; }
+
+.context-description {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--serif);
+  font-style: normal;
+  font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 0;
+  max-width: 36ch;
+}
+
+.context-description::first-line { font-style: italic; }
 
 .context-percentile,
 .context-ranking {
@@ -52,19 +54,21 @@
   font-family: var(--mono);
   font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   color: var(--ink-mute);
-  font-style: normal;
-  margin-top: 0.5rem;
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule);
 }
 
 .context-percentile { grid-row: 2; }
-.context-ranking { grid-row: 3; grid-column: 2; }
+.context-ranking { grid-row: 3; }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .temperature-context {
     grid-template-columns: 1fr;
-    gap: 0.5rem;
+    row-gap: 0.5rem;
+    padding: 1.25rem 0 1rem;
   }
   .temp-value,
   .context-description,
@@ -73,5 +77,6 @@
     grid-column: 1;
     grid-row: auto;
   }
-  .temp-value { align-self: start; }
+  .temp-value { font-size: clamp(4rem, 22vw, 7rem); }
+  .context-description { max-width: none; }
 }
