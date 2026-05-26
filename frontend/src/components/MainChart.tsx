@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { WeatherDataPoint, YearlyAggregate } from '../types';
 import type { MetricKey } from '../utils/config';
@@ -35,13 +35,32 @@ const MainChart: React.FC<MainChartProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const totalWidth = propWidth ?? 720;
+  const MAX_WIDTH = 800;
+  const FALLBACK_WIDTH = isVertical ? 360 : 720;
+  const totalWidth =
+    propWidth ??
+    (measuredWidth !== null ? Math.min(measuredWidth, MAX_WIDTH) : FALLBACK_WIDTH);
   const totalHeight = propHeight ?? 400;
   const width = totalWidth - MARGIN.left - MARGIN.right;
   const height = totalHeight - MARGIN.top - MARGIN.bottom;
+
+  useEffect(() => {
+    if (propWidth !== undefined || !wrapperRef.current) return;
+    const el = wrapperRef.current;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setMeasuredWidth(w);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [propWidth]);
 
   useEffect(() => {
     if (!svgRef.current || filteredData.length === 0) return;
@@ -324,7 +343,7 @@ const MainChart: React.FC<MainChartProps> = ({
   }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical]);
 
   return (
-    <div className="main-chart-wrapper">
+    <div className="main-chart-wrapper" ref={wrapperRef}>
       <svg
         ref={svgRef}
         width={totalWidth}
