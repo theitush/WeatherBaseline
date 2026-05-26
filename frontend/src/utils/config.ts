@@ -102,17 +102,12 @@ const CONFIG: Config = {
   // Derived from index.css OKLCH tokens (--hot / --cold). Keep these in sync
   // with the design tokens if either palette ever moves. Hex form is required
   // because d3 consumes the value.
+  // JOURNAL PLATE — earth pigments. Burnt sienna vs deep moss. No third accent.
   metricColors: {
-    max_temperature: { base: '#c95a36', name: 'Vermillion' },
-    min_temperature: { base: '#1f6f7a', name: 'Teal' },
-    precipitation_sum: {
-      base: '#6b6896',
-      name: 'Muted Iris'
-    },
-    wind_speed_10m_max: {
-      base: '#728c6e',
-      name: 'Sage'
-    }
+    max_temperature: { base: '#b35a2c', name: 'Burnt Sienna' },
+    min_temperature: { base: '#3f5e3a', name: 'Deep Moss' },
+    precipitation_sum: { base: '#8a7345', name: 'Umber' },
+    wind_speed_10m_max: { base: '#6f7a5a', name: 'Sage' }
   },
 
   // Opacity levels for different chart elements

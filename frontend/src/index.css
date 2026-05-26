@@ -3,21 +3,23 @@
    See PRODUCT.md for the principles these tokens serve. */
 
 :root {
-  /* Journal: off-white print stock, neutral grey ink with the faintest cool tint. */
-  --paper: oklch(97% 0.006 95);
-  --paper-deep: oklch(94% 0.008 95);
-  --ink: oklch(20% 0.008 240);
-  --ink-mute: oklch(46% 0.01 240);
-  --ink-soft: oklch(62% 0.008 240);
-  --rule: oklch(84% 0.008 240);
-  --rule-strong: oklch(58% 0.012 240);
+  /* JOURNAL PLATE — off-white print stock, neutral grey ink with a faint
+     olive tint. Earth-tone data pair: burnt sienna vs deep moss. No third
+     accent — restraint matches the scientific-paper register. */
+  --paper: oklch(96.5% 0.012 95);
+  --paper-deep: oklch(93% 0.014 90);
+  --ink: oklch(22% 0.010 95);
+  --ink-mute: oklch(46% 0.014 95);
+  --ink-soft: oklch(62% 0.012 95);
+  --rule: oklch(82% 0.012 90);
+  --rule-strong: oklch(54% 0.018 85);
 
-  /* Wong colour-blind-safe pair used in journal figure plates. */
-  --hot: oklch(60% 0.16 38);
-  --cold: oklch(45% 0.09 195);
-  --mark: oklch(20% 0.008 240);
+  /* Earth pigments: burnt sienna / iron-oxide, deep forest moss. */
+  --hot: oklch(54% 0.15 45);
+  --cold: oklch(40% 0.08 145);
+  --mark: oklch(22% 0.010 95);
 
-  --focus: oklch(60% 0.16 38);
+  --focus: oklch(54% 0.15 45);
 
   /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
      None of these are on the impeccable reflex-reject list. */

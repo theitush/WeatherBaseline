@@ -8,6 +8,33 @@
 
 .main-chart-svg { display: block; max-width: 100%; }
 
+/* JOURNAL PLATE — serif roman axis labels, medium strokes, plate frame with
+   corner ticks rendered via the wrapper's pseudo-elements. */
+.main-chart-wrapper {
+  position: relative;
+  padding: 0.875rem 1rem 1.25rem;
+}
+
+.main-chart-wrapper::before,
+.main-chart-wrapper::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--ink);
+  pointer-events: none;
+}
+.main-chart-wrapper::before {
+  top: 0; left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+.main-chart-wrapper::after {
+  bottom: 0; right: 0;
+  border-left: 0;
+  border-top: 0;
+}
+
 .main-chart-svg .grid line {
   stroke: var(--rule);
   stroke-dasharray: 0;
@@ -17,8 +44,9 @@
 .main-chart-svg .grid path { stroke-width: 0; }
 
 .main-chart-svg .axis text {
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--serif);
+  font-style: normal;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   fill: var(--ink-mute);
 }
@@ -28,6 +56,8 @@
   stroke: var(--rule-strong);
   stroke-width: 0.75;
 }
+
+.main-chart-svg .trend-line { stroke-width: 1.75 !important; }
 
 .main-chart-svg .data-point { cursor: crosshair; }
 .main-chart-svg .current-temp-point { cursor: pointer; }
