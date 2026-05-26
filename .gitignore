@@ -6,3 +6,12 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# ERA5 pipeline
+/scripts/era5_pipeline/.venv/
+/scripts/era5_pipeline/.cdsapirc
+/scripts/era5_pipeline/.bench_tmp/
+/scripts/era5_pipeline/.pipeline_tmp/
+/scripts/era5_pipeline/state.json
+/scripts/era5_pipeline/benchmark_results.json
+/data/
