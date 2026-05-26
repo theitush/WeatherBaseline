@@ -1,7 +1,12 @@
 .main-chart-wrapper {
   position: relative;
-  display: inline-block;
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  min-width: 0;
 }
+
+.main-chart-svg { display: block; max-width: 100%; }
 
 .main-chart-svg .grid line {
   stroke: var(--rule);
