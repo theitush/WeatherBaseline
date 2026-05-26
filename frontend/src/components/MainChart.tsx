@@ -372,8 +372,8 @@ const MainChart: React.FC<MainChartProps> = ({
             .html(
               `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}<br/><em>Target date</em>`
             )
-            .style('left', event.pageX + 12 + 'px')
-            .style('top', event.pageY - 28 + 'px');
+            .style('left', event.clientX + 12 + 'px')
+            .style('top', event.clientY - 28 + 'px');
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
     }
