@@ -189,17 +189,15 @@
 }
 .chart-legend-item { display: flex; align-items: center; gap: 0.4rem; }
 
-/* Charts container: framed panel, fluid flex row. */
+/* Charts container: fluid flex row; each chart wears its own hairline frame. */
 .charts-container {
   grid-column: 1 / -1;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 1rem 0.75rem 0.5rem;
+  background: transparent;
+  padding: 0;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
-  gap: 0;
+  align-items: stretch;
+  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -210,7 +208,7 @@
 
 .charts-container .histogram-chart-wrapper {
   flex: 0 0 auto;
-  margin-left: -30px;
+  margin-left: 0;
 }
 
 .charts-container.mobile {

@@ -102,23 +102,12 @@ const CONFIG: Config = {
   // Derived from index.css OKLCH tokens (--hot / --cold). Keep these in sync
   // with the design tokens if either palette ever moves. Hex form is required
   // because d3 consumes the value.
+  // DASHBOARD GRID — jewel tones. Vermilion vs deep petrol; acid accent.
   metricColors: {
-    max_temperature: {
-      base: '#b94a2a',     // oklch(55% 0.16 35) — oxide red, the "hot" signal
-      name: 'Oxide'
-    },
-    min_temperature: {
-      base: '#3c6f9a',     // oklch(50% 0.09 240) — slate blue, the "cold" signal
-      name: 'Slate'
-    },
-    precipitation_sum: {
-      base: '#6b6896',
-      name: 'Muted Iris'
-    },
-    wind_speed_10m_max: {
-      base: '#728c6e',
-      name: 'Sage'
-    }
+    max_temperature: { base: '#e85a30', name: 'Vermilion' },
+    min_temperature: { base: '#285e6e', name: 'Petrol' },
+    precipitation_sum: { base: '#4a7a8a', name: 'Teal' },
+    wind_speed_10m_max: { base: '#c9b73a', name: 'Acid' }
   },
 
   // Opacity levels for different chart elements

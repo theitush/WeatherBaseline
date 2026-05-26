@@ -5,9 +5,18 @@
 
 .histogram-chart-svg { display: block; }
 
+/* DASHBOARD GRID — hairline ruled frame, mono tabular axes. */
+.histogram-chart-wrapper {
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 0.5rem 0.5rem 0.75rem;
+  background: var(--paper);
+}
+
 .histogram-chart-svg .axis text {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   fill: var(--ink-mute);
 }
@@ -15,9 +24,9 @@
 .histogram-chart-svg .axis line,
 .histogram-chart-svg .axis path {
   stroke: var(--rule-strong);
-  stroke-width: 0.75;
+  stroke-width: 0.6;
 }
 
-.histogram-chart-svg .bar { opacity: 0.85; }
+.histogram-chart-svg .bar { opacity: 0.92; }
 
 .histogram-chart-svg { overflow: visible; }

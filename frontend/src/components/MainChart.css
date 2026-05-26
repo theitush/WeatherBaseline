@@ -8,17 +8,27 @@
 
 .main-chart-svg { display: block; max-width: 100%; }
 
+/* DASHBOARD GRID — hairline ruled frame, dense, mono tabular axes. */
+.main-chart-wrapper {
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 0.5rem 0.5rem 0.75rem;
+  background: var(--paper);
+}
+
 .main-chart-svg .grid line {
   stroke: var(--rule);
   stroke-dasharray: 0;
-  stroke-width: 0.5;
+  stroke-width: 0.4;
+  opacity: 0.7;
 }
 
 .main-chart-svg .grid path { stroke-width: 0; }
 
 .main-chart-svg .axis text {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   fill: var(--ink-mute);
 }
@@ -26,8 +36,11 @@
 .main-chart-svg .axis line,
 .main-chart-svg .axis path {
   stroke: var(--rule-strong);
-  stroke-width: 0.75;
+  stroke-width: 0.6;
 }
+
+.main-chart-svg .trend-line { stroke-width: 1.1 !important; }
+.main-chart-svg .current-temp-line { stroke-width: 1 !important; }
 
 .main-chart-svg .data-point { cursor: crosshair; }
 .main-chart-svg .current-temp-point { cursor: pointer; }
