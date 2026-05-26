@@ -16,9 +16,13 @@
 
 .main-chart-svg .grid path { stroke-width: 0; }
 
+/* EDITORIAL FEATURE — serif italic axis labels, thicker strokes, no frame, airy. */
+.main-chart-wrapper { padding: 0.5rem 0.75rem 1.25rem; }
+
 .main-chart-svg .axis text {
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   fill: var(--ink-mute);
 }
@@ -28,6 +32,8 @@
   stroke: var(--rule-strong);
   stroke-width: 0.75;
 }
+
+.main-chart-svg .trend-line { stroke-width: 2.75 !important; }
 
 .main-chart-svg .data-point { cursor: crosshair; }
 .main-chart-svg .current-temp-point { cursor: pointer; }

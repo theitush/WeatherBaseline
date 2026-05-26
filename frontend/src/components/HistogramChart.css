@@ -5,9 +5,11 @@
 
 .histogram-chart-svg { display: block; }
 
+/* EDITORIAL FEATURE — serif italic axis labels match MainChart. */
 .histogram-chart-svg .axis text {
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   fill: var(--ink-mute);
 }
@@ -18,6 +20,6 @@
   stroke-width: 0.75;
 }
 
-.histogram-chart-svg .bar { opacity: 0.85; }
+.histogram-chart-svg .bar { opacity: 0.88; }
 
 .histogram-chart-svg { overflow: visible; }

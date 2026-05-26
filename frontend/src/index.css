@@ -3,21 +3,23 @@
    See PRODUCT.md for the principles these tokens serve. */
 
 :root {
-  /* Paper + ink. Neutrals tinted warm; never pure white or black. */
-  --paper: oklch(96.5% 0.012 70);
-  --paper-deep: oklch(93% 0.015 70);
-  --ink: oklch(22% 0.015 60);
-  --ink-mute: oklch(45% 0.012 60);
-  --ink-soft: oklch(60% 0.01 60);
-  --rule: oklch(85% 0.012 70);
-  --rule-strong: oklch(70% 0.014 70);
+  /* EDITORIAL FEATURE — warm cream paper, warm-reds family, no cool tones.
+     Coral/persimmon hot + soft muted-plum cold both live in the warm half.
+     Paper is pushed toward true cream. */
+  --paper: oklch(95.5% 0.022 80);
+  --paper-deep: oklch(91.5% 0.026 78);
+  --ink: oklch(22% 0.020 40);
+  --ink-mute: oklch(48% 0.030 35);
+  --ink-soft: oklch(62% 0.024 35);
+  --rule: oklch(82% 0.022 70);
+  --rule-strong: oklch(64% 0.030 50);
 
-  /* Editorial: coral that prints heavy on cream; softened indigo cold. */
-  --hot: oklch(58% 0.18 25);
-  --cold: oklch(45% 0.10 250);
-  --mark: oklch(18% 0.02 50);
+  /* Persimmon hot, muted-plum cold (both warm). */
+  --hot: oklch(60% 0.20 35);
+  --cold: oklch(48% 0.10 15);
+  --mark: oklch(20% 0.04 40);
 
-  --focus: oklch(58% 0.18 25);
+  --focus: oklch(60% 0.20 35);
 
   /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
      None of these are on the impeccable reflex-reject list. */

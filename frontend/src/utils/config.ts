@@ -102,17 +102,13 @@ const CONFIG: Config = {
   // Derived from index.css OKLCH tokens (--hot / --cold). Keep these in sync
   // with the design tokens if either palette ever moves. Hex form is required
   // because d3 consumes the value.
+  // EDITORIAL FEATURE — warm-reds family. Persimmon hot, muted plum cold.
+  // Mirror of the OKLCH --hot/--cold tokens in index.css.
   metricColors: {
-    max_temperature: { base: '#cc5436', name: 'Coral' },
-    min_temperature: { base: '#395d99', name: 'Indigo' },
-    precipitation_sum: {
-      base: '#6b6896',
-      name: 'Muted Iris'
-    },
-    wind_speed_10m_max: {
-      base: '#728c6e',
-      name: 'Sage'
-    }
+    max_temperature: { base: '#d96440', name: 'Persimmon' },
+    min_temperature: { base: '#8c5961', name: 'Muted Plum' },
+    precipitation_sum: { base: '#a87b3e', name: 'Ochre' },
+    wind_speed_10m_max: { base: '#9b6b54', name: 'Terracotta' }
   },
 
   // Opacity levels for different chart elements
