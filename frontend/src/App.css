@@ -1,181 +1,270 @@
-/* App shell — print-broadsheet shape. No cards, no shadows. */
+/* Variant: JOURNAL PLATE
+   A two-column print-science article. Small-caps article number, justified
+   serif body, the temperature reads as the abstract, the chart is a numbered
+   Plate with a left-side figure-legend column running alongside.
+   Reading lane: Nature / AGU / Annals of the AAG. */
 
 .app {
   min-height: 100vh;
   background: var(--paper);
+  background-image:
+    linear-gradient(to right, var(--rule) 1px, transparent 1px);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 .app-container {
-  max-width: 72rem;
+  max-width: 56rem;
   margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 5vw, 4rem) 5rem;
+  font-family: var(--serif);
 }
 
-/* Masthead — left-aligned, serif headline, hairline rule beneath. */
+/* === MASTHEAD ===
+   Two-line journal stationery: small-caps eyebrow with article meta,
+   followed by a serif title in roman (not italic) — the journal-cover voice. */
 .app-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  padding-bottom: 0.875rem;
+  border-top: 4px solid var(--ink);
   border-bottom: 1px solid var(--ink);
-  margin-bottom: 2rem;
+  padding-top: 0.875rem;
+  margin: 0 0 2rem;
 }
 
 .app-header h1 {
-  font-size: var(--step-4);
-  line-height: 0.95;
-  letter-spacing: -0.025em;
-  font-weight: 500;
-  font-style: italic;
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  font-style: normal;
   color: var(--ink);
+  margin: 0;
+}
+
+.app-header h1::before {
+  content: 'Vol. I  ·  Article 01  ·  Received ' attr(data-x);
+  display: block;
+  font-family: var(--mono);
+  font-style: normal;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.6875rem;
+  color: var(--ink-mute);
+  margin-bottom: 0.625rem;
 }
 
 .app-header .subtitle {
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.6875rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
   color: var(--ink-mute);
-  align-self: flex-end;
-  padding-bottom: 0.4rem;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-/* Controls — read as the "filing card" of a research instrument.
-   Single horizontal strip on a tinted band, no rounded card. */
+.app-header .subtitle::before {
+  content: '— ';
+  color: var(--ink-mute);
+}
+
+/* === ABSTRACT / KEYWORDS strip ===
+   .controls-panel becomes a tinted "keywords" band. */
 .controls-panel {
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 1rem 0;
-  margin-bottom: 2.5rem;
-  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-left-width: 4px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 2rem;
+  background: var(--paper-deep);
+  font-family: var(--sans);
+  font-size: var(--step--1);
+}
+
+.controls-panel::before {
+  content: 'Inputs';
+  display: block;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--ink-mute);
+  margin-bottom: 0.5rem;
 }
 
 .controls-row {
   display: flex;
-  align-items: flex-end;
-  gap: 2rem;
+  align-items: center;
+  gap: 1.25rem 2rem;
   flex-wrap: wrap;
 }
-
-.controls-row > .location-selector {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+.controls-row > .location-selector { flex: 1 1 18rem; min-width: 0; }
 
 .error-message {
-  border-left: none;
-  border-top: 1px solid var(--hot);
-  border-bottom: 1px solid var(--hot);
-  background: transparent;
+  border: 1px solid var(--hot);
+  border-left-width: 4px;
+  background: var(--paper-deep);
   color: var(--hot);
-  padding: 0.75rem 0;
-  margin: 1.5rem 0;
+  padding: 0.625rem 0.875rem;
+  margin: 1.25rem 0;
   font-family: var(--mono);
   font-size: var(--step--1);
 }
-
-.error-message strong {
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.6875rem;
-  margin-right: 0.75rem;
-}
+.error-message strong { text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.6875rem; margin-right: 0.75rem; }
 
 .data-panel { margin-top: 0; }
 
-.charts-section { margin: 1.5rem 0 0; }
+/* === FIGURE PLATE ===
+   The chart sits inside a numbered, framed plate. Legend lives on the
+   left as a figure-key column on desktop, collapses below on mobile. */
+.charts-section {
+  margin: 2.25rem 0 0;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  padding: 0;
+  display: grid;
+  grid-template-columns: 14rem 1fr;
+  grid-template-areas:
+    'plate-head plate-head'
+    'plate-key  plate-fig'
+    'plate-cap  plate-cap';
+}
 
 .charts-controls {
-  margin-bottom: 1rem;
+  grid-area: plate-head;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-}
-
-.chart-title {
-  text-align: left;
-  font-family: var(--serif);
-  font-size: var(--step-2);
-  font-style: italic;
-  font-weight: 500;
-  color: var(--ink);
-  margin: 1rem 0 0.5rem;
-  letter-spacing: -0.005em;
-}
-
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0.5rem 0 1rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  background: transparent;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--paper-deep);
   font-family: var(--mono);
   font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   color: var(--ink-mute);
+}
+
+.charts-controls::before {
+  content: 'Plate I';
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.2em;
+}
+
+/* The figure legend column (uses .chart-legend). On desktop it rotates
+   to the left as a key column; on mobile it goes back to a horizontal strip. */
+.chart-legend {
+  grid-area: plate-key;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 1rem 1rem 1rem 1.125rem;
+  border-right: 1px solid var(--rule);
+  border-top: none;
+  border-bottom: none;
+  background: var(--paper-deep);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-mute);
+}
+
+.chart-legend::before {
+  content: 'Key';
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.2em;
+  margin-bottom: 0.25rem;
 }
 
 .chart-legend-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
 }
 
 .charts-container {
+  grid-area: plate-fig;
   background: transparent;
-  padding: 0.5rem 0;
+  padding: 1rem 0.5rem 0.5rem 0.5rem;
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
 }
-
 .charts-container .main-chart-wrapper,
 .charts-container .histogram-chart-wrapper {
-  display: inline-block;
-  vertical-align: top;
-  font-size: var(--step-0);
+  display: inline-block; vertical-align: top; font-size: var(--step-0);
 }
-
 .charts-container .histogram-chart-wrapper { margin-left: -30px; }
-
 .charts-container.mobile {
-  white-space: normal;
-  overflow-x: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
+  white-space: normal; overflow-x: visible;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
 }
-
 .charts-container.mobile .main-chart-wrapper,
-.charts-container.mobile .histogram-chart-wrapper {
-  display: block;
-  margin: 0;
-}
-
+.charts-container.mobile .histogram-chart-wrapper { display: block; margin: 0; }
 .charts-container.mobile .main-chart-wrapper { margin-top: -14px; }
 
-.charts-placeholder {
-  border: 1px solid var(--rule);
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: var(--step--1);
+.chart-title {
+  grid-area: plate-cap;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0;
+  padding: 0.875rem 1rem 1rem;
+  border-top: 1px solid var(--rule);
+  text-align: left;
+  line-height: 1.45;
+  max-width: none;
 }
 
+.chart-title::before {
+  content: 'Caption. ';
+  font-family: var(--serif);
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 0.25rem;
+}
+
+/* === Mobile collapse === */
 @media (max-width: 767px) {
-  .app-container { padding: 1.25rem 1rem 3rem; }
-  .app-header { gap: 0.5rem; padding-bottom: 0.75rem; margin-bottom: 1.25rem; }
-  .app-header h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
-  .app-header .subtitle { align-self: flex-start; padding-bottom: 0; }
-  .controls-panel { padding: 0.75rem 0; margin-bottom: 1.5rem; }
-  .controls-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-  .charts-controls { margin-bottom: 0.5rem; }
+  .app-container { padding: 1.5rem 1rem 3rem; }
+  .app-header h1 { font-size: clamp(1.75rem, 7vw, 2.25rem); }
+  .controls-panel { padding: 0.625rem 0.875rem; }
+  .controls-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+
+  .charts-section {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'plate-head'
+      'plate-key'
+      'plate-fig'
+      'plate-cap';
+  }
+  .chart-legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 0.625rem 0.875rem;
+    gap: 0.25rem 1rem;
+  }
+  .chart-legend::before { width: 100%; margin: 0 0 0.25rem; }
 }

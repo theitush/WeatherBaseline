@@ -3,22 +3,21 @@
    See PRODUCT.md for the principles these tokens serve. */
 
 :root {
-  /* Paper + ink. Neutrals tinted warm; never pure white or black. */
-  --paper: oklch(96.5% 0.012 70);
-  --paper-deep: oklch(93% 0.015 70);
-  --ink: oklch(22% 0.015 60);
-  --ink-mute: oklch(45% 0.012 60);
-  --ink-soft: oklch(60% 0.01 60);
-  --rule: oklch(85% 0.012 70);
-  --rule-strong: oklch(70% 0.014 70);
+  /* Journal: off-white print stock, neutral grey ink with the faintest cool tint. */
+  --paper: oklch(97% 0.006 95);
+  --paper-deep: oklch(94% 0.008 95);
+  --ink: oklch(20% 0.008 240);
+  --ink-mute: oklch(46% 0.01 240);
+  --ink-soft: oklch(62% 0.008 240);
+  --rule: oklch(84% 0.008 240);
+  --rule-strong: oklch(58% 0.012 240);
 
-  /* Data palette. Two committed hues; everything else derives. */
-  --hot: oklch(55% 0.16 35);     /* oxide / brick — heat */
-  --cold: oklch(50% 0.09 240);   /* slate blue — cold */
-  --mark: oklch(28% 0.025 50);   /* target date marker — warm near-black */
+  /* Wong colour-blind-safe pair used in journal figure plates. */
+  --hot: oklch(60% 0.16 38);
+  --cold: oklch(45% 0.09 195);
+  --mark: oklch(20% 0.008 240);
 
-  /* Focus ring — single, visible, non-blue. */
-  --focus: oklch(55% 0.16 35);
+  --focus: oklch(60% 0.16 38);
 
   /* Type. Spectral for page voice, Geist for UI, Geist Mono for numbers.
      None of these are on the impeccable reflex-reject list. */

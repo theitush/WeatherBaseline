@@ -103,14 +103,8 @@ const CONFIG: Config = {
   // with the design tokens if either palette ever moves. Hex form is required
   // because d3 consumes the value.
   metricColors: {
-    max_temperature: {
-      base: '#b94a2a',     // oklch(55% 0.16 35) — oxide red, the "hot" signal
-      name: 'Oxide'
-    },
-    min_temperature: {
-      base: '#3c6f9a',     // oklch(50% 0.09 240) — slate blue, the "cold" signal
-      name: 'Slate'
-    },
+    max_temperature: { base: '#c95a36', name: 'Vermillion' },
+    min_temperature: { base: '#1f6f7a', name: 'Teal' },
     precipitation_sum: {
       base: '#6b6896',
       name: 'Muted Iris'
