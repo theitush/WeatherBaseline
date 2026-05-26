@@ -1,5 +1,7 @@
 .histogram-chart-wrapper {
-  display: inline-block;
+  display: block;
+  width: 100%;
+  max-width: 800px;
 }
 
 .histogram-chart-svg .axis text {
