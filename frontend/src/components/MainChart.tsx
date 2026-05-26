@@ -259,6 +259,62 @@ const MainChart: React.FC<MainChartProps> = ({
 
     dotSelection.transition().duration(500).style('opacity', 1);
 
+    // Record high (red) and record low (blue) markers — slightly larger than the target-date dot.
+    const valid = filteredData.filter((d) => {
+      const v = d[currentMetric];
+      return typeof v === 'number' && Number.isFinite(v);
+    });
+    if (valid.length > 0) {
+      let lo = valid[0];
+      let hi = valid[0];
+      for (const d of valid) {
+        if ((d[currentMetric] as number) < (lo[currentMetric] as number)) lo = d;
+        if ((d[currentMetric] as number) > (hi[currentMetric] as number)) hi = d;
+      }
+      const recs: Array<{ d: typeof lo; color: string; label: string }> = [
+        { d: hi, color: '#c0392b', label: 'Record high' },
+        { d: lo, color: '#2f6fb8', label: 'Record low' },
+      ];
+      // 5-point star path, outer radius 9, inner radius ~3.8
+      const starPath = (cx: number, cy: number, outer = 9, inner = 3.8): string => {
+        const pts: string[] = [];
+        for (let i = 0; i < 10; i++) {
+          const r = i % 2 === 0 ? outer : inner;
+          const a = -Math.PI / 2 + (i * Math.PI) / 5;
+          pts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
+        }
+        return `M${pts.join(' L')} Z`;
+      };
+
+      g.selectAll('.record-point')
+        .data(recs)
+        .enter()
+        .append('path')
+        .attr('class', 'record-point')
+        .attr('d', (r) => {
+          const cx = isVertical ? tempScale(r.d[currentMetric] as number) : timeScale(r.d.date);
+          const cy = isVertical ? timeScale(r.d.date) : tempScale(r.d[currentMetric] as number);
+          return starPath(cx, cy);
+        })
+        .attr('fill', (r) => r.color)
+        .attr('stroke', 'white')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0)
+        .on('mouseover', (event, r) => {
+          tooltip
+            .style('opacity', 1)
+            .html(
+              `<strong>${r.label}</strong><br/>${r.d.date.toDateString()}<br/>${pointLabels[currentMetric]}: ${(r.d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
+            )
+            .style('left', event.clientX + 12 + 'px')
+            .style('top', event.clientY - 28 + 'px');
+        })
+        .on('mouseout', () => tooltip.style('opacity', 0))
+        .transition()
+        .duration(500)
+        .style('opacity', 1);
+    }
+
     dotSelection
       .on('mouseover', (event, d) => {
         tooltip

@@ -17,17 +17,23 @@
 .metric-button {
   padding: 8px 16px;
   font-size: 14px;
-  border: 2px solid #ccc;
+  border: 2px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
+  transition: all 0.15s;
+  font-weight: 600;
+  opacity: 0.45;
+  filter: saturate(0.7);
 }
 
 .metric-button:hover {
-  border-color: #999;
+  opacity: 0.75;
 }
 
 .metric-button.active {
-  border-color: transparent;
+  opacity: 1;
+  filter: none;
+  border-color: #111;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08), 0 3px 8px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
 }

@@ -27,22 +27,24 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
     <div className="metric-selector">
       <label>Metric:</label>
       <div className="metric-buttons">
-        {activeMetrics.map((metric) => (
-          <button
-            key={metric}
-            className={`metric-button ${currentMetric === metric ? 'active' : ''}`}
-            onClick={() => onChange(metric)}
-            style={{
-              backgroundColor:
-                currentMetric === metric
-                  ? CONFIG.metricColors[metric].base
-                  : 'transparent',
-              color: currentMetric === metric ? 'white' : '#333',
-            }}
-          >
-            {metricLabels[metric]}
-          </button>
-        ))}
+        {activeMetrics.map((metric) => {
+          const isActive = currentMetric === metric;
+          const color = CONFIG.metricColors[metric].base;
+          return (
+            <button
+              key={metric}
+              className={`metric-button ${isActive ? 'active' : ''}`}
+              onClick={() => onChange(metric)}
+              style={{
+                backgroundColor: color,
+                borderColor: isActive ? '#111' : color,
+                color: 'white',
+              }}
+            >
+              {metricLabels[metric]}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

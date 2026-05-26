@@ -129,20 +129,22 @@ const CONFIG: Config = {
   },
 
   // Utility function to get color with opacity for a specific element
+  // Chart elements use a neutral grey scale; metric color is reserved for buttons
+  // and identity markers (e.g. min=blue, max=orange).
   getColorForElement(metric: MetricKey, elementType: ElementType): string {
-    const baseColor = this.metricColors[metric]?.base;
+    const greyBase = '#555555';
     const opacity = this.opacityLevels[elementType];
 
-    if (!baseColor || opacity === undefined) {
-      console.warn(`Invalid metric "${metric}" or element type "${elementType}"`);
-      return baseColor || '#000000';
+    if (opacity === undefined) {
+      console.warn(`Invalid element type "${elementType}"`);
+      return greyBase;
     }
 
     if (opacity === 1.0) {
-      return baseColor;
+      return greyBase;
     }
 
-    return this.hexToRgba(baseColor, opacity);
+    return this.hexToRgba(greyBase, opacity);
   },
 
   // Utility function to convert hex color to rgba

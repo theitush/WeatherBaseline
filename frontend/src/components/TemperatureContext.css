@@ -21,9 +21,9 @@
 }
 
 .temp-value {
-  font-size: 32px;
+  font-size: 48px;
   font-weight: bold;
-  color: #4A90E2;
+  color: #333;
 }
 
 .context-description {
@@ -59,7 +59,7 @@
   line-height: 1.25;
   flex-shrink: 0;
   min-width: 72px;
-  padding-top: 32px;
+  padding-top: 48px;
 }
 
 .record-scale-low .record-scale-temp {
@@ -72,7 +72,7 @@
 
 .record-scale-temp {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 20px;
 }
 
 .record-scale-name {
@@ -94,7 +94,7 @@
   position: relative;
   flex: 1;
   height: 60px;
-  margin-top: 26px;
+  margin-top: 42px;
 }
 
 .record-scale-gradient {
@@ -131,8 +131,8 @@
 
 .record-scale-marker-value {
   position: absolute;
-  top: -30px;
-  font-size: 26px;
+  top: -44px;
+  font-size: 42px;
   font-weight: 700;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
