@@ -113,6 +113,8 @@ const AppContent: React.FC = () => {
             <TemperatureContextDisplay
               context={temperatureContext}
               currentTemp={getCurrentTemp()}
+              filteredData={filteredData}
+              currentMetric={currentMetric}
             />
 
             <div className="charts-section">

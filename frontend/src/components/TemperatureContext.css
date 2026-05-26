@@ -42,3 +42,106 @@
   color: #666;
   font-style: italic;
 }
+
+.record-scale {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 0 4px;
+}
+
+.record-scale-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.25;
+  flex-shrink: 0;
+  min-width: 72px;
+  padding-top: 32px;
+}
+
+.record-scale-low .record-scale-temp {
+  color: #2f6fb8;
+}
+
+.record-scale-high .record-scale-temp {
+  color: #c0392b;
+}
+
+.record-scale-temp {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.record-scale-name {
+  color: #888;
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+
+.record-scale-date {
+  color: #999;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+.record-scale-track {
+  position: relative;
+  flex: 1;
+  height: 60px;
+  margin-top: 26px;
+}
+
+.record-scale-gradient {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    #4A90E2 0%,
+    #c8d4e0 50%,
+    #FF8C42 100%
+  );
+}
+
+.record-scale-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.record-scale-marker-tick {
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+}
+
+.record-scale-marker-value {
+  position: absolute;
+  top: -30px;
+  font-size: 26px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .record-scale-name,
+  .record-scale-date {
+    color: #aaa;
+  }
+}
