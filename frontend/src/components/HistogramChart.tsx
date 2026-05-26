@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
@@ -33,14 +33,38 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   height: propHeight,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 300);
+  // Horizontal mode shows the histogram beside the MainChart; it should stay narrow.
+  // Vertical mode (mobile) shows the histogram full-width below MainChart, so it
+  // should expand to fill the wrapper up to the same 800 max.
+  const MAX_WIDTH = 800;
+  const FALLBACK_WIDTH = isVertical ? 360 : 300;
+  const TOTAL_WIDTH =
+    propWidth ??
+    (measuredWidth !== null
+      ? Math.min(measuredWidth, isVertical ? MAX_WIDTH : FALLBACK_WIDTH)
+      : FALLBACK_WIDTH);
   const TOTAL_HEIGHT = propHeight ?? (isVertical ? 180 : 400);
 
   const width = TOTAL_WIDTH - MARGIN.left - MARGIN.right;
   const height = TOTAL_HEIGHT - MARGIN.top - MARGIN.bottom;
+
+  useEffect(() => {
+    if (propWidth !== undefined || !wrapperRef.current) return;
+    const el = wrapperRef.current;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setMeasuredWidth(w);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [propWidth]);
 
   useEffect(() => {
     if (!svgRef.current || filteredData.length === 0) return;
@@ -302,7 +326,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical]);
 
   return (
-    <div className="histogram-chart-wrapper">
+    <div className="histogram-chart-wrapper" ref={wrapperRef}>
       <svg
         ref={svgRef}
         width={TOTAL_WIDTH}

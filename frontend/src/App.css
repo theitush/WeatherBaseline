@@ -130,19 +130,22 @@
 .charts-container {
   background: transparent;
   padding: 0.5rem 0;
-  font-size: 0;
-  white-space: nowrap;
-  overflow-x: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
 }
 
-.charts-container .main-chart-wrapper,
+.charts-container .main-chart-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .charts-container .histogram-chart-wrapper {
-  display: inline-block;
-  vertical-align: top;
-  font-size: var(--step-0);
+  flex: 0 0 auto;
+  margin-left: -30px;
 }
-
-.charts-container .histogram-chart-wrapper { margin-left: -30px; }
 
 .charts-container.mobile {
   white-space: normal;
