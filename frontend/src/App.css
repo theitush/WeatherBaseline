@@ -1,81 +1,123 @@
-/* App shell — print-broadsheet shape. No cards, no shadows. */
+/* Variant: DASHBOARD GRID
+   A working instrument, not a page. Left rail sidebar with brand + navigation
+   stubs, top filter bar holds location and date, a 12-column content grid
+   below with stat row + chart workspace. Edge-to-edge, no centered column. */
 
 .app {
   min-height: 100vh;
   background: var(--paper);
+  display: grid;
+  grid-template-columns: 14rem 1fr;
+  grid-template-rows: auto 1fr;
 }
 
-.app-container {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
-}
-
-/* Masthead — left-aligned, serif headline, hairline rule beneath. */
+/* === SIDEBAR === Reuses .app-header. Sticky to the viewport.
+   Brand + a stub nav (built purely with ::before content so we don't
+   need to touch App.tsx). */
 .app-header {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  background: var(--paper-deep);
+  border-right: 1px solid var(--rule-strong);
+  padding: 1.5rem 1.25rem;
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+  height: 100vh;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--ink);
-  margin-bottom: 2rem;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .app-header h1 {
-  font-size: var(--step-4);
-  line-height: 0.95;
-  letter-spacing: -0.025em;
-  font-weight: 500;
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--ink);
+  margin: 0;
+  font-style: normal;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.app-header h1::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--hot);
+  border-radius: 1px;
+  flex: 0 0 auto;
 }
 
 .app-header .subtitle {
   font-family: var(--mono);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.6875rem;
-  color: var(--ink-mute);
-  align-self: flex-end;
-  padding-bottom: 0.4rem;
+  letter-spacing: 0.18em;
+  font-size: 0.625rem;
+  color: var(--ink-soft);
+  padding-left: 1.15rem;
 }
 
-/* Controls — read as the "filing card" of a research instrument.
-   Single horizontal strip on a tinted band, no rounded card. */
-.controls-panel {
+.app-header::after {
+  content: 'Overview\A History\A Compare\A About';
+  white-space: pre;
+  display: block;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
   border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 1rem 0;
-  margin-bottom: 2.5rem;
-  background: transparent;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  color: var(--ink-mute);
+  line-height: 2.1;
+  letter-spacing: -0.005em;
+}
+
+/* === TOP FILTER BAR === — .controls-panel becomes the top toolbar. */
+.controls-panel {
+  grid-column: 2;
+  grid-row: 1;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-strong);
+  padding: 0.875rem clamp(1.25rem, 2.5vw, 2rem);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
 }
 
 .controls-row {
   display: flex;
-  align-items: flex-end;
-  gap: 2rem;
+  align-items: center;
+  gap: 1.5rem 2rem;
   flex-wrap: wrap;
 }
 
-.controls-row > .location-selector {
-  flex: 1 1 auto;
-  min-width: 0;
+.controls-row > .location-selector { flex: 1 1 22rem; min-width: 0; }
+
+/* === MAIN WORKSPACE === */
+.app-container {
+  grid-column: 2;
+  grid-row: 2;
+  max-width: none;
+  margin: 0;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  display: contents;
 }
 
 .error-message {
-  border-left: none;
-  border-top: 1px solid var(--hot);
-  border-bottom: 1px solid var(--hot);
-  background: transparent;
+  grid-column: 2;
+  background: color-mix(in oklch, var(--hot) 8%, transparent);
+  border: 1px solid var(--hot);
   color: var(--hot);
-  padding: 0.75rem 0;
-  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
   font-family: var(--mono);
   font-size: var(--step--1);
+  border-radius: 2px;
 }
-
 .error-message strong {
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -83,99 +125,118 @@
   margin-right: 0.75rem;
 }
 
-.data-panel { margin-top: 0; }
+.data-panel {
+  grid-column: 2;
+  grid-row: 2;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.25rem;
+  align-content: start;
+}
 
-.charts-section { margin: 1.5rem 0 0; }
+/* The stat row spans the full grid. */
+.temperature-context { grid-column: 1 / -1; }
+
+/* The chart workspace becomes a card-grid section. */
+.charts-section {
+  grid-column: 1 / -1;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
 
 .charts-controls {
-  margin-bottom: 1rem;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+  margin: 0 0 0.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
 }
 
 .chart-title {
-  text-align: left;
-  font-family: var(--serif);
-  font-size: var(--step-2);
-  font-style: italic;
+  grid-column: 1 / -1;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   font-weight: 500;
-  color: var(--ink);
-  margin: 1rem 0 0.5rem;
-  letter-spacing: -0.005em;
+  color: var(--ink-mute);
+  margin: 0;
+  font-style: normal;
 }
 
 .chart-legend {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0.5rem 0 1rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  background: transparent;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
   font-family: var(--mono);
   font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-mute);
 }
+.chart-legend-item { display: flex; align-items: center; gap: 0.4rem; }
 
-.chart-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
+/* Charts container: framed panel, 8/4 split feel via inline-block + scroll. */
 .charts-container {
-  background: transparent;
-  padding: 0.5rem 0;
+  grid-column: 1 / -1;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 1rem 0.75rem 0.5rem;
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
 }
-
 .charts-container .main-chart-wrapper,
 .charts-container .histogram-chart-wrapper {
   display: inline-block;
   vertical-align: top;
   font-size: var(--step-0);
 }
-
 .charts-container .histogram-chart-wrapper { margin-left: -30px; }
-
 .charts-container.mobile {
-  white-space: normal;
-  overflow-x: visible;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
+  white-space: normal; overflow-x: visible;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
 }
-
 .charts-container.mobile .main-chart-wrapper,
-.charts-container.mobile .histogram-chart-wrapper {
-  display: block;
-  margin: 0;
-}
-
+.charts-container.mobile .histogram-chart-wrapper { display: block; margin: 0; }
 .charts-container.mobile .main-chart-wrapper { margin-top: -14px; }
 
-.charts-placeholder {
-  border: 1px solid var(--rule);
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: var(--step--1);
+/* === COLLAPSE on narrow screens === */
+@media (max-width: 960px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+  }
+  .app-header {
+    grid-column: 1; grid-row: 1;
+    position: static; height: auto;
+    flex-direction: row; align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    border-right: none;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .app-header::after { display: none; }
+  .app-header .subtitle { padding-left: 0; margin-left: auto; }
+  .controls-panel { grid-column: 1; grid-row: 2; padding: 0.75rem 1rem; }
+  .data-panel { grid-column: 1; grid-row: 3; padding: 1rem; }
+  .error-message { grid-column: 1; margin: 0.75rem 1rem; }
 }
-
-@media (max-width: 767px) {
-  .app-container { padding: 1.25rem 1rem 3rem; }
-  .app-header { gap: 0.5rem; padding-bottom: 0.75rem; margin-bottom: 1.25rem; }
-  .app-header h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
-  .app-header .subtitle { align-self: flex-start; padding-bottom: 0; }
-  .controls-panel { padding: 0.75rem 0; margin-bottom: 1.5rem; }
-  .controls-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-  .charts-controls { margin-bottom: 0.5rem; }
+@media (max-width: 540px) {
+  .controls-row { flex-direction: column; align-items: stretch; gap: 0.625rem; }
+  .data-panel { gap: 0.875rem; }
 }

@@ -3,14 +3,15 @@
    See PRODUCT.md for the principles these tokens serve. */
 
 :root {
-  /* Paper + ink. Neutrals tinted warm; never pure white or black. */
-  --paper: oklch(96.5% 0.012 70);
-  --paper-deep: oklch(93% 0.015 70);
-  --ink: oklch(22% 0.015 60);
-  --ink-mute: oklch(45% 0.012 60);
-  --ink-soft: oklch(60% 0.01 60);
-  --rule: oklch(85% 0.012 70);
-  --rule-strong: oklch(70% 0.014 70);
+  /* Dashboard: near-neutral paper, slightly cooler than Tufte cream;
+     paper-deep is the sidebar/track shade. */
+  --paper: oklch(98.5% 0.004 240);
+  --paper-deep: oklch(96% 0.005 240);
+  --ink: oklch(20% 0.008 250);
+  --ink-mute: oklch(48% 0.01 250);
+  --ink-soft: oklch(64% 0.008 250);
+  --rule: oklch(90% 0.006 240);
+  --rule-strong: oklch(80% 0.008 240);
 
   /* Data palette. Two committed hues; everything else derives. */
   --hot: oklch(55% 0.16 35);     /* oxide / brick — heat */
