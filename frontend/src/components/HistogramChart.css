@@ -1,8 +1,9 @@
 .histogram-chart-wrapper {
   display: block;
-  width: 100%;
   max-width: 800px;
 }
+
+.histogram-chart-svg { display: block; }
 
 .histogram-chart-svg .axis text {
   font-family: var(--mono);
