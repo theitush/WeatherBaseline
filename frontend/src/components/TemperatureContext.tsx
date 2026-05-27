@@ -11,27 +11,25 @@ interface TemperatureContextProps {
 
 const BIN_COUNT = 10;
 
-// Gradient stops: low (blue) -> mid (neutral) -> high (red/orange)
-const GRADIENT = [
-  { t: 0, rgb: [74, 144, 226] },   // #4A90E2
-  { t: 0.5, rgb: [200, 212, 224] }, // #c8d4e0
-  { t: 1, rgb: [255, 140, 66] },   // #FF8C42
+// Gradient stops: record-low blue -> white -> record-high red (matches chart markers)
+const GRADIENT_LOW = [
+  { t: 0, rgb: [47, 111, 184] },    // #2f6fb8 record-low blue
+  { t: 1, rgb: [195, 215, 235] },   // very faint blue at midpoint
+];
+const GRADIENT_HIGH = [
+  { t: 0, rgb: [240, 210, 205] },   // very faint red at midpoint
+  { t: 1, rgb: [192, 57, 43] },     // #c0392b record-high red
 ];
 
 const interpolateGradient = (t: number): string => {
   const clamped = Math.max(0, Math.min(1, t));
-  for (let i = 0; i < GRADIENT.length - 1; i++) {
-    const a = GRADIENT[i];
-    const b = GRADIENT[i + 1];
-    if (clamped >= a.t && clamped <= b.t) {
-      const local = (clamped - a.t) / (b.t - a.t);
-      const r = Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * local);
-      const g = Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * local);
-      const bl = Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * local);
-      return `rgb(${r}, ${g}, ${bl})`;
-    }
-  }
-  return '#222';
+  const [a, b, local] = clamped <= 0.5
+    ? [GRADIENT_LOW[0], GRADIENT_LOW[1], clamped / 0.5]
+    : [GRADIENT_HIGH[0], GRADIENT_HIGH[1], (clamped - 0.5) / 0.5];
+  const r = Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * local);
+  const g = Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * local);
+  const bl = Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * local);
+  return `rgb(${r}, ${g}, ${bl})`;
 };
 
 const formatDate = (d: Date): string => {
