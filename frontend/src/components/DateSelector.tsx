@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './DateSelector.css';
 
 interface DateSelectorProps {
@@ -7,28 +7,35 @@ interface DateSelectorProps {
 }
 
 const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) => {
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState(currentDate);
 
-  const openPicker = () => {
-    const el = inputRef.current;
-    if (el && typeof (el as any).showPicker === 'function') {
-      try { (el as any).showPicker(); } catch {}
-    } else {
-      el?.focus();
-      el?.click();
+  useEffect(() => {
+    setPending(currentDate);
+  }, [currentDate]);
+
+  const commit = () => {
+    if (pending && pending !== currentDate) {
+      onChange(pending);
     }
   };
 
   return (
-    <div className="date-selector" onClick={openPicker}>
-      <label htmlFor="target-date">Date:</label>
+    <div className="date-selector">
       <input
-        ref={inputRef}
         type="date"
         id="target-date"
-        value={currentDate}
-        onChange={(e) => onChange(e.target.value)}
-        onClick={(e) => { e.stopPropagation(); openPicker(); }}
+        value={pending}
+        onChange={(e) => setPending(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            setPending(currentDate);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
         max={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
       />
     </div>

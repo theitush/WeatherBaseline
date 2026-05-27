@@ -55,13 +55,14 @@ body {
 
 .controls-row {
   display: flex;
-  align-items: flex-end;
-  gap: 15px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex-wrap: nowrap;
 }
 
 .controls-row > .location-selector {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
