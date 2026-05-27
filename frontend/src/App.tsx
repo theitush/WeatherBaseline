@@ -110,6 +110,8 @@ const AppContent: React.FC = () => {
 
         {!loading && !error && filteredData.length > 0 && (
           <div className="data-panel">
+            <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
+
             <TemperatureContextDisplay
               context={temperatureContext}
               currentTemp={getCurrentTemp()}
@@ -119,7 +121,6 @@ const AppContent: React.FC = () => {
 
             <div className="charts-section">
               <div className="charts-controls">
-                <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
               </div>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
               {isMobile && <Legend metric={currentMetric} />}

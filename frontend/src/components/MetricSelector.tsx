@@ -25,7 +25,6 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
 
   return (
     <div className="metric-selector">
-      <label>Metric:</label>
       <div className="metric-buttons">
         {activeMetrics.map((metric) => {
           const isActive = currentMetric === metric;

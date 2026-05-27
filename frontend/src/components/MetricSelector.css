@@ -1,12 +1,7 @@
 .metric-selector {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 15px;
-}
-
-.metric-selector label {
-  font-weight: 500;
-  min-width: 80px;
 }
 
 .metric-buttons {
