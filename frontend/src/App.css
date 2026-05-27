@@ -29,28 +29,29 @@ body {
 
 .app-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
 }
 
 .app-header h1 {
-  margin: 0 0 10px 0;
+  margin: 0 0 6px 0;
   font-size: 36px;
-  color: #333;
+  color: #222;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 16px;
-  color: #666;
+  font-size: 13px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .controls-panel {
-  background-color: #f8f9fa;
-  padding: 25px;
-  border-radius: 8px;
-  margin-bottom: 30px;
+  padding: 8px 0 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #eee;
 }
 
 .controls-row {
@@ -163,14 +164,11 @@ body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px 12px;
-  margin: 6px 0 8px 0;
-  padding: 6px 8px;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  font-size: 10px;
-  color: #333;
+  gap: 4px 16px;
+  margin: 6px 0 10px 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #555;
 }
 
 .chart-legend-item {
