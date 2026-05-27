@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './DateSelector.css';
 
 interface DateSelectorProps {
@@ -8,6 +8,9 @@ interface DateSelectorProps {
 
 const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) => {
   const [pending, setPending] = useState(currentDate);
+  // Tracks whether the last interaction was keyboard (typing) vs pointer (picker).
+  // Picker selections commit immediately; typed edits wait for Enter/blur.
+  const lastInputWasKeyboard = useRef(false);
 
   useEffect(() => {
     setPending(currentDate);
@@ -25,7 +28,19 @@ const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) =>
         type="date"
         id="target-date"
         value={pending}
-        onChange={(e) => setPending(e.target.value)}
+        onKeyDownCapture={() => {
+          lastInputWasKeyboard.current = true;
+        }}
+        onPointerDownCapture={() => {
+          lastInputWasKeyboard.current = false;
+        }}
+        onChange={(e) => {
+          const next = e.target.value;
+          setPending(next);
+          if (!lastInputWasKeyboard.current && next && next !== currentDate) {
+            onChange(next);
+          }
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {

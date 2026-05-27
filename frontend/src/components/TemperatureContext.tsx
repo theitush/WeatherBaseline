@@ -11,24 +11,19 @@ interface TemperatureContextProps {
 
 const BIN_COUNT = 10;
 
-// Gradient stops: record-low blue -> white -> record-high red (matches chart markers)
-const GRADIENT_LOW = [
-  { t: 0, rgb: [47, 111, 184] },    // #2f6fb8 record-low blue
-  { t: 1, rgb: [195, 215, 235] },   // very faint blue at midpoint
-];
-const GRADIENT_HIGH = [
-  { t: 0, rgb: [240, 210, 205] },   // very faint red at midpoint
-  { t: 1, rgb: [192, 57, 43] },     // #c0392b record-high red
-];
+// Gradient stops: record-low blue -> white -> record-high red (matches the bar exactly)
+const GRADIENT_LOW_RGB = [47, 111, 184];    // #2f6fb8
+const GRADIENT_MID_RGB = [255, 255, 255];   // #ffffff
+const GRADIENT_HIGH_RGB = [192, 57, 43];    // #c0392b
 
 const interpolateGradient = (t: number): string => {
   const clamped = Math.max(0, Math.min(1, t));
   const [a, b, local] = clamped <= 0.5
-    ? [GRADIENT_LOW[0], GRADIENT_LOW[1], clamped / 0.5]
-    : [GRADIENT_HIGH[0], GRADIENT_HIGH[1], (clamped - 0.5) / 0.5];
-  const r = Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * local);
-  const g = Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * local);
-  const bl = Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * local);
+    ? [GRADIENT_LOW_RGB, GRADIENT_MID_RGB, clamped / 0.5]
+    : [GRADIENT_MID_RGB, GRADIENT_HIGH_RGB, (clamped - 0.5) / 0.5];
+  const r = Math.round(a[0] + (b[0] - a[0]) * local);
+  const g = Math.round(a[1] + (b[1] - a[1]) * local);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * local);
   return `rgb(${r}, ${g}, ${bl})`;
 };
 

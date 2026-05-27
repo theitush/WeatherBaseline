@@ -137,8 +137,8 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  -webkit-text-stroke: 1px #111;
-  text-stroke: 1px #111;
+  -webkit-text-stroke: 2px #111;
+  text-stroke: 2px #111;
   paint-order: stroke fill;
 }
 
