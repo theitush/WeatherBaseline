@@ -258,6 +258,59 @@ def select_top_cells(pop: np.ndarray, lats: np.ndarray, lons: np.ndarray, top_n:
     return cells
 
 
+def select_region_cells(pop: np.ndarray, lats: np.ndarray, lons: np.ndarray,
+                        bbox: tuple[float, float, float, float], floor: float):
+    """Return EVERY cell inside a lat/lon bbox with population >= floor.
+
+    Unlike select_top_cells (a global population ranking), this takes ALL
+    populated cells in a region so a country of interest gets dense coverage
+    regardless of where its towns fall in the global ranking. Cells carry
+    cell_id=-1 here; main() reassigns ids after merging with the global set.
+
+    bbox is (lat_lo, lat_hi, lon_lo, lon_hi) in degrees. floor drops near-empty
+    desert/ocean-edge cells (population is a per-cell sum; a fractional value is
+    GHSL noise, not a settlement).
+    """
+    lat_lo, lat_hi, lon_lo, lon_hi = bbox
+    lat_sel = np.where((lats >= lat_lo) & (lats <= lat_hi))[0]
+    lon_sel = np.where((lons >= lon_lo) & (lons <= lon_hi))[0]
+    cells = []
+    for r in lat_sel:
+        for c in lon_sel:
+            p = pop[r, c]
+            if p < floor:
+                continue
+            lat, lon = float(lats[r]), float(lons[c])
+            tile_id, tile_lat, tile_lon = store_tile(lat, lon)
+            cells.append({
+                "cell_id": -1,  # reassigned after merge
+                "lat": round(lat, 1),
+                "lon": round(lon, 1),
+                "population": int(round(p)),
+                "tile_id": tile_id,
+                "tile_lat": tile_lat,
+                "tile_lon": tile_lon,
+            })
+    print(f"  region {bbox} floor>={floor:g}: {len(cells):,} cells",
+          file=sys.stderr)
+    return cells
+
+
+def merge_cells(global_cells: list[dict], region_cells: list[dict]):
+    """Union the global top-N with region cells, dedup on (lat, lon).
+
+    Ranking is by population descending so cell_id stays "0 = most populous"
+    across the merged set. A cell present in both keeps its (identical) row once.
+    """
+    by_coord = {}
+    for cell in global_cells + region_cells:
+        by_coord[(cell["lat"], cell["lon"])] = cell
+    merged = sorted(by_coord.values(), key=lambda c: c["population"], reverse=True)
+    for rank, cell in enumerate(merged):
+        cell["cell_id"] = rank
+    return merged
+
+
 def report_budget(cells: list[dict], n_years: int, n_vars: int) -> None:
     """Print the tile count and the resulting zarr request-quota estimate.
 
@@ -309,6 +362,11 @@ def main() -> int:
                     help="stored zarr variables to fetch (t2m, tp, u10, v10 = 4)")
     ap.add_argument("--refresh", action="store_true",
                     help="recompute the population grid even if a cache exists")
+    ap.add_argument("--region", action="append", default=None,
+                    metavar="lat_lo,lat_hi,lon_lo,lon_hi[,floor]",
+                    help="add EVERY populated cell in this bbox (>= floor people, "
+                         "default 100) on top of the global top-N, for dense "
+                         "coverage of a country of interest. Repeatable.")
     args = ap.parse_args()
 
     if args.ghsl is None:
@@ -333,6 +391,22 @@ def main() -> int:
         pop = aggregate_to_grid(args.ghsl, lats, lons)
         save_cached_pop(pop, args.ghsl)
     cells = select_top_cells(pop, lats, lons, args.top_n)
+
+    if args.region:
+        region_cells = []
+        for spec in args.region:
+            parts = [float(x) for x in spec.split(",")]
+            if len(parts) not in (4, 5):
+                print(f"ERROR: --region needs 4 or 5 comma values, got {spec!r}",
+                      file=sys.stderr)
+                return 2
+            bbox = tuple(parts[:4])
+            floor = parts[4] if len(parts) == 5 else 100.0
+            region_cells += select_region_cells(pop, lats, lons, bbox, floor)
+        before = len(cells)
+        cells = merge_cells(cells, region_cells)
+        print(f"  merged: {before:,} global + {len(region_cells):,} region "
+              f"-> {len(cells):,} unique cells", file=sys.stderr)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     import csv
