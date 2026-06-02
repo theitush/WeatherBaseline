@@ -1,8 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+/dist/
+
+# Python caches
+__pycache__/
+*.pyc
 
 # Playwright
-node_modules/
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/.playwright-mcp/
+
+# Vendored Claude skill tooling (regenerable from skills-lock.json)
+/.agents/
+
+# Secrets — CDS API credentials. NEVER commit.
+.cdsapirc
+
+# Screenshots / scratch images at repo root (not committed assets under frontend/)
+/*.png
+
+# ERA5 data outputs (large, regenerable from the pipeline)
+/data/era5/archive/
+/data/era5/cell_daily/
+/data/era5/cities.csv
+/data/era5/pop_grid.npz
+/data/era5-land/

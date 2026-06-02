@@ -1,0 +1,20 @@
+# Secrets — CDS API credentials. NEVER commit.
+.cdsapirc
+
+# Python env / caches
+.venv/
+__pycache__/
+*.pyc
+
+# Large source rasters & docs (re-downloadable from Copernicus GHSL)
+*.tif
+*.tif.ovr
+*.pdf
+*.xlsx
+*:Zone.Identifier
+
+# Scratch output
+.bench_tmp/
+
+# Note: benchmark_zarr_results*.json are committed intentionally as the
+# decision record for why zarr was chosen over the CDS API (see STATUS.md).
