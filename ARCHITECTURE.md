@@ -1,10 +1,35 @@
 # HowHotWasIt — v2 architecture (data & serving)
 
-Status: **in progress** on branch `v2-tiered-serving`. Serving path built;
-**BLOCKED on a grid decision** — see "⛔ OPEN DECISION: the grid" below. Supersedes
+Status: **in progress** on branch `v2-tiered-serving`. Serving path built; grid
+decision **RESOLVED 2026-06-03** — see "✅ GRID DECISION" below. Supersedes
 the current Node `backend/cacheManager.js` + `/api/archive` model.
 
-## ⛔ OPEN DECISION: the grid (resolve before continuing)
+## ✅ GRID DECISION (resolved 2026-06-03)
+
+**Canonical grid = ERA5-Land 0.1°.** We query Open-Meteo per cell and let each
+endpoint snap to its own grid via `cell_selection=nearest` — that is good enough;
+no regridding or recalculation on our side.
+
+- **Archive + recent temp** → `models=era5_land` (exact 0.1° match, invisible seam).
+- **Recent precip/wind** → `historical-forecast` API (IFS family). Same single-source,
+  24h-TTL logic as recent temp; just a different model because `era5_land` returns
+  `null` for precip/wind. This is **intentional, not provisional** — the earlier
+  "rejected provisional hack" framing is retired.
+- **Forecast (all 4)** → `models=ecmwf_ifs` (IFS HRES). Snaps to its own ~9 km grid
+  (~2.7 km offset from our 0.1° point at mid-latitudes) on either grid choice, so
+  the forecast tier never matches the storage grid regardless — accepted.
+
+**DEFERRED (much later): cross-model bias.** The three sources sit on three physical
+grids/models (era5_land 0.1°, historical-forecast ~0.0625°, IFS HRES O1280), so
+precip/wind carry a model bias at the archive↔recent seam and forecast carries one
+at the recent↔forecast seam. Quantifying and bias-correcting this is a **future
+task**, not a blocker for shipping v2.
+
+The original decision write-up (G1 vs G2) is kept below for history.
+
+---
+
+## (historical) ⛔ OPEN DECISION: the grid
 
 The whole v2 design assumed archive + recent could BOTH be ERA5-Land 0.1° so the
 seam is invisible. While wiring `recent` we hit a hard wall, confirmed against
@@ -37,15 +62,12 @@ metrics**):
   precip/wind cannot exist; also note there is **no 0.1° forecast model**, so even
   the forecast tier's grid is unresolved under G2.
 
-Until this is picked, `backend/ensureFresh.js` carries a PROVISIONAL split-grid
-recent (temp=era5_land, precip/wind=historical-forecast IFS family) that the user
-has rejected — it must be rewritten to the chosen single grid.
-
-Also unresolved by G1/G2: how the forecast tier's grid matches the archive grid
-(IFS 9km ≠ ERA5 0.25° ≠ ERA5-Land 0.1° — three physically different grids; no API
-param makes them identical, `cell_selection=nearest` only makes the pick
-deterministic). Whatever grid wins, quantify the residual cross-model bias
-(see "Producer gap" / bias task).
+RESOLUTION (2026-06-03): chose **ERA5-Land 0.1°** (was Option G2, accepting the
+split-source recent as intentional rather than rewriting to a single grid). The
+split-grid recent in `backend/ensureFresh.js` is the shipping design. The residual
+cross-model bias (IFS 9km ≠ ERA5-Land 0.1° ≠ historical-forecast — three physical
+grids; `cell_selection=nearest` only makes each pick deterministic) is a **deferred
+task**, see "✅ GRID DECISION" above.
 
 ---
 

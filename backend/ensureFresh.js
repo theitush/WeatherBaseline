@@ -14,9 +14,13 @@
 //   - temp  → models=era5_land (exact 0.1° grid match to the archive: the
 //             archive↔recent seam is invisible, and temp is all the UI shows).
 //   - p/w   → historical-forecast API (IFS HRES family, ~0.0625° grid — finer
-//             than ERA5-Land's 0.1°, far better than ERA5 0.25°). This is a
-//             different MODEL from ERA5-Land, so precip/wind carry a model bias
-//             at the archive↔recent seam (tracked: bias-correction task).
+//             than ERA5-Land's 0.1°, far better than ERA5 0.25°). Same single-
+//             source, same 24h TTL as recent temp — just a different model
+//             because era5_land returns null for p/w. This is the SHIPPING
+//             design (grid decision resolved 2026-06-03), not provisional.
+//             It carries a model bias at the archive↔recent seam vs ERA5-Land;
+//             quantifying/correcting that is a DEFERRED task (see ARCHITECTURE.md
+//             "✅ GRID DECISION"), not a blocker.
 //
 // Grid alignment: the three sources sit on three physically different grids
 // (era5_land 0.1°, historical-forecast 0.0625°, IFS HRES O1280) — no API param
