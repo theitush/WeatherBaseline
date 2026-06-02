@@ -153,7 +153,136 @@ function getOrdinalSuffix(num: number): string {
 }
 
 /**
- * Generate temperature context message with percentile ranking
+ * Phrase vocabulary per metric. Each metric reads as a low↔high spectrum at
+ * three intensities (mild / strong / extreme) plus a shared "normal" bank:
+ *   - temperature: cold ↔ hot
+ *   - precipitation: dry ↔ wet
+ *   - wind: calm ↔ gusty
+ * `rankLow`/`rankHigh` name the ends for the "Nth Xest in dataset!" line.
+ * The percentile branching that picks a bank is identical across metrics.
+ */
+interface MetricPhrases {
+  normal: string[];
+  mildLow: string[];
+  mildHigh: string[];
+  strongLow: string[];
+  strongHigh: string[];
+  extremeLow: string[];
+  extremeHigh: string[];
+  rankLow: string;
+  rankHigh: string;
+}
+
+const TEMP_PHRASES: MetricPhrases = {
+  normal: [
+    'Pretty typical', 'Normal range', 'Average temp', 'Nothing unusual',
+    'Right on track', 'Nothing special', 'Just average', 'Not exciting',
+  ],
+  mildLow: [
+    'A bit cool', 'Slightly chilly', 'Cooler side', 'Touch below normal',
+    'Mildly cold', 'A bit brisk', 'Slightly frosty', 'A bit nippy',
+    'Somewhat chilly', 'A bit fresh', 'A bit crisp', 'Sorta cool',
+  ],
+  mildHigh: [
+    'A bit warm', 'Slightly toasty', 'Warmer side', 'Touch above normal',
+    'Mildly hot', 'A bit balmy', 'Slightly sultry', 'A bit steamy',
+    'Somewhat warm', 'Sorta hot',
+  ],
+  strongLow: [
+    'Unusually cold', 'Quite chilly', 'Pretty frigid', 'Really cool',
+    'Very cold', 'Bitterly cold', 'Chill af', 'Nippy!',
+  ],
+  strongHigh: [
+    'Unusually hot', 'Quite toasty', 'Pretty scorching', 'Really warm',
+    'Very hot', 'Hot af', 'Sweltering', 'Scorching',
+  ],
+  extremeLow: [
+    'Exceptionally frigid!', 'Bone-chilling!', 'Historic freeze!',
+    'Brutal cold!', 'Arctic blast!',
+  ],
+  extremeHigh: [
+    'Scorching rare heat!', 'Blazing anomaly!', 'Infernal heat!',
+    'Blistering hot!', 'Record heat!',
+  ],
+  rankLow: 'coldest',
+  rankHigh: 'hottest',
+};
+
+const PRECIP_PHRASES: MetricPhrases = {
+  normal: [
+    'Pretty typical', 'Normal range', 'Average rainfall', 'Nothing unusual',
+    'Right on track', 'Nothing special', 'Just average', 'Not exciting',
+  ],
+  mildLow: [
+    'A bit dry', 'Slightly dry', 'Drier side', 'Touch below normal',
+    'Mildly dry', 'A bit parched', 'Somewhat dry', 'Sorta dry',
+  ],
+  mildHigh: [
+    'A bit wet', 'Slightly damp', 'Wetter side', 'Touch above normal',
+    'Mildly wet', 'A bit drizzly', 'Somewhat wet', 'Sorta soggy',
+  ],
+  strongLow: [
+    'Unusually dry', 'Quite dry', 'Pretty parched', 'Really dry',
+    'Very dry', 'Bone dry', 'Arid af', 'Drought-ish',
+  ],
+  strongHigh: [
+    'Unusually wet', 'Quite soggy', 'Pretty soaking', 'Really wet',
+    'Very wet', 'Wet af', 'Drenching', 'Soaking',
+  ],
+  extremeLow: [
+    'Exceptionally dry!', 'Bone-dry record!', 'Historic drought!',
+    'Brutally arid!', 'Dust-bowl dry!',
+  ],
+  extremeHigh: [
+    'Torrential rare rain!', 'Drenching anomaly!', 'Deluge!',
+    'Flooding rain!', 'Record downpour!',
+  ],
+  rankLow: 'driest',
+  rankHigh: 'wettest',
+};
+
+const WIND_PHRASES: MetricPhrases = {
+  normal: [
+    'Pretty typical', 'Normal range', 'Average wind', 'Nothing unusual',
+    'Right on track', 'Nothing special', 'Just average', 'Not exciting',
+  ],
+  mildLow: [
+    'A bit calm', 'Slightly still', 'Calmer side', 'Touch below normal',
+    'Mildly calm', 'A bit settled', 'Somewhat still', 'Sorta calm',
+  ],
+  mildHigh: [
+    'A bit breezy', 'Slightly gusty', 'Breezier side', 'Touch above normal',
+    'Mildly windy', 'A bit blustery', 'Somewhat breezy', 'Sorta gusty',
+  ],
+  strongLow: [
+    'Unusually calm', 'Quite still', 'Pretty dead-calm', 'Really calm',
+    'Very still', 'Dead calm', 'Calm af', 'Eerily still',
+  ],
+  strongHigh: [
+    'Unusually windy', 'Quite gusty', 'Pretty blustery', 'Really windy',
+    'Very gusty', 'Windy af', 'Howling', 'Blustery',
+  ],
+  extremeLow: [
+    'Exceptionally calm!', 'Dead-still record!', 'Historic lull!',
+    'Glassy calm!', 'Not a breath!',
+  ],
+  extremeHigh: [
+    'Ferocious rare wind!', 'Howling anomaly!', 'Gale-force!',
+    'Blasting gusts!', 'Record winds!',
+  ],
+  rankLow: 'calmest',
+  rankHigh: 'windiest',
+};
+
+const METRIC_PHRASES: Record<MetricKey, MetricPhrases> = {
+  max_temperature: TEMP_PHRASES,
+  min_temperature: TEMP_PHRASES,
+  precipitation_sum: PRECIP_PHRASES,
+  wind_speed_10m_max: WIND_PHRASES,
+};
+
+/**
+ * Generate context message with percentile ranking, phrased for the metric.
  */
 export function generateTemperatureContext(
   currentTemp: number | null | undefined,
@@ -165,96 +294,25 @@ export function generateTemperatureContext(
   const percentile = calculateTemperaturePercentile(currentTemp, data, currentMetric);
   const percentileFromBottom = 100 - percentile;
 
-  // Sort all temperatures to get rankings
+  // Sort all values to get rankings (ascending, so index 0 is the lowest).
   const allTemps = data
     .map((d) => d[currentMetric])
     .filter((t): t is number => t !== null && t !== undefined)
     .sort((a, b) => a - b);
   const totalCount = allTemps.length;
 
-  // Find exact ranking
-  const rankingFromColdest = allTemps.findIndex((temp) => temp >= currentTemp) + 1;
-  const rankingFromHottest = totalCount - allTemps.lastIndexOf(currentTemp);
+  // Find exact ranking from each end of the sorted values.
+  const rankingFromLow = allTemps.findIndex((temp) => temp >= currentTemp) + 1;
+  const rankingFromHigh = totalCount - allTemps.lastIndexOf(currentTemp);
 
-  // Random phrase arrays
-  const normalPhrases = [
-    'Pretty typical',
-    'Normal range',
-    'Average temp',
-    'Nothing unusual',
-    'Right on track',
-    'Nothing special',
-    'Just average',
-    'Not exciting',
-  ];
-  const coolPhrases = [
-    'A bit cool',
-    'Slightly chilly',
-    'Cooler side',
-    'Touch below normal',
-    'Mildly cold',
-    'A bit brisk',
-    'Slightly frosty',
-    'A bit nippy',
-    'Somewhat chilly',
-    'A bit fresh',
-    'A bit crisp',
-    'Sorta cool',
-  ];
-  const warmPhrases = [
-    'A bit warm',
-    'Slightly toasty',
-    'Warmer side',
-    'Touch above normal',
-    'Mildly hot',
-    'A bit balmy',
-    'Slightly sultry',
-    'A bit steamy',
-    'Somewhat warm',
-    'Sorta hot',
-  ];
-  const coldPhrases = [
-    'Unusually cold',
-    'Quite chilly',
-    'Pretty frigid',
-    'Really cool',
-    'Very cold',
-    'Bitterly cold',
-    'Chill af',
-    'Nippy!',
-  ];
-  const hotPhrases = [
-    'Unusually hot',
-    'Quite toasty',
-    'Pretty scorching',
-    'Really warm',
-    'Very hot',
-    'Hot af',
-    'Sweltering',
-    'Scorching',
-  ];
-  const extremeColdPhrases = [
-    'Exceptionally frigid!',
-    'Bone-chilling!',
-    'Historic freeze!',
-    'Brutal cold!',
-    'Arctic blast!',
-  ];
-  const extremeHotPhrases = [
-    'Scorching rare heat!',
-    'Blazing anomaly!',
-    'Infernal heat!',
-    'Blistering hot!',
-    'Record heat!',
-  ];
+  const phrases = METRIC_PHRASES[currentMetric];
 
-  // Get random phrase
+  // Get random phrase; append seasonal context to non-normal banks.
   const getRandomPhrase = (arr: string[]): string => {
     const phrase = arr[Math.floor(Math.random() * arr.length)];
-    // Add seasonal context to non-normal phrases
-    if (arr === extremeColdPhrases || arr === extremeHotPhrases) {
+    if (arr === phrases.extremeLow || arr === phrases.extremeHigh) {
       return phrase + ' (for the season)';
-    } else if (arr !== normalPhrases) {
+    } else if (arr !== phrases.normal) {
       return phrase + ' for the season';
     }
     return phrase;
@@ -266,35 +324,35 @@ export function generateTemperatureContext(
   };
 
   if (percentileFromBottom <= 5) {
-    // Bottom 5% - very extreme cold
+    // Bottom 5% - extreme low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(extremeColdPhrases);
-    context.ranking = `${rankingFromColdest}${getOrdinalSuffix(rankingFromColdest)} coldest in dataset!`;
+    context.description = getRandomPhrase(phrases.extremeLow);
+    context.ranking = `${rankingFromLow}${getOrdinalSuffix(rankingFromLow)} ${phrases.rankLow} in dataset!`;
   } else if (percentile <= 5) {
-    // Top 5% - very extreme hot
+    // Top 5% - extreme high
     context.percentile = `${percentile.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(extremeHotPhrases);
-    context.ranking = `${rankingFromHottest}${getOrdinalSuffix(rankingFromHottest)} hottest in dataset!`;
+    context.description = getRandomPhrase(phrases.extremeHigh);
+    context.ranking = `${rankingFromHigh}${getOrdinalSuffix(rankingFromHigh)} ${phrases.rankHigh} in dataset!`;
   } else if (percentileFromBottom <= 10) {
-    // Bottom 10% - extreme cold
+    // Bottom 10% - strong low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(coldPhrases);
+    context.description = getRandomPhrase(phrases.strongLow);
   } else if (percentile <= 10) {
-    // Top 10% - extreme hot
+    // Top 10% - strong high
     context.percentile = `${percentile.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(hotPhrases);
+    context.description = getRandomPhrase(phrases.strongHigh);
   } else if (percentileFromBottom <= 20) {
-    // 10-20th percentile - a bit cool
+    // 10-20th percentile - mild low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(coolPhrases);
+    context.description = getRandomPhrase(phrases.mildLow);
   } else if (percentile <= 20) {
-    // 80-90th percentile - a bit warm
+    // 80-90th percentile - mild high
     context.percentile = `${percentile.toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(warmPhrases);
+    context.description = getRandomPhrase(phrases.mildHigh);
   } else {
     // 20-80th percentile - normal
     context.percentile = `${Math.min(percentile, percentileFromBottom).toFixed(0)}th percentile`;
-    context.description = getRandomPhrase(normalPhrases);
+    context.description = getRandomPhrase(phrases.normal);
   }
 
   return context;
