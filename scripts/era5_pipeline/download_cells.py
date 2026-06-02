@@ -25,11 +25,16 @@ Usage (test run — one tile, one year):
   source .venv/bin/activate
   python download_cells.py --tile 9_37 --year 2020
 
-  # all tiles, a year range:
-  python download_cells.py --start-year 2018 --end-year 2020
+  # several tiles, full history (1950 → latest available):
+  python download_cells.py --tile 9_5,8_37,5_5 --start-year 1950
 
-Output: data/era5/cell_daily/{cell_id}.csv  (one file per cell, appended/extended)
+Output: data/era5-land/archive/archive_{lat}_{lon}.csv.gz  (one gzip per cell,
+        merged-by-date on re-run; lat_lon = the cell's snapped 0.1deg centre)
         schema: date,tmax_C,tmin_C,precip_mm,wind_max_ms
+
+This is the v2 `archive` tier per ARCHITECTURE.md: immutable, gzip, keyed by
+snapped lat_lon (matching the weather_hist_{lat}_{lon} convention). Browsers
+auto-gunzip via Content-Encoding: gzip when served from R2/CDN.
 """
 from __future__ import annotations
 
@@ -45,7 +50,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 CELLS_CSV = REPO / "data" / "era5" / "cells.csv"
-OUT_DIR = REPO / "data" / "era5" / "cell_daily"
+OUT_DIR = REPO / "data" / "era5-land" / "archive"
 
 # Hourly ERA5-Land ARCO zarr store on EarthDataHub.
 ZARR_URL = "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr"
@@ -281,7 +286,7 @@ def process_tile(
     # the missing Dec-31-(year) row) are handled by the merge, not by luck.
     tp_dates = pd.to_datetime(tp_sum[time_name].values).date
 
-    frames: dict[int, pd.DataFrame] = {}
+    frames: dict[tuple[float, float], pd.DataFrame] = {}
     for c, slon in zip(tile_cells, sel_lons):
         sel = {lat_name: c["lat"], lon_name: float(slon)}
         temp_wind = pd.DataFrame({
@@ -301,19 +306,35 @@ def process_tile(
         # outer join: keeps Dec-31-(year-1) precip (no temp/wind that day) and
         # Dec-31-(year) temp/wind (no precip until next year's run).
         frame = temp_wind.merge(precip, on="date", how="outer").sort_values("date")
-        frames[c["cell_id"]] = frame[
+        # Key by the cell's own snapped 0.1deg centre (from cells.csv), not the
+        # store's float lat/lon — keeps the archive filename on the clean grid.
+        frames[(c["lat"], c["lon"])] = frame[
             ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
         ]
 
     return frames
 
 
-def write_cell_csv(cell_id: int, frame) -> Path:
-    """Write (or merge by date) one cell's daily frame to its CSV."""
+def archive_name(lat: float, lon: float) -> str:
+    """v2 archive filename for a snapped 0.1deg cell centre.
+
+    Cells.csv already stores lat/lon on the 0.1deg grid, so one decimal place
+    reproduces them exactly (e.g. 34.0, -118.3). Matches the
+    archive_{lat}_{lon}.csv.gz convention in ARCHITECTURE.md.
+    """
+    return f"archive_{lat:.1f}_{lon:.1f}.csv.gz"
+
+
+def write_archive(lat: float, lon: float, frame) -> Path:
+    """Write (or merge by date) one cell's daily frame to its gzip archive.
+
+    Gzip + merge-by-date means re-running for an overlapping year range is
+    idempotent: existing dates are overwritten last-wins, new dates appended.
+    """
     import pandas as pd
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUT_DIR / f"{cell_id}.csv"
+    path = OUT_DIR / archive_name(lat, lon)
     if path.exists():
         old = pd.read_csv(path, parse_dates=["date"])
         old["date"] = old["date"].dt.date
@@ -324,16 +345,25 @@ def write_cell_csv(cell_id: int, frame) -> Path:
         )
     else:
         merged = frame.sort_values("date")
-    merged.to_csv(path, index=False)
+    merged.to_csv(path, index=False, compression="gzip")
     return path
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--tile", help="only this tile_id (e.g. 9_37); default: all")
+    ap.add_argument(
+        "--tile",
+        help="tile_id(s), comma-separated (e.g. 9_5,8_37,5_5); default: all",
+    )
     ap.add_argument("--year", type=int, help="single year (shorthand)")
-    ap.add_argument("--start-year", type=int, default=2020)
-    ap.add_argument("--end-year", type=int, default=2020)
+    ap.add_argument("--start-year", type=int, default=1950)
+    ap.add_argument(
+        "--end-year",
+        type=int,
+        default=datetime.now().year,
+        help="inclusive; default = current year. ERA5-Land lags ~6 days, so the "
+        "current year's tail is simply absent (the .sel returns fewer days).",
+    )
     args = ap.parse_args()
 
     if args.year is not None:
@@ -342,10 +372,15 @@ def main() -> int:
 
     cells = load_cells()
     by_tile = group_by_tile(cells)
-    tiles = {args.tile: by_tile[args.tile]} if args.tile else by_tile
-    if args.tile and not tiles[args.tile]:
-        print(f"no cells in tile {args.tile!r}")
-        return 1
+    if args.tile:
+        wanted = [t.strip() for t in args.tile.split(",") if t.strip()]
+        missing = [t for t in wanted if not by_tile.get(t)]
+        if missing:
+            print(f"no cells in tile(s): {', '.join(missing)}")
+            return 1
+        tiles = {t: by_tile[t] for t in wanted}
+    else:
+        tiles = by_tile
 
     n_cells = sum(len(v) for v in tiles.values())
     print(f"ERA5-Land cell download")
@@ -375,22 +410,22 @@ def main() -> int:
     for tile_id, tile_cells in tiles.items():
         for year in years:
             frames = process_tile(ds, tile_id, tile_cells, year)
-            for cell_id, frame in frames.items():
-                path = write_cell_csv(cell_id, frame)
+            for (lat, lon), frame in frames.items():
+                path = write_archive(lat, lon, frame)
                 total_written += 1
-            log(f"  tile {tile_id} year {year}: wrote {len(frames)} cell CSVs")
+            log(f"  tile {tile_id} year {year}: wrote {len(frames)} archives")
 
     print(f"\nDone — {total_written} cell-year frames written to {OUT_DIR}")
 
-    # Quick sanity print of the first cell's first tile.
+    # Quick sanity print of the first cell of the first tile.
     first_tile = next(iter(tiles))
-    sample_id = tiles[first_tile][0]["cell_id"]
-    sample_path = OUT_DIR / f"{sample_id}.csv"
+    sample = tiles[first_tile][0]
+    sample_path = OUT_DIR / archive_name(sample["lat"], sample["lon"])
     if sample_path.exists():
         import pandas as pd
 
         df = pd.read_csv(sample_path)
-        print(f"\nsample — cell {sample_id} ({sample_path.name}), {len(df)} days:")
+        print(f"\nsample — {sample_path.name}, {len(df)} days:")
         print(df.describe().loc[["min", "mean", "max"]].round(2).to_string())
     return 0
 
