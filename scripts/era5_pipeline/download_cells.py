@@ -1,47 +1,44 @@
-"""Download ERA5-Land daily metrics for selected cells, grouped by zarr tile.
+"""Download ERA5-Land daily metrics for selected cells — batched, parallel, resumable.
 
-Reads `data/era5/cells.csv` (the top-N populated 0.1deg cells from
-select_cells.py), groups the cells by their 6.4deg zarr `tile_id`, and for each
-DISTINCT tile fetches the hourly chunks ONCE — then computes 4 daily metrics for
-every cell in that tile:
+Batched, parallel, resumable. Inputs (data/era5/cells.csv) and outputs
+(data/era5-land/archive/archive_{lat}_{lon}.csv.gz, schema
+date,tmax_C,tmin_C,precip_mm,wind_max_ms) are unchanged; archives merge by date.
+Design notes:
 
-  tmax_C   daily maximum 2m temperature      (max of hourly t2m)
-  tmin_C  daily minimum 2m temperature         (min of hourly t2m)
-  precip_mm daily total precipitation        (tp is accumulated — the day's
-                                               total is the value at the next
-                                               day's 00:00 step; see process_tile)
-  wind_max_ms daily maximum 10m wind speed   (max of hourly sqrt(u10^2+v10^2))
+1. BATCHED TIME SPANS (was: one .compute() per year).
+   The store's time chunks are 2880 h = 120 days, NOT aligned to calendar years.
+   A single year straddles ~4 chunks, and each boundary chunk is shared with the
+   neighbouring year — so year-by-year RE-FETCHES every boundary chunk (~3x the
+   reads). Fetching a multi-year span reads each 120-day chunk exactly once.
+   --batch-years bounds the span so memory stays sane (a span's t2m array is
+   span_years * 8760 * 64 * 64 * 4 bytes; ~20 yr ≈ 3 GB/var per tile).
 
-Why per-tile, not per-cell: the zarr store chunks 64x64 cells (=6.4deg) into one
-spatial chunk. Fetching per cell would re-pull the shared chunk for every cell
-in it. Grouping by tile_id and selecting the tile's lat/lon box means dask reads
-each spatial chunk exactly once. Each selected cell IS an ERA5-Land cell centre,
-so we index it directly with .sel(method="nearest") — no interpolation needed.
+2. PARALLEL FETCHES. The 4 stored vars (t2m, tp, u10, v10) are independent
+   network-bound .compute()s, so we fetch them concurrently (thread pool).
+   --parallel-tiles additionally runs whole tiles concurrently. The store drops
+   connections under load, so keep the worker count modest; the per-step retry
+   covers the occasional drop.
 
-Wind speed MUST be computed hourly then resampled: mean(sqrt(u^2+v^2)) !=
-sqrt(mean(u)^2+mean(v)^2). 
+3. RESUME. Before fetching, we read each tile's existing archives and compute the
+   set of YEARS already present across its cells. Only missing years are fetched —
+   including interior gaps (a hole left by an interrupted run), not just the tail.
+   The trailing (current) year is always re-fetched: ERA5-Land lags ~6 days, so
+   new data keeps arriving. --no-resume forces a full refetch.
 
-Usage (test run — one tile, one year):
+Usage:
   source .venv/bin/activate
-  python download_cells.py --tile 9_37 --year 2020
-
-  # several tiles, full history (1950 → latest available):
-  python download_cells.py --tile 9_5,8_37,5_5 --start-year 1950
-
-Output: data/era5-land/archive/archive_{lat}_{lon}.csv.gz  (one gzip per cell,
-        merged-by-date on re-run; lat_lon = the cell's snapped 0.1deg centre)
-        schema: date,tmax_C,tmin_C,precip_mm,wind_max_ms
-
-This is the v2 `archive` tier per ARCHITECTURE.md: immutable, gzip, keyed by
-snapped lat_lon (matching the weather_hist_{lat}_{lon} convention). Browsers
-auto-gunzip via Content-Encoding: gzip when served from R2/CDN.
+  python download_cells.py --tile 9_37 --year 2020          # one span, one year
+  python download_cells.py --tile 9_5,8_37 --start-year 1950 # resume missing yrs
+  python download_cells.py --start-year 1950 --batch-years 20 --parallel-tiles 2
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -55,8 +52,8 @@ OUT_DIR = REPO / "data" / "era5-land" / "archive"
 # Hourly ERA5-Land ARCO zarr store on EarthDataHub.
 ZARR_URL = "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr"
 
-# Stored variables we need. Derived metrics (tmax/tmin from t2m, wind speed
-# from u10+v10) cost nothing extra — the cost is per stored variable fetched.
+# Stored variables we need. Derived metrics (tmax/tmin from t2m, wind speed from
+# u10+v10) cost nothing extra — the cost is per stored variable fetched.
 ZARR_VARS = ["t2m", "tp", "u10", "v10"]
 
 # The store chunks 64x64 cells per spatial chunk. tile_id encodes the chunk
@@ -66,13 +63,21 @@ TILE_CELLS = 64
 # Generous per-request HTTP ceiling — a cold ~47 MB chunk can be slow.
 HTTP_TIMEOUT_S = 2400
 
+# Default span per .compute(). ~20 yr ≈ 3 GB/var in memory per tile — bounded,
+# while still reading each 120-day time-chunk only once across the span.
+DEFAULT_BATCH_YEARS = 20
+
 _T0 = time.time()
+# log() is called from worker threads when --parallel-tiles > 1; serialise the
+# print so lines from different tiles don't interleave mid-string.
+_LOG_LOCK = threading.Lock()
 
 
 def log(msg: str) -> None:
     """Timestamped log: wall-clock time + elapsed seconds since start."""
     now = datetime.now().strftime("%H:%M:%S")
-    print(f"  [{now} | +{time.time() - _T0:7.1f}s] {msg}", flush=True)
+    with _LOG_LOCK:
+        print(f"  [{now} | +{time.time() - _T0:7.1f}s] {msg}", flush=True)
 
 
 def fmt_dur(seconds: float) -> str:
@@ -82,8 +87,7 @@ def fmt_dur(seconds: float) -> str:
 
 
 # Transient network errors worth retrying — EarthDataHub object storage
-# occasionally drops a connection mid-chunk (ContentLengthError / payload not
-# completed). A plain re-fetch of the same chunk almost always succeeds.
+# occasionally drops a connection mid-chunk. A plain re-fetch almost always works.
 _RETRY_HINTS = (
     "payload is not completed",
     "not enough data to satisfy content length",
@@ -101,11 +105,10 @@ def _is_transient(err: Exception) -> bool:
 
 
 def _compute_step(name: str, da):
-    """Compute one lazy DataArray, with retry on transient network errors.
+    """Compute one lazy DataArray, retrying on transient network errors.
 
-    Logs start/end wall time + duration. On a dropped connection it backs off
-    and re-fetches — the same chunks, so no extra request budget beyond the
-    failed attempt.
+    On a dropped connection it backs off and re-fetches the same chunks (no extra
+    request budget beyond the failed attempt).
     """
     for attempt in range(1, _MAX_RETRIES + 1):
         suffix = "" if attempt == 1 else f" (attempt {attempt}/{_MAX_RETRIES})"
@@ -145,20 +148,14 @@ def group_by_tile(cells: list[dict]) -> dict[str, list[dict]]:
 
 
 # Scalar (0-dim) coordinates the store attaches to every variable. They carry
-# constant metadata (number=0, surface=0.0, depthBelowLandLayer=100.0) and we
-# don't use them — but each is its own zarr chunk that xarray re-fetches on
-# EVERY .compute(). Verified via an HTTP-level trace: leaving them in cost ~3
-# extra requests per variable per tile-year (~22 of the measured 38). Dropping
-# them at open time brings a tile-year to exactly 16 data-chunk requests.
+# constant metadata we don't use, but each is its own zarr chunk that xarray
+# re-fetches on EVERY .compute(). Dropping them at open time saves ~3 requests
+# per variable per fetch.
 _DROP_COORDS = ["number", "surface", "depthBelowLandLayer"]
 
 
 def open_store():
-    """Open the hourly zarr store lazily, dropping the unused scalar coords.
-
-    `chunks={}` keeps it lazy (data fetched on .compute()). The scalar-coord
-    drop is a real request saving — see _DROP_COORDS.
-    """
+    """Open the hourly zarr store lazily, dropping the unused scalar coords."""
     import aiohttp
     import xarray as xr
 
@@ -179,19 +176,80 @@ def open_store():
     return ds
 
 
-def process_tile(
+# --------------------------------------------------------------------------- #
+# Resume: which years does a tile already have?
+# --------------------------------------------------------------------------- #
+def years_present_for_tile(tile_cells: list[dict]) -> set[int]:
+    """Years already covered by EVERY cell in the tile (intersection).
+
+    A year counts as present for a cell only if that cell's archive has a row for
+    that year. We intersect across the tile's cells so a year is "done" only when
+    all cells have it — a tile fetch writes all cells together, so a year missing
+    from any cell means that whole tile-year still needs fetching. Interior gaps
+    (a year missing in the middle, e.g. from an interrupted run) are caught too,
+    because we look at the actual set of years, not just the max date.
+    """
+    import pandas as pd
+
+    per_cell_years: list[set[int]] = []
+    for c in tile_cells:
+        path = OUT_DIR / archive_name(c["lat"], c["lon"])
+        if not path.exists():
+            return set()  # a missing cell file means nothing is safely done
+        # Only need the date column; parse years cheaply.
+        dates = pd.read_csv(path, usecols=["date"])["date"]
+        yrs = set(pd.to_datetime(dates).dt.year.unique().tolist())
+        per_cell_years.append(yrs)
+    return set.intersection(*per_cell_years) if per_cell_years else set()
+
+
+def missing_years(tile_cells: list[dict], years: list[int], latest_year: int,
+                  resume: bool) -> list[int]:
+    """The subset of `years` still to fetch for this tile.
+
+    With resume on: drop years already present in every cell, but ALWAYS keep the
+    latest year (ERA5-Land lags ~6 days, so new data keeps arriving and the last
+    stored year is partial). With resume off: fetch all requested years.
+    """
+    if not resume:
+        return years
+    have = years_present_for_tile(tile_cells)
+    return [y for y in years if y not in have or y >= latest_year]
+
+
+def batches(years: list[int], batch_years: int) -> list[tuple[int, int]]:
+    """Split a sorted year list into (start, end) spans of up to batch_years,
+    breaking a span wherever the years aren't contiguous so a gap isn't fetched.
+    """
+    if not years:
+        return []
+    ys = sorted(years)
+    spans: list[tuple[int, int]] = []
+    run_start = prev = ys[0]
+    for y in ys[1:]:
+        contiguous = y == prev + 1
+        within_cap = y - run_start + 1 <= batch_years
+        if contiguous and within_cap:
+            prev = y
+            continue
+        spans.append((run_start, prev))
+        run_start = prev = y
+    spans.append((run_start, prev))
+    return spans
+
+
+def process_span(
     ds,
     tile_id: str,
     tile_cells: list[dict],
-    year: int,
-) -> dict[int, "object"]:
-    """Fetch one tile's hourly data for `year`, return per-cell daily frames.
-
-    Selects exactly the tile's one 64x64 spatial chunk by integer index (so the
-    fetch reads precisely one chunk per axis — no margin, no straddle), slices
-    the year, then computes all 4 daily metrics for the whole chunk in one go.
-    Each selected cell is read out by nearest-neighbour index — it's an exact
-    cell centre within the chunk.
+    start_year: int,
+    end_year: int,
+    var_workers: int,
+) -> dict[tuple[float, float], "object"]:
+    """Fetch one tile's hourly data for [start_year, end_year], return per-cell
+    daily frames. Reads exactly the tile's one 64x64 spatial chunk per axis and
+    the time-chunks spanning the year range — each chunk fetched once. The 4 vars
+    are computed concurrently across a thread pool of size var_workers.
     """
     import pandas as pd
 
@@ -206,108 +264,85 @@ def process_tile(
     sel_lons = np.where(lons < 0, lons + 360.0, lons) if lon_is_360 else lons
 
     # Select EXACTLY this tile's one 64x64 spatial chunk by integer index.
-    # tile_id is "{chunk_row}_{chunk_col}" on the store's coordinate grid
-    # (see retile/select_cells.store_tile), so isel over [chunk*64 : +64]
-    # reads precisely one chunk per axis — no bounding-box margin, no risk of
-    # straddling a chunk boundary and quadrupling the request count.
     chunk_row, chunk_col = (int(x) for x in tile_id.split("_"))
     lat_i0, lat_i1 = chunk_row * TILE_CELLS, chunk_row * TILE_CELLS + TILE_CELLS
     lon_i0, lon_i1 = chunk_col * TILE_CELLS, chunk_col * TILE_CELLS + TILE_CELLS
-    # clamp to the store extent (the last chunk on each axis is partial)
     lat_i1 = min(lat_i1, ds.sizes[lat_name])
     lon_i1 = min(lon_i1, ds.sizes[lon_name])
 
-    log(f"  tile {tile_id}: {len(tile_cells)} cells, "
+    span = f"{start_year}" if start_year == end_year else f"{start_year}-{end_year}"
+    log(f"  tile {tile_id} | years {span}: {len(tile_cells)} cells, "
         f"chunk lat[{lat_i0}:{lat_i1}] lon[{lon_i0}:{lon_i1}]")
 
     sub = ds[ZARR_VARS].sel({
-        time_name: slice(str(year), str(year)),
+        time_name: slice(str(start_year), str(end_year)),
     }).isel({
         lat_name: slice(lat_i0, lat_i1),
         lon_name: slice(lon_i0, lon_i1),
     })
     n_steps = sub.sizes.get(time_name)
     n_lat, n_lon = sub.sizes.get(lat_name), sub.sizes.get(lon_name)
-    log(f"  tile {tile_id}: window {n_lat}x{n_lon} cells x {n_steps} hourly steps")
-    # Per-variable uncompressed payload estimate (float32). The actual download
-    # is compressed and chunk-aligned, but this gives a feel for the volume.
-    var_mb = n_steps * n_lat * n_lon * 4 / 1e6
-    log(f"  tile {tile_id}: ~{var_mb:.1f} MB/var uncompressed "
-        f"({len(ZARR_VARS)} vars -> ~{var_mb * len(ZARR_VARS):.1f} MB total)")
+    var_mb = (n_steps or 0) * (n_lat or 0) * (n_lon or 0) * 4 / 1e6
+    log(f"  tile {tile_id} | years {span}: window {n_lat}x{n_lon} cells x "
+        f"{n_steps} hourly steps, ~{var_mb:.0f} MB/var "
+        f"(~{var_mb * len(ZARR_VARS):.0f} MB total)")
 
-    # --- daily metrics, computed one variable at a time so each fetch is
-    #     visible in the log AND each transfer stays small (a fat multi-var
-    #     .compute() is more likely to have its connection dropped mid-stream).
-    #     t2m is fetched once and reused for max + min.
-    log(f"  tile {tile_id}: starting compute — 4 fetches (t2m, tp, u10, v10)")
+    if not n_steps:
+        log(f"  tile {tile_id} | years {span}: no steps in range — skipping")
+        return {}
+
+    # --- fetch the 4 vars concurrently ---------------------------------------
+    log(f"  tile {tile_id} | years {span}: fetching {len(ZARR_VARS)} vars "
+        f"({var_workers} concurrent)")
     c0 = time.time()
+    raw: dict[str, object] = {}
+    with ThreadPoolExecutor(max_workers=var_workers) as ex:
+        futs = {ex.submit(_compute_step, f"{v} hourly", sub[v]): v
+                for v in ZARR_VARS}
+        for fut in as_completed(futs):
+            raw[futs[fut]] = fut.result()  # re-raises on permanent failure
 
-    t2m_hourly = _compute_step("t2m hourly", sub["t2m"])
-    t2m_daily = t2m_hourly.resample({time_name: "1D"})
+    # --- daily metrics -------------------------------------------------------
+    t2m_daily = raw["t2m"].resample({time_name: "1D"})
     t2m_max = t2m_daily.max()
     t2m_min = t2m_daily.min()
 
-    # --- precipitation: tp is ACCUMULATED, not per-hour --------------------
-    # ERA5-Land tp accumulates over a forecast run that resets at 01:00 UTC, so
-    # the value at a day's 00:00 step is that day's COMPLETE total. Verified
-    # against the raw hourly dump: a naive resample().sum() over-counts ~20x.
-    # Daily total for day D = tp at (D+1) 00:00. We pick every 00:00 step and
-    # shift its timestamp back one day so it lands on the day it summarises.
-    #
-    # Within a single year's fetch the 00:00 steps run Jan 1 .. Dec 31, so
-    # after the -1 day shift the tp series covers Dec 31 (year-1) .. Dec 30
-    # (year). We keep the Dec-31-(year-1) value — it's real data, and the
-    # per-cell CSV merges by date so it fills the gap year-1's own run left.
-    # Only Dec 31 (year) is absent here; that year's successor run supplies it.
-    tp_hourly = _compute_step("tp hourly", sub["tp"])
-    tp_midnight = tp_hourly.sel(
-        {time_name: tp_hourly[time_name].dt.hour == 0}
-    )
+    # tp is ACCUMULATED (resets 01:00 UTC); the value at a day's 00:00 step is
+    # that day's COMPLETE total. Daily total for day D = tp at (D+1) 00:00, so we
+    # pick every 00:00 step and shift its timestamp back one day.
+    tp_hourly = raw["tp"]
+    tp_midnight = tp_hourly.sel({time_name: tp_hourly[time_name].dt.hour == 0})
     tp_sum = tp_midnight.assign_coords({
         time_name: tp_midnight[time_name] - np.timedelta64(1, "D")
     })
 
-    # wind: u10 and v10 fetched SEPARATELY (smaller transfers = fewer dropped
-    # connections), then hourly speed sqrt(u^2+v^2), then daily max.
-    u10_hourly = _compute_step("u10 hourly", sub["u10"])
-    v10_hourly = _compute_step("v10 hourly", sub["v10"])
-    wind_hourly = np.sqrt(u10_hourly ** 2 + v10_hourly ** 2)
+    # wind: hourly speed sqrt(u^2+v^2) then daily max (must be hourly-then-max:
+    # mean(speed) != speed(mean)).
+    wind_hourly = np.sqrt(raw["u10"] ** 2 + raw["v10"] ** 2)
     wind_max = wind_hourly.resample({time_name: "1D"}).max()
 
-    log(f"  tile {tile_id}: all chunks fetched + aggregated in "
+    log(f"  tile {tile_id} | years {span}: all vars fetched + aggregated in "
         f"{fmt_dur(time.time() - c0)}")
 
     dates = pd.to_datetime(t2m_max[time_name].values).date
-    log(f"  tile {tile_id}: {len(dates)} daily values; reading out {len(tile_cells)} cells")
-
-    # tp's daily axis is shifted -1 day vs the t2m/wind axis, so it covers
-    # Dec 31 (year-1) .. Dec 30 (year). Join on date — never positionally — so
-    # each tp value lands on the day it belongs to and the axis offset (and
-    # the missing Dec-31-(year) row) are handled by the merge, not by luck.
     tp_dates = pd.to_datetime(tp_sum[time_name].values).date
+    log(f"  tile {tile_id} | years {span}: {len(dates)} daily values; "
+        f"reading out {len(tile_cells)} cells")
 
     frames: dict[tuple[float, float], pd.DataFrame] = {}
     for c, slon in zip(tile_cells, sel_lons):
         sel = {lat_name: c["lat"], lon_name: float(slon)}
         temp_wind = pd.DataFrame({
             "date": dates,
-            "tmax_C": np.round(
-                t2m_max.sel(sel, method="nearest").values - 273.15, 3),
-            "tmin_C": np.round(
-                t2m_min.sel(sel, method="nearest").values - 273.15, 3),
-            "wind_max_ms": np.round(
-                wind_max.sel(sel, method="nearest").values, 3),
+            "tmax_C": np.round(t2m_max.sel(sel, method="nearest").values - 273.15, 3),
+            "tmin_C": np.round(t2m_min.sel(sel, method="nearest").values - 273.15, 3),
+            "wind_max_ms": np.round(wind_max.sel(sel, method="nearest").values, 3),
         })
         precip = pd.DataFrame({
             "date": tp_dates,
-            "precip_mm": np.round(
-                tp_sum.sel(sel, method="nearest").values * 1000.0, 3),
+            "precip_mm": np.round(tp_sum.sel(sel, method="nearest").values * 1000.0, 3),
         })
-        # outer join: keeps Dec-31-(year-1) precip (no temp/wind that day) and
-        # Dec-31-(year) temp/wind (no precip until next year's run).
         frame = temp_wind.merge(precip, on="date", how="outer").sort_values("date")
-        # Key by the cell's own snapped 0.1deg centre (from cells.csv), not the
-        # store's float lat/lon — keeps the archive filename on the clean grid.
         frames[(c["lat"], c["lon"])] = frame[
             ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
         ]
@@ -316,59 +351,87 @@ def process_tile(
 
 
 def archive_name(lat: float, lon: float) -> str:
-    """v2 archive filename for a snapped 0.1deg cell centre.
-
-    Cells.csv already stores lat/lon on the 0.1deg grid, so one decimal place
-    reproduces them exactly (e.g. 34.0, -118.3). Matches the
-    archive_{lat}_{lon}.csv.gz convention in ARCHITECTURE.md.
-    """
+    """v2 archive filename for a snapped 0.1deg cell centre."""
     return f"archive_{lat:.1f}_{lon:.1f}.csv.gz"
+
+
+# Writes share OUT_DIR across tile threads; serialise the read-merge-write so two
+# threads never clobber the same (or a freshly created) archive.
+_WRITE_LOCK = threading.Lock()
 
 
 def write_archive(lat: float, lon: float, frame) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
-    Gzip + merge-by-date means re-running for an overlapping year range is
-    idempotent: existing dates are overwritten last-wins, new dates appended.
+    Merge-by-date makes re-running an overlapping span idempotent: existing dates
+    are overwritten last-wins, new dates appended.
     """
     import pandas as pd
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUT_DIR / archive_name(lat, lon)
-    if path.exists():
-        old = pd.read_csv(path, parse_dates=["date"])
-        old["date"] = old["date"].dt.date
-        merged = (
-            pd.concat([old, frame])
-            .drop_duplicates(subset="date", keep="last")
-            .sort_values("date")
-        )
-    else:
-        merged = frame.sort_values("date")
-    merged.to_csv(path, index=False, compression="gzip")
+    with _WRITE_LOCK:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        path = OUT_DIR / archive_name(lat, lon)
+        if path.exists():
+            old = pd.read_csv(path, parse_dates=["date"])
+            old["date"] = old["date"].dt.date
+            merged = (
+                pd.concat([old, frame])
+                .drop_duplicates(subset="date", keep="last")
+                .sort_values("date")
+            )
+        else:
+            merged = frame.sort_values("date")
+        merged.to_csv(path, index=False, compression="gzip")
     return path
+
+
+def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
+             var_workers, resume) -> int:
+    """Fetch all missing year-spans for one tile; return archives written."""
+    todo = missing_years(tile_cells, years, latest_year, resume)
+    if not todo:
+        log(f"tile {tile_id}: nothing missing — already complete, skipping")
+        return 0
+    spans = batches(todo, batch_years)
+    skipped = sorted(set(years) - set(todo))
+    log(f"tile {tile_id}: {len(todo)} years to fetch in {len(spans)} span(s)"
+        + (f"; resume skipped {len(skipped)} present year(s)" if skipped else ""))
+
+    written = 0
+    for (s, e) in spans:
+        frames = process_span(ds, tile_id, tile_cells, s, e, var_workers)
+        for (lat, lon), frame in frames.items():
+            write_archive(lat, lon, frame)
+            written += 1
+        span = f"{s}" if s == e else f"{s}-{e}"
+        log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives")
+    return written
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--tile",
-        help="tile_id(s), comma-separated (e.g. 9_5,8_37,5_5); default: all",
-    )
+    ap.add_argument("--tile", help="tile_id(s), comma-separated; default: all")
     ap.add_argument("--year", type=int, help="single year (shorthand)")
     ap.add_argument("--start-year", type=int, default=1950)
-    ap.add_argument(
-        "--end-year",
-        type=int,
-        default=datetime.now().year,
-        help="inclusive; default = current year. ERA5-Land lags ~6 days, so the "
-        "current year's tail is simply absent (the .sel returns fewer days).",
-    )
+    ap.add_argument("--end-year", type=int, default=datetime.now().year,
+                    help="inclusive; default = current year")
+    ap.add_argument("--batch-years", type=int, default=DEFAULT_BATCH_YEARS,
+                    help=f"max years per fetch (default {DEFAULT_BATCH_YEARS}); "
+                    "bigger = fewer calls but more memory")
+    ap.add_argument("--var-workers", type=int, default=4,
+                    help="concurrent variable fetches per span (default 4 = all)")
+    ap.add_argument("--parallel-tiles", type=int, default=1,
+                    help="tiles fetched concurrently (default 1); the store "
+                    "drops connections under load, so keep this small")
+    ap.add_argument("--no-resume", action="store_true",
+                    help="refetch everything, ignoring existing archives")
     args = ap.parse_args()
 
     if args.year is not None:
         args.start_year = args.end_year = args.year
     years = list(range(args.start_year, args.end_year + 1))
+    latest_year = args.end_year
+    resume = not args.no_resume
 
     cells = load_cells()
     by_tile = group_by_tile(cells)
@@ -383,10 +446,14 @@ def main() -> int:
         tiles = by_tile
 
     n_cells = sum(len(v) for v in tiles.values())
-    print(f"ERA5-Land cell download")
+    print("ERA5-Land cell download (v2: batched + parallel + resumable)")
     print(f"  store : {ZARR_URL}")
     print(f"  vars  : {ZARR_VARS}")
-    print(f"  scope : {len(tiles)} tile(s), {n_cells} cell(s), years {years}")
+    print(f"  scope : {len(tiles)} tile(s), {n_cells} cell(s), "
+          f"years {args.start_year}-{args.end_year}")
+    print(f"  batch : up to {args.batch_years} yr/fetch, {args.var_workers} "
+          f"var-workers, {args.parallel_tiles} parallel tile(s)")
+    print(f"  resume: {'on' if resume else 'OFF (full refetch)'}")
     print(f"  out   : {OUT_DIR}\n")
 
     log("opening zarr store...")
@@ -407,17 +474,23 @@ def main() -> int:
         return 1
 
     total_written = 0
-    for tile_id, tile_cells in tiles.items():
-        for year in years:
-            frames = process_tile(ds, tile_id, tile_cells, year)
-            for (lat, lon), frame in frames.items():
-                path = write_archive(lat, lon, frame)
-                total_written += 1
-            log(f"  tile {tile_id} year {year}: wrote {len(frames)} archives")
+    if args.parallel_tiles > 1:
+        with ThreadPoolExecutor(max_workers=args.parallel_tiles) as ex:
+            futs = {
+                ex.submit(run_tile, ds, t, c, years, latest_year,
+                          args.batch_years, args.var_workers, resume): t
+                for t, c in tiles.items()
+            }
+            for fut in as_completed(futs):
+                total_written += fut.result()
+    else:
+        for tile_id, tile_cells in tiles.items():
+            total_written += run_tile(
+                ds, tile_id, tile_cells, years, latest_year,
+                args.batch_years, args.var_workers, resume)
 
-    print(f"\nDone — {total_written} cell-year frames written to {OUT_DIR}")
+    print(f"\nDone — {total_written} cell-span frames written to {OUT_DIR}")
 
-    # Quick sanity print of the first cell of the first tile.
     first_tile = next(iter(tiles))
     sample = tiles[first_tile][0]
     sample_path = OUT_DIR / archive_name(sample["lat"], sample["lon"])
