@@ -60,6 +60,14 @@ ZARR_VARS = ["t2m", "tp", "u10", "v10"]
 # index, so one tile == one 64-cell block on each axis. Must match select_cells.
 TILE_CELLS = 64
 
+# Hourly steps per year (8760 h; leap years are ~0.03% more — ignore for an
+# estimate). One var's in-memory array over an N-year span is
+# HOURS_PER_YEAR * N * 64 * 64 * float32. Used only for the RAM warning.
+HOURS_PER_YEAR = 8760
+# Concurrent var fetches each hold their full hourly array at once; the daily
+# resample + sqrt(u^2+v^2) allocate transient copies on top. ~1.5x covers it.
+_RAM_OVERHEAD = 1.5
+
 # Generous per-request HTTP ceiling — a cold ~47 MB chunk can be slow.
 HTTP_TIMEOUT_S = 2400
 
@@ -84,6 +92,79 @@ def fmt_dur(seconds: float) -> str:
     """Human-friendly duration, e.g. '3m 12s'."""
     m, s = divmod(int(seconds), 60)
     return f"{m}m {s:02d}s" if m else f"{s}s"
+
+
+# ANSI colors for the RAM warning — disabled when stdout isn't a TTY (piping to
+# a log file) or NO_COLOR is set, so redirected logs stay plain text.
+def _colors_enabled() -> bool:
+    import os
+    import sys
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def _c(text: str, code: str) -> str:
+    """Wrap text in an ANSI SGR code if colors are enabled, else return as-is."""
+    return f"\033[{code}m{text}\033[0m" if _colors_enabled() else text
+
+
+def _available_ram_gb() -> float | None:
+    """Free RAM in GB, or None if it can't be determined on this platform.
+
+    Reads /proc/meminfo MemAvailable (Linux); falls back to psutil if present.
+    None means "couldn't tell" — we then warn unconditionally rather than guess.
+    """
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / 1e6  # kB -> GB
+    except OSError:
+        pass
+    try:
+        import psutil
+        return psutil.virtual_memory().available / 1e9
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int) -> None:
+    """Estimate peak RAM for the chosen settings and warn if it's tight.
+
+    Peak ≈ one var's hourly array (HOURS_PER_YEAR * batch_years * 64*64 * 4 B)
+    held once per concurrent var, times concurrent tiles, times overhead for the
+    transient resample/sqrt copies. Compared against MemAvailable so it's loud on
+    a small remote box, where an OOM would silently kill the run mid-fetch.
+    """
+    per_var_gb = HOURS_PER_YEAR * batch_years * TILE_CELLS * TILE_CELLS * 4 / 1e9
+    peak_gb = per_var_gb * var_workers * parallel_tiles * _RAM_OVERHEAD
+    avail = _available_ram_gb()
+
+    print(f"  RAM   : ~{peak_gb:.1f} GB peak estimate "
+          f"({per_var_gb:.1f} GB/var x {var_workers} var-workers "
+          f"x {parallel_tiles} tile(s) x {_RAM_OVERHEAD:g} overhead)")
+    if avail is None:
+        print(_c("  !! could not read available RAM — make sure the box has at "
+                 f"least ~{peak_gb:.0f} GB free, or lower --batch-years / "
+                 "--var-workers / --parallel-tiles.", "33"))  # yellow
+        return
+    if peak_gb > avail * 0.9:
+        print(f"          {_c(f'{avail:.1f} GB available now', '1;31')}")  # bold red
+        # halve batch-years until the estimate fits, as a concrete suggestion
+        suggest = batch_years
+        while suggest > 1 and (peak_gb * suggest / batch_years) > avail * 0.9:
+            suggest //= 2
+        bar = _c("  " + "!" * 60, "1;31")
+        print(bar)
+        print(_c("  !! WARNING: peak RAM estimate is close to or exceeds "
+                 "available RAM —", "1;31"))
+        print(_c("  !!          the run may be OOM-killed mid-fetch.", "1;31"))
+        print(_c("  !! Try --batch-years {}".format(max(1, suggest))
+                 + (" and/or --var-workers 1" if var_workers > 1 else "")
+                 + (" and/or --parallel-tiles 1" if parallel_tiles > 1 else "")
+                 + ".", "1;31"))
+        print(bar)
+    else:
+        print(f"          {_c(f'{avail:.1f} GB available now — OK', '32')}")  # green
 
 
 # Transient network errors worth retrying — EarthDataHub object storage
@@ -454,7 +535,9 @@ def main() -> int:
     print(f"  batch : up to {args.batch_years} yr/fetch, {args.var_workers} "
           f"var-workers, {args.parallel_tiles} parallel tile(s)")
     print(f"  resume: {'on' if resume else 'OFF (full refetch)'}")
-    print(f"  out   : {OUT_DIR}\n")
+    print(f"  out   : {OUT_DIR}")
+    warn_ram(args.batch_years, args.var_workers, args.parallel_tiles)
+    print()
 
     log("opening zarr store...")
     try:
