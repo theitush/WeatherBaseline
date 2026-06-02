@@ -33,6 +33,14 @@ const formatDate = (d: Date): string => {
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 };
 
+// Unit suffix appended to record-scale values, per metric.
+const METRIC_UNITS: Record<MetricKey, string> = {
+  max_temperature: '°',
+  min_temperature: '°',
+  precipitation_sum: 'mm',
+  wind_speed_10m_max: 'm/s',
+};
+
 const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   context,
   currentTemp,
@@ -42,6 +50,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   if (!context || currentTemp === null) {
     return null;
   }
+
+  const unit = METRIC_UNITS[currentMetric];
+  // Temperature degrees read "12.3°"; other metrics read "12.3 mm".
+  const fmt = (v: number) => (unit === '°' ? `${v.toFixed(1)}°` : `${v.toFixed(1)} ${unit}`);
 
   const valid = filteredData.filter((d) => {
     const v = d[currentMetric];
@@ -84,7 +96,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         {binnedPct !== null && recordLow !== null && recordHigh !== null ? (
           <div className="record-scale" aria-label="Temperature vs records">
             <div className="record-scale-label record-scale-low">
-              <span className="record-scale-temp">{recordLow.toFixed(1)}°</span>
+              <span className="record-scale-temp">{fmt(recordLow)}</span>
               <span className="record-scale-name">record low</span>
               {recordLowDate && (
                 <span className="record-scale-date">{formatDate(recordLowDate)}</span>
@@ -100,7 +112,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
                   className="record-scale-marker-value"
                   style={{ color: markerColor }}
                 >
-                  {currentTemp.toFixed(1)}°
+                  {fmt(currentTemp)}
                 </span>
                 <span
                   className="record-scale-marker-tick"
@@ -109,7 +121,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
               </div>
             </div>
             <div className="record-scale-label record-scale-high">
-              <span className="record-scale-temp">{recordHigh.toFixed(1)}°</span>
+              <span className="record-scale-temp">{fmt(recordHigh)}</span>
               <span className="record-scale-name">record high</span>
               {recordHighDate && (
                 <span className="record-scale-date">{formatDate(recordHighDate)}</span>
@@ -117,7 +129,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
             </div>
           </div>
         ) : (
-          <div className="temp-value">{currentTemp.toFixed(1)}°C</div>
+          <div className="temp-value">{fmt(currentTemp)}</div>
         )}
       </div>
     </div>

@@ -124,7 +124,7 @@ const MainChart: React.FC<MainChartProps> = ({
       max_temperature: 'Max Apparent Temp (°C)',
       min_temperature: 'Min Apparent Temp (°C)',
       precipitation_sum: 'Precipitation (mm)',
-      wind_speed_10m_max: 'Max Wind Speed (km/h)',
+      wind_speed_10m_max: 'Max Wind Speed (m/s)',
     };
     if (isVertical) {
       g.append('text')
@@ -237,7 +237,7 @@ const MainChart: React.FC<MainChartProps> = ({
       max_temperature: '°C',
       min_temperature: '°C',
       precipitation_sum: 'mm',
-      wind_speed_10m_max: 'km/h',
+      wind_speed_10m_max: 'm/s',
     };
     const pointLabels: Record<MetricKey, string> = {
       max_temperature: 'Max Apparent Temp',
