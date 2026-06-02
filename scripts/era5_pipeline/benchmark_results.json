@@ -1,0 +1,26 @@
+{
+  "year": 2020,
+  "max_concurrent": 2,
+  "strategies": {
+    "B": {
+      "name": "global",
+      "n_requests": 1,
+      "wall_s": 12235.98831152916,
+      "total_mb": 1461.240371,
+      "n_ok": 1,
+      "records": [
+        {
+          "label": "B_global_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": null,
+          "ok": true,
+          "size_mb": 1461.240371,
+          "queue_to_running_s": 143.72906684875488,
+          "running_to_done_s": 11408.468628168106,
+          "error": null
+        }
+      ]
+    }
+  }
+}

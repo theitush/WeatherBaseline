@@ -1,0 +1,136 @@
+{
+  "year": 2020,
+  "max_concurrent": 2,
+  "strategies": {
+    "A": {
+      "name": "per_city",
+      "n_requests": 3,
+      "wall_s": 2409.370758295059,
+      "total_mb": 0.29041,
+      "n_ok": 3,
+      "records": [
+        {
+          "label": "A_New_York_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            41.21,
+            -74.51,
+            40.21,
+            -73.51
+          ],
+          "ok": true,
+          "size_mb": 0.096636,
+          "queue_to_running_s": null,
+          "running_to_done_s": null,
+          "error": null
+        },
+        {
+          "label": "A_London_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            52.02,
+            -0.59,
+            51.02,
+            0.41000000000000003
+          ],
+          "ok": true,
+          "size_mb": 0.094887,
+          "queue_to_running_s": 33.59974408149719,
+          "running_to_done_s": 2361.5966761112213,
+          "error": null
+        },
+        {
+          "label": "A_Tokyo_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            36.18,
+            139.19,
+            35.18,
+            140.19
+          ],
+          "ok": true,
+          "size_mb": 0.098887,
+          "queue_to_running_s": 462.1760847568512,
+          "running_to_done_s": 1518.2964091300964,
+          "error": null
+        }
+      ]
+    },
+    "C": {
+      "name": "regional",
+      "n_requests": 4,
+      "wall_s": 4878.766999959946,
+      "total_mb": 196.525545,
+      "n_ok": 4,
+      "records": [
+        {
+          "label": "C_region0_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            50,
+            -130,
+            30,
+            -110
+          ],
+          "ok": true,
+          "size_mb": 19.267878,
+          "queue_to_running_s": 25.545949459075928,
+          "running_to_done_s": 1033.460242509842,
+          "error": null
+        },
+        {
+          "label": "C_region1_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            50,
+            -80,
+            30,
+            -70
+          ],
+          "ok": true,
+          "size_mb": 8.392641,
+          "queue_to_running_s": 1073.4401874542236,
+          "running_to_done_s": 893.2681012153625,
+          "error": null
+        },
+        {
+          "label": "C_region2_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            60,
+            -5,
+            25,
+            50
+          ],
+          "ok": true,
+          "size_mb": 110.602469,
+          "queue_to_running_s": 1976.3975462913513,
+          "running_to_done_s": 1202.9279391765594,
+          "error": null
+        },
+        {
+          "label": "C_region3_tmin",
+          "year": 2020,
+          "target": "tmin",
+          "area": [
+            40,
+            95,
+            10,
+            145
+          ],
+          "ok": true,
+          "size_mb": 58.262557,
+          "queue_to_running_s": 3216.2567706108093,
+          "running_to_done_s": 1165.9490773677826,
+          "error": null
+        }
+      ]
+    }
+  }
+}

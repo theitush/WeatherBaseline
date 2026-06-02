@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "year": 2020,
+  "n_cities": 3,
+  "zarr_url": "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr",
+  "var": "t2m",
+  "method": "hourly t2m -> resample(D) min/max",
+  "timings_s": {
+    "open": 5.888,
+    "select": 0.023,
+    "compute": 69.875,
+    "save": 0.008,
+    "total": 75.794
+  },
+  "error": null,
+  "peak_mem_mb": 242.1,
+  "per_city_s": {
+    "New York": 24.79,
+    "London": 24.06,
+    "Tokyo": 20.88
+  },
+  "n_days": 366,
+  "payload_mb_est": 0.0176,
+  "save_error": "ImportError: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.\nA suitable version of pyarrow or fastparquet is required for parquet support.\nTrying to import the above resulted in these errors:\n - `Import pyarrow` failed. pyarrow is required for parquet support. Use pip or conda to install the pyarrow package.\n - `Import fastparquet` failed. fastparquet is required for parquet support. Use pip or conda to install the fastparquet package.",
+  "sample": {
+    "New York": {
+      "all_nan": true,
+      "nan_days": 366
+    },
+    "London": {
+      "all_nan": true,
+      "nan_days": 366
+    },
+    "Tokyo": {
+      "all_nan": false,
+      "tmin_lo_C": -3.47,
+      "tmax_hi_C": 33.7,
+      "mean_tmin_C": 12.42,
+      "mean_tmax_C": 19.09,
+      "tmin_le_tmax": true,
+      "nan_days": 0
+    }
+  },
+  "wall_s": 75.841
+}
