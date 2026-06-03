@@ -326,6 +326,13 @@ export function generateTemperatureContext(
     description: '',
   };
 
+  // A bone-dry day (0mm) can't get any drier — say so plainly.
+  if (currentMetric === 'precipitation_sum' && currentTemp === 0) {
+    context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
+    context.description = 'As dry as it gets!';
+    return context;
+  }
+
   if (percentileFromBottom <= 5) {
     // Bottom 5% - extreme low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
