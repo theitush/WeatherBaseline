@@ -1,4 +1,5 @@
 .histogram-chart-wrapper {
+  position: relative;
   display: inline-block;
 }
 
@@ -14,6 +15,7 @@
 
 .histogram-chart-svg .bar {
   opacity: 0.8;
+  cursor: crosshair;
 }
 
 .histogram-chart-svg {

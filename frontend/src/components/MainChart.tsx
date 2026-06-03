@@ -318,6 +318,30 @@ const MainChart: React.FC<MainChartProps> = ({
 
     dotSelection.transition().duration(500).style('opacity', 1);
 
+    // Invisible larger hit-targets so the hover doesn't require pixel-perfect aim
+    // on the 2px dots. Appended before the record stars / current-date marker so
+    // those stay on top and keep their own (more specific) tooltips.
+    g.selectAll('.data-point-hit')
+      .data(filteredData.filter((d) => d[currentMetric] !== undefined))
+      .enter()
+      .append('circle')
+      .attr('class', 'data-point-hit')
+      .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
+      .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
+      .attr('r', 6)
+      .attr('fill', 'transparent')
+      .style('cursor', 'crosshair')
+      .on('mouseover', (event, d) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
+          )
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
+      })
+      .on('mouseout', () => tooltip.style('opacity', 0));
+
     // Record high (red) and record low (blue) markers — slightly larger than the target-date dot.
     const valid = filteredData.filter((d) => {
       const v = d[currentMetric];
@@ -373,18 +397,6 @@ const MainChart: React.FC<MainChartProps> = ({
         .duration(500)
         .style('opacity', 1);
     }
-
-    dotSelection
-      .on('mouseover', (event, d) => {
-        tooltip
-          .style('opacity', 1)
-          .html(
-            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
-          )
-          .style('left', event.clientX + 12 + 'px')
-          .style('top', event.clientY - 28 + 'px');
-      })
-      .on('mouseout', () => tooltip.style('opacity', 0));
 
     // Current date indicator
     const targetDate = new Date(currentDate + 'T12:00:00');

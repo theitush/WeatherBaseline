@@ -32,6 +32,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   height: propHeight,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -50,6 +51,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const g = svg
       .append('g')
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+
+    const tooltip = d3.select(tooltipRef.current);
 
     const values = filteredData
       .map((d) => d[currentMetric])
@@ -83,20 +86,38 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .domain([0, d3.max(bins, (d) => d.length) as number])
       .range([0, isVertical ? height : width]);
 
-    // Bars (animate count dimension from 0 on enter)
+    const units: Record<MetricKey, string> = {
+      max_temperature: '°C',
+      min_temperature: '°C',
+      precipitation_sum: 'mm',
+      wind_speed_10m_max: 'm/s',
+    };
+
+    // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
+    // axis leaves thin white separators between bins, matching the period hists.
     const barSel = g.selectAll('.bar')
       .data(bins)
       .enter()
       .append('rect')
       .attr('class', 'bar')
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
+      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'))
+      .on('mouseover', (event, d) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
+          )
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
+      })
+      .on('mouseout', () => tooltip.style('opacity', 0));
 
     if (isVertical) {
       // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
       barSel
-        .attr('x', (d) => tempScale(d.x0 as number))
+        .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
         .attr('y', height)
-        .attr('width', (d) => tempScale(d.x1 as number) - tempScale(d.x0 as number))
+        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
         .attr('height', 0)
         .transition()
         .duration(500)
@@ -105,9 +126,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     } else {
       barSel
         .attr('x', 0)
-        .attr('y', (d) => tempScale(d.x1 as number))
+        .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
         .attr('width', 0)
-        .attr('height', (d) => tempScale(d.x0 as number) - tempScale(d.x1 as number))
+        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1))
         .transition()
         .duration(500)
         .attr('width', (d) => countLen(d.length));
@@ -295,6 +316,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         height={TOTAL_HEIGHT}
         className="histogram-chart-svg"
       />
+      <div ref={tooltipRef} className="chart-tooltip" />
     </div>
   );
 };
