@@ -128,7 +128,7 @@ const AppContent: React.FC = () => {
               <div className="charts-controls">
               </div>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
-              {isMobile && <Legend metric={currentMetric} />}
+              <Legend metric={currentMetric} />
               <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
                 {isMobile ? (
                   <>

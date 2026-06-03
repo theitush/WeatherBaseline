@@ -121,8 +121,8 @@ const MainChart: React.FC<MainChartProps> = ({
 
     // Axis label (the temp axis)
     const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Apparent Temp (°C)',
-      min_temperature: 'Min Apparent Temp (°C)',
+      max_temperature: 'Max Temp (°C)',
+      min_temperature: 'Min Temp (°C)',
       precipitation_sum: 'Precipitation (mm)',
       wind_speed_10m_max: 'Max Wind Speed (m/s)',
     };
@@ -240,8 +240,8 @@ const MainChart: React.FC<MainChartProps> = ({
       wind_speed_10m_max: 'm/s',
     };
     const pointLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Apparent Temp',
-      min_temperature: 'Min Apparent Temp',
+      max_temperature: 'Max Temp',
+      min_temperature: 'Min Temp',
       precipitation_sum: 'Precipitation',
       wind_speed_10m_max: 'Max Wind Speed',
     };

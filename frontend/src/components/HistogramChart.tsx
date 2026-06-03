@@ -3,7 +3,6 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
-import { getLegendData, drawLegendSwatch } from './Legend';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -283,21 +282,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       }
     }
 
-    // Desktop-only in-SVG legend; mobile renders an HTML legend above the charts (see App.tsx).
-    if (!isVertical) {
-      const legend = g.append('g').attr('class', 'legend')
-        .attr('transform', `translate(${width - 110}, 0)`);
-      getLegendData(currentMetric).forEach((item, i) => {
-        const row = legend.append('g').attr('transform', `translate(0, ${i * 16 + 7})`);
-        drawLegendSwatch(row, item);
-        row.append('text').attr('x', 18).attr('y', 0).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
-      });
-      const lbox = (legend.node() as SVGGElement).getBBox();
-      legend.insert('rect', ':first-child')
-        .attr('x', lbox.x - 4).attr('y', lbox.y - 4)
-        .attr('width', lbox.width + 8).attr('height', lbox.height + 8)
-        .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
-    }
+    // Legend is rendered as an HTML element above the charts for both
+    // mobile and desktop (see App.tsx).
 
   }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical]);
 
