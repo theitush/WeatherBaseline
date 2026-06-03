@@ -65,11 +65,15 @@ export interface ApiForecastResponse {
   };
 }
 
-export interface NominatimResult {
+/**
+ * A geocoder hit, normalized to the shape LocationSelector consumes. We geocode
+ * via Photon (komoot), whose GeoJSON we flatten into this in searchCities.
+ * `display_name` is "Primary, detail, Country"; `type` is Photon's osm_value
+ * (city/town/village/...) so the existing place-type filter still works.
+ */
+export interface GeocodeResult {
   display_name: string;
   lat: string;
   lon: string;
-  name?: string;
   type: string;
-  importance: number;
 }

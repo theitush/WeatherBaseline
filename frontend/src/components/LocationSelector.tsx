@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { searchCities } from '../services/api';
 import { loadCells, snapToNearestCell, type SnappedCell } from '../services/cellIndex';
-import type { NominatimResult } from '../types';
+import type { GeocodeResult } from '../types';
 import './LocationSelector.css';
 
 interface LocationSelectorProps {
@@ -13,9 +13,24 @@ interface LocationSelectorProps {
 
 /** A geocoder result paired with the curated cell it snaps to. */
 interface Suggestion {
-  place: NominatimResult;
+  place: GeocodeResult;
   snapped: SnappedCell;
 }
+
+/**
+ * Photon osm_value's we treat as "a place you'd search weather for". Covers
+ * populated places (city→hamlet) and admin-area centroids; filters out streets,
+ * POIs, shops, etc. that Photon also returns.
+ */
+const PLACE_TYPES = new Set([
+  'city',
+  'town',
+  'village',
+  'hamlet',
+  'municipality',
+  'administrative',
+  'suburb',
+]);
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({
   cityName,
@@ -28,6 +43,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchTimeout = useRef<number | null>(null);
+  const searchAbort = useRef<AbortController | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,19 +65,21 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
 
     searchTimeout.current = setTimeout(async () => {
+      // Cancel any still-in-flight geocode so its late response can't clobber
+      // results for the query the user is actually on now.
+      searchAbort.current?.abort();
+      const controller = new AbortController();
+      searchAbort.current = controller;
+
       // Geocode anywhere, then snap each hit to the nearest cell we can serve.
-      const [results, cells] = await Promise.all([searchCities(value), loadCells()]);
+      const [results, cells] = await Promise.all([
+        searchCities(value, controller.signal),
+        loadCells(),
+      ]);
+      if (controller.signal.aborted) return; // superseded by a newer keystroke
       const matched: Suggestion[] = [];
       for (const place of results) {
-        const type = place.type;
-        if (
-          type !== 'city' &&
-          type !== 'town' &&
-          type !== 'village' &&
-          type !== 'administrative'
-        ) {
-          continue;
-        }
+        if (!PLACE_TYPES.has(place.type)) continue;
         const snapped = snapToNearestCell(parseFloat(place.lat), parseFloat(place.lon), cells);
         if (snapped) matched.push({ place, snapped });
         if (matched.length === 6) break;

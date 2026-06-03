@@ -1,7 +1,7 @@
 // API service. Weather data now comes from the v2 tiered cell files (see
 // tieredData.ts); only city search still hits a live API here.
 import { loadCellTimeline } from './tieredData';
-import type { WeatherDataPoint, NominatimResult } from '../types';
+import type { WeatherDataPoint, GeocodeResult } from '../types';
 
 /**
  * Format date to YYYY-MM-DD string
@@ -67,37 +67,72 @@ export async function getTemperatureHistory(
   return timeline.filter((d) => withinSeasonalWindow(d.date, targetDt, daysRange));
 }
 
+/** Photon GeoJSON feature — only the fields we actually read. */
+interface PhotonFeature {
+  geometry: { coordinates: [number, number] }; // [lon, lat]
+  properties: {
+    name?: string;
+    city?: string;
+    state?: string;
+    county?: string;
+    country?: string;
+    osm_key?: string;
+    osm_value?: string;
+  };
+}
+
 /**
- * Search for cities using Nominatim geocoding API
+ * Build "Primary, detail, Country" from Photon's structured fields. Photon
+ * gives us clean components instead of Nominatim's verbose display_name, so we
+ * assemble a tidy label and de-dupe parts that repeat (e.g. name === city).
  */
-export async function searchCities(query: string): Promise<NominatimResult[]> {
+function photonDisplayName(p: PhotonFeature['properties']): string {
+  const parts = [p.name, p.city, p.county, p.state, p.country]
+    .filter((v): v is string => Boolean(v))
+    .filter((v, i, arr) => arr.indexOf(v) === i); // drop dupes, keep order
+  return parts.join(', ');
+}
+
+/**
+ * Search for places using Photon (komoot) — an autocomplete-oriented geocoder.
+ * Returns results normalized to GeocodeResult. Pass an AbortSignal so the caller
+ * can cancel a stale in-flight request when the query changes; an abort resolves
+ * to [] rather than throwing.
+ */
+export async function searchCities(
+  query: string,
+  signal?: AbortSignal
+): Promise<GeocodeResult[]> {
   if (!query || query.trim().length < 2) {
     return [];
   }
 
   const params = new URLSearchParams({
     q: query,
-    format: 'json',
-    limit: '6',
-    addressdetails: '1',
+    limit: '10', // we filter by place type client-side, so over-fetch a bit
   });
 
-  const url = `https://nominatim.openstreetmap.org/search?${params}`;
+  const url = `https://photon.komoot.io/api?${params}`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'HowHotWasIt Weather App',
-      },
-    });
+    const response = await fetch(url, { signal });
 
     if (!response.ok) {
       throw new Error(`Geocoding failed: ${response.status}`);
     }
 
-    const results: NominatimResult[] = await response.json();
-    return results;
+    const data: { features?: PhotonFeature[] } = await response.json();
+    return (data.features ?? []).map((f) => ({
+      display_name: photonDisplayName(f.properties),
+      lat: String(f.geometry.coordinates[1]),
+      lon: String(f.geometry.coordinates[0]),
+      type: f.properties.osm_value ?? '',
+    }));
   } catch (error) {
+    // A cancelled request is expected churn, not a failure — stay quiet.
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return [];
+    }
     console.error('Error searching cities:', error);
     return [];
   }
