@@ -1,6 +1,6 @@
 """Download ERA5-Land daily metrics for selected cells — batched, parallel, resumable.
 
-Batched, parallel, resumable. Inputs (data/era5/cells.csv) and outputs
+Batched, parallel, resumable. Inputs (data/cells.csv) and outputs
 (data/era5-land/archive/archive_{lat}_{lon}.csv.gz, schema
 date,tmax_C,tmin_C,precip_mm,wind_max_ms) are unchanged; archives merge by date.
 Design notes:
@@ -46,7 +46,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-CELLS_CSV = REPO / "data" / "era5" / "cells.csv"
+CELLS_CSV = REPO / "data" / "cells.csv"
 OUT_DIR = REPO / "data" / "era5-land" / "archive"
 
 # Hourly ERA5-Land ARCO zarr store on EarthDataHub.

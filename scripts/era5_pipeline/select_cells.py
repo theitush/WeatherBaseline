@@ -24,9 +24,9 @@ What it does
 
 Output
 ------
-  data/era5/cells.csv     -- the selection: columns
+  data/cells.csv          -- the selection: columns
                              cell_id,lat,lon,population,tile_id,tile_lat,tile_lon
-  data/era5/pop_grid.npz  -- cached aggregated population grid (the slow part).
+  data/era5-land/pop_grid.npz  -- cached aggregated population grid (the slow part).
                              Reused on re-runs so a different --top-n is instant;
                              pass --refresh to recompute it. Keyed by raster
                              name so a new GHS-POP file is not silently reused.
@@ -63,8 +63,8 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE.parents[1] / "data" / "era5"
-OUT = DATA / "cells.csv"
+DATA = HERE.parents[1] / "data" / "era5-land"
+OUT = HERE.parents[1] / "data" / "cells.csv"
 # Cached aggregated population grid. Computing it means reading a multi-GB
 # GHS-POP raster and scatter-adding ~1e9 pixels -- slow. Cache it so re-running
 # with a different --top-n is instant. Keyed by raster name+epoch so a

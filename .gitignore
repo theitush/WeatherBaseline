@@ -26,8 +26,5 @@ __pycache__/
 /*.png
 
 # ERA5 data outputs (large, regenerable from the pipeline)
-/data/era5/archive/
-/data/era5/cell_daily/
-/data/era5/cities.csv
-/data/era5/pop_grid.npz
+/data/era5_deprecated/
 /data/era5-land/
