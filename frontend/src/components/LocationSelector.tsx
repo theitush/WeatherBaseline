@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { searchCities } from '../services/api';
+import { loadCells, snapToNearestCell, type SnappedCell } from '../services/cellIndex';
 import type { NominatimResult } from '../types';
 import './LocationSelector.css';
 
@@ -10,6 +11,12 @@ interface LocationSelectorProps {
   onChange: (name: string, lat: number, lon: number) => void;
 }
 
+/** A geocoder result paired with the curated cell it snaps to. */
+interface Suggestion {
+  place: NominatimResult;
+  snapped: SnappedCell;
+}
+
 const LocationSelector: React.FC<LocationSelectorProps> = ({
   cityName,
   latitude,
@@ -17,7 +24,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   onChange,
 }) => {
   const [cityInput, setCityInput] = useState(cityName);
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchTimeout = useRef<number | null>(null);
@@ -42,31 +49,39 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
 
     searchTimeout.current = setTimeout(async () => {
-      const results = await searchCities(value);
-      const cities = results.filter((result) => {
-        const type = result.type;
-        return (
-          type === 'city' ||
-          type === 'town' ||
-          type === 'village' ||
-          type === 'administrative'
-        );
-      });
-      setSuggestions(cities.slice(0, 6));
-      setShowSuggestions(cities.length > 0);
+      // Geocode anywhere, then snap each hit to the nearest cell we can serve.
+      const [results, cells] = await Promise.all([searchCities(value), loadCells()]);
+      const matched: Suggestion[] = [];
+      for (const place of results) {
+        const type = place.type;
+        if (
+          type !== 'city' &&
+          type !== 'town' &&
+          type !== 'village' &&
+          type !== 'administrative'
+        ) {
+          continue;
+        }
+        const snapped = snapToNearestCell(parseFloat(place.lat), parseFloat(place.lon), cells);
+        if (snapped) matched.push({ place, snapped });
+        if (matched.length === 6) break;
+      }
+      setSuggestions(matched);
+      setShowSuggestions(matched.length > 0);
     }, 300);
   };
 
-  const selectCity = (city: NominatimResult) => {
-    const lat = parseFloat(city.lat);
-    const lon = parseFloat(city.lon);
+  const selectSuggestion = (suggestion: Suggestion) => {
+    const { place, snapped } = suggestion;
 
-    setCityInput(city.display_name);
+    setCityInput(place.display_name);
     setShowSuggestions(false);
     setSuggestions([]);
     setSelectedIndex(-1);
 
-    onChange(city.display_name, lat, lon);
+    // Emit the snapped CELL's coords (not the typed point) so loadCellTimeline
+    // hits a built archive. The name stays the human-searched place.
+    onChange(place.display_name, snapped.cell.lat, snapped.cell.lon);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -81,7 +96,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (selectedIndex >= 0) {
-        selectCity(suggestions[selectedIndex]);
+        selectSuggestion(suggestions[selectedIndex]);
       }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
@@ -115,10 +130,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         />
         {showSuggestions && suggestions.length > 0 && (
           <div className="city-suggestions">
-            {suggestions.map((city, index) => {
-              const name = city.display_name.split(',')[0];
-              const country = city.display_name.split(',').slice(-1)[0].trim();
-              const details = city.display_name
+            {suggestions.map((suggestion, index) => {
+              const { place, snapped } = suggestion;
+              const name = place.display_name.split(',')[0];
+              const country = place.display_name.split(',').slice(-1)[0].trim();
+              const details = place.display_name
                 .replace(name + ', ', '')
                 .replace(', ' + country, '');
 
@@ -126,12 +142,16 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                 <div
                   key={index}
                   className={`city-suggestion ${index === selectedIndex ? 'selected' : ''}`}
-                  onClick={() => selectCity(city)}
+                  onClick={() => selectSuggestion(suggestion)}
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
                   <div className="city-name">{name}</div>
                   <div className="city-details">
                     {details}, {country}
+                  </div>
+                  <div className="city-snap">
+                    <span className="city-snap-arrow">↳</span> nearest data point{' '}
+                    <span className="city-snap-dist">· {formatKm(snapped.distanceKm)}</span>
                   </div>
                 </div>
               );
@@ -142,5 +162,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     </div>
   );
 };
+
+/** Distance read-out: whole km, or "<1 km" when the cell is essentially on top. */
+function formatKm(km: number): string {
+  if (km < 1) return '<1 km away';
+  return `${Math.round(km)} km away`;
+}
 
 export default LocationSelector;

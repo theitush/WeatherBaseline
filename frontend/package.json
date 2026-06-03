@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync-cells": "node scripts/sync-cells.mjs",
+    "predev": "npm run sync-cells",
     "dev": "vite",
+    "prebuild": "npm run sync-cells",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
