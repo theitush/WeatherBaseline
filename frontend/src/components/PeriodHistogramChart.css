@@ -1,0 +1,31 @@
+.period-histogram-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.period-histogram-svg {
+  overflow: visible;
+}
+
+.period-histogram-svg .axis text {
+  font-size: 11px;
+  fill: #555;
+}
+
+.period-histogram-svg .axis line,
+.period-histogram-svg .axis path {
+  stroke: #aaa;
+}
+
+.period-histogram-svg .panel-baseline {
+  stroke: #ddd;
+  stroke-width: 1;
+}
+
+.period-histogram-svg .period-bar {
+  cursor: crosshair;
+}
+
+.period-histogram-svg .period-median {
+  cursor: pointer;
+}

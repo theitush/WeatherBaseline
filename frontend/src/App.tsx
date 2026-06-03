@@ -7,6 +7,7 @@ import TemperatureContextDisplay from './components/TemperatureContext';
 import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
+import PeriodHistogramChart from './components/PeriodHistogramChart';
 import { Legend } from './components/Legend';
 import './App.css';
 
@@ -169,6 +170,14 @@ const AppContent: React.FC = () => {
                     />
                   </>
                 )}
+              </div>
+              <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
+                <PeriodHistogramChart
+                  filteredData={filteredData}
+                  currentMetric={currentMetric}
+                  width={isMobile ? mobileWidth : 720}
+                  panelHeight={isMobile ? 64 : 72}
+                />
               </div>
             </div>
           </div>
