@@ -150,8 +150,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                     {details}, {country}
                   </div>
                   <div className="city-snap">
-                    <span className="city-snap-arrow">↳</span> nearest data point{' '}
-                    <span className="city-snap-dist">· {formatKm(snapped.distanceKm)}</span>
+                    <span className="city-snap-arrow">↳</span>
+                    <span className="city-snap-label">nearest data point</span>
+                    <span className="city-snap-dist">{formatKm(snapped.distanceKm)}</span>
                   </div>
                 </div>
               );

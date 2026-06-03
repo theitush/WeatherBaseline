@@ -47,7 +47,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   filteredData,
   currentMetric,
 }) => {
-  if (!context || currentTemp === null) {
+  // currentTemp can legitimately be 0 (a dry day reads 0mm); only bail on true absence.
+  if (!context || currentTemp === null || currentTemp === undefined) {
     return null;
   }
 

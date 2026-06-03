@@ -289,7 +289,10 @@ export function generateTemperatureContext(
   data: WeatherDataPoint[],
   currentMetric: MetricKey
 ): TemperatureContext | null {
-  if (!currentTemp || !data || data.length === 0) return null;
+  // Note: currentTemp can legitimately be 0 (e.g. a bone-dry day, 0mm precip),
+  // so guard on null/undefined/NaN rather than falsiness.
+  if (currentTemp === null || currentTemp === undefined || !Number.isFinite(currentTemp)
+      || !data || data.length === 0) return null;
 
   const percentile = calculateTemperaturePercentile(currentTemp, data, currentMetric);
   const percentileFromBottom = 100 - percentile;
