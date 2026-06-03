@@ -147,7 +147,8 @@
    can't share a row through normal flow. Like rdp's own default, we overlay
    the nav row (now carrying the Today button + arrows) onto the caption line,
    pinned top-right. Padding on the caption reserves space so the dropdowns
-   never collide with it. */
+   never collide with it. The month dropdown uses short names (Jan, Feb, …) so
+   its width stays constant and can't push the year under the nav row. */
 .date-popover .rdp-months {
   position: relative;
 }

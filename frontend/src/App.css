@@ -227,7 +227,7 @@ body {
     padding-bottom: 12px;
   }
   .controls-panel {
-    padding: 12px;
+    padding: 0 0 16px;
     margin-bottom: 16px;
   }
   .controls-row {
@@ -235,7 +235,8 @@ body {
     gap: 10px;
   }
   .controls-row > .location-selector {
-    flex: 1 1 100%;
+    flex: 1 1 0;
+    min-width: 0;
     flex-wrap: wrap;
   }
   .location-selector {
@@ -246,6 +247,7 @@ body {
   }
   .city-search-container {
     flex: 1 1 100%;
+    min-width: 0;
   }
   .coordinates {
     flex: 1 1 100%;
@@ -264,7 +266,11 @@ body {
     padding: 12px;
   }
   .date-selector {
-    flex: 1 1 100%;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .date-trigger {
+    width: 100%;
   }
   #target-date {
     flex: 1 1 auto;
@@ -273,6 +279,7 @@ body {
     font-size: 16px;
   }
   .metric-selector {
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 8px;
   }
@@ -280,11 +287,13 @@ body {
     min-width: 0;
   }
   .metric-buttons {
-    gap: 6px;
+    width: 100%;
+    gap: 8px;
     flex-wrap: wrap;
   }
   .metric-button {
-    padding: 6px 10px;
+    flex: 1 1 calc(50% - 4px);
+    padding: 8px 10px;
     font-size: 13px;
   }
   .charts-controls {

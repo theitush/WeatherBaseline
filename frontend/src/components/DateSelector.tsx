@@ -26,6 +26,11 @@ const parseISO = (iso: string): Date => {
   return new Date(y, m - 1, d);
 };
 
+// Short month labels (Jan, Feb, …) for the caption dropdown, so a long name
+// like "September" can't widen the month dropdown into the Today button.
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const toISO = (date: Date): string => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -151,6 +156,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange, maxD
             startMonth={MIN_DATE}
             endMonth={maxAllowed}
             showOutsideDays
+            formatters={{ formatMonthDropdown: (month) => SHORT_MONTHS[month.getMonth()] }}
             components={{ Nav: NavWithToday }}
           />
         </div>
