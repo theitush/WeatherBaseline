@@ -146,6 +146,65 @@ const MainChart: React.FC<MainChartProps> = ({
         .text(tempLabels[currentMetric]);
     }
 
+    // Pre-satellite era: light shading + dashed boundary at 1979 with a label.
+    const satelliteDate = new Date(1979, 0, 1);
+    if (satelliteDate > dateExtent[0]) {
+      const boundaryPos = timeScale(satelliteDate);
+      if (isVertical) {
+        // Time runs along y (top = latest). Pre-1979 is the bottom band.
+        g.append('rect')
+          .attr('class', 'satellite-era-shade')
+          .attr('x', 0)
+          .attr('y', boundaryPos)
+          .attr('width', width)
+          .attr('height', height - boundaryPos)
+          .attr('fill', '#000')
+          .attr('opacity', 0.02);
+        g.append('line')
+          .attr('class', 'satellite-era-line')
+          .attr('x1', 0).attr('x2', width)
+          .attr('y1', boundaryPos).attr('y2', boundaryPos)
+          .attr('stroke', '#999')
+          .attr('stroke-width', 0.75)
+          .attr('stroke-dasharray', '3,4');
+        g.append('text')
+          .attr('class', 'satellite-era-label')
+          .attr('x', width - 5)
+          .attr('y', boundaryPos - 5)
+          .style('text-anchor', 'end')
+          .style('font-size', '11px')
+          .style('font-style', 'italic')
+          .style('fill', '#777')
+          .text('Satellites!');
+      } else {
+        // Time runs along x (left = earliest). Pre-1979 is the left band.
+        g.append('rect')
+          .attr('class', 'satellite-era-shade')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', boundaryPos)
+          .attr('height', height)
+          .attr('fill', '#000')
+          .attr('opacity', 0.02);
+        g.append('line')
+          .attr('class', 'satellite-era-line')
+          .attr('x1', boundaryPos).attr('x2', boundaryPos)
+          .attr('y1', 0).attr('y2', height)
+          .attr('stroke', '#999')
+          .attr('stroke-width', 0.75)
+          .attr('stroke-dasharray', '3,4');
+        g.append('text')
+          .attr('class', 'satellite-era-label')
+          .attr('x', boundaryPos)
+          .attr('y', -5)
+          .style('text-anchor', 'middle')
+          .style('font-size', '11px')
+          .style('font-style', 'italic')
+          .style('fill', '#777')
+          .text('Satellites!');
+      }
+    }
+
     // Percentile bands
     const validAggs = yearlyAggregates.filter(
       (d) =>
