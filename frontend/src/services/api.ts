@@ -55,14 +55,10 @@ export async function getTemperatureHistory(
   console.log(`Getting ${targetDate} ±${daysRange} days data for ${latitude}, ${longitude}`);
 
   const targetDt = parseDate(targetDate);
-  const currentDate = new Date();
-  currentDate.setHours(0, 0, 0, 0);
 
-  // Forecast tier reaches +3 days; anything beyond that isn't available.
-  if (targetDt > addDays(currentDate, 3)) {
-    throw new Error(`${targetDate} should be within 3 days of today!`);
-  }
-
+  // No horizon guard here: the date picker already caps selection to the cell's
+  // real last available date (which varies by timezone), so anything that
+  // reaches this point is in-range. Dates with no data just filter to empty.
   const timeline = await loadCellTimeline(latitude, longitude);
   return timeline.filter((d) => withinSeasonalWindow(d.date, targetDt, daysRange));
 }

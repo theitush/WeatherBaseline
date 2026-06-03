@@ -44,7 +44,14 @@ const RECENT_TTL_MS = Number(process.env.RECENT_TTL_MS ?? 24 * 60 * 60 * 1000);
 // past_days is deliberately wider than the measured ~6-day ERA5-Land publish lag
 // so forecast overlaps recent by ~3 days — no gap at the seam if the lag slips.
 const FORECAST_PAST_DAYS = 9;
-const FORECAST_DAYS = 3;
+// The frontend picker allows today + 3 (DateSelector MAX_DATE). Open-Meteo
+// anchors forecast_days to *UTC* "today", so the local trailing day shifts by
+// timezone: =4 reaches today+3 in east-of-UTC zones (Tel Aviv) but only today+2
+// in west-of-UTC zones (Mexico City). =5 guarantees today+3 is present in every
+// timezone; the trailing-null filter trims any genuinely-unpublished day.
+// Kept tight on purpose: ecmwf_ifs would serve 16 days, but API call-weight
+// scales with the day count and days past +3 aren't selectable anyway.
+const FORECAST_DAYS = 5;
 
 // The recent call backfills the window that newly crossed the publish frontier.
 // 14 days is comfortably wider than the lag + a few skipped runs; append-by-date

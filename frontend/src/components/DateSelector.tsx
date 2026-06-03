@@ -6,10 +6,16 @@ import './DateSelector.css';
 interface DateSelectorProps {
   currentDate: string;
   onChange: (date: string) => void;
+  // Last date the loaded cell actually has data for (YYYY-MM-DD). The picker
+  // caps its horizon here so it never offers a day the data lacks — the
+  // forecast edge varies by cell timezone, so a fixed today+N would over-offer
+  // for cells west of UTC. Null until the first cell loads.
+  maxDate?: string | null;
 }
 
-// Forecast horizon: today + 3 days is the furthest the data supports.
-const MAX_DATE = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+// Fallback horizon before any cell has loaded: today + 3 days. Once a cell
+// loads, maxDate (the cell's real last date) supersedes this.
+const FALLBACK_MAX_DATE = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
 // Bound the year dropdown at 1950.
 const MIN_DATE = new Date(1950, 0, 1);
 
@@ -36,12 +42,19 @@ const formatLabel = (iso: string): string => {
   });
 };
 
-const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) => {
+const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange, maxDate }) => {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<Date>(parseISO(currentDate));
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const selected = parseISO(currentDate);
+
+  // Cap to the cell's real last available date once loaded; fall back to
+  // today+3 only before the first cell has loaded.
+  const maxAllowed = useMemo(
+    () => (maxDate ? parseISO(maxDate) : FALLBACK_MAX_DATE),
+    [maxDate]
+  );
 
   // Keep the visible month in sync when the date is reset externally (e.g. a
   // different city), and snap back to the selected month each time we open.
@@ -133,10 +146,10 @@ const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) =>
             month={month}
             onMonthChange={setMonth}
             onSelect={handleSelect}
-            disabled={{ after: MAX_DATE }}
+            disabled={{ after: maxAllowed }}
             captionLayout="dropdown"
             startMonth={MIN_DATE}
-            endMonth={MAX_DATE}
+            endMonth={maxAllowed}
             showOutsideDays
             components={{ Nav: NavWithToday }}
           />

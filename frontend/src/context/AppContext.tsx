@@ -3,6 +3,7 @@ import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { getTemperatureHistory } from '../services/api';
+import { getCellMaxDate } from '../services/tieredData';
 import {
   calculateYearlyAggregates,
   filterDataByYearRange,
@@ -36,6 +37,10 @@ interface AppState {
   startYear: number;
   endYear: number;
   setYearRange: (start: number, end: number) => void;
+
+  // Last available date (YYYY-MM-DD) for the loaded cell — the date picker
+  // caps its horizon to this so it never offers a day the data lacks.
+  maxAvailableDate: string | null;
 
   // Current temperature context
   temperatureContext: TemperatureContext | null;
@@ -94,6 +99,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [startYear, setStartYear] = useState<number>(1940);
   const [endYear, setEndYear] = useState<number>(new Date().getFullYear());
 
+  // Last available date for the loaded cell (drives the picker's max).
+  const [maxAvailableDate, setMaxAvailableDate] = useState<string | null>(null);
+
   // Temperature context
   const [temperatureContext, setTemperatureContext] = useState<TemperatureContext | null>(null);
 
@@ -125,6 +133,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       // Update full data
       setFullData(data);
+
+      // Record the cell's last available date for the picker's horizon cap.
+      // Populated by loadCellTimeline (run inside getTemperatureHistory above).
+      setMaxAvailableDate(getCellMaxDate(location.lat, location.lon));
 
       // Get available years
       const years = getAvailableYears(data);
@@ -236,6 +248,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     startYear,
     endYear,
     setYearRange,
+    maxAvailableDate,
     temperatureContext,
     loading,
     error,

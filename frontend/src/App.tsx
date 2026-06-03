@@ -22,6 +22,7 @@ const AppContent: React.FC = () => {
     fullData,
     yearlyAggregates,
     temperatureContext,
+    maxAvailableDate,
     loading,
     error,
   } = useApp();
@@ -98,7 +99,11 @@ const AppContent: React.FC = () => {
               onChange={handleLocationChange}
             />
 
-            <DateSelector currentDate={currentDate} onChange={handleDateChange} />
+            <DateSelector
+              currentDate={currentDate}
+              onChange={handleDateChange}
+              maxDate={maxAvailableDate}
+            />
           </div>
         </div>
 
