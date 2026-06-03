@@ -84,13 +84,32 @@ async function readRows(tier, lat, lon) {
 /**
  * Write rows to a tier file as gzip CSV (creating the tier dir if needed).
  * Rows are sorted by date and serialized in SCHEMA column order.
+ *
+ * Written atomically: a refresh rewrites the file while the static server may
+ * be serving it to a client that just called ensure-fresh. fs.writeFile to the
+ * live path is non-atomic, so a concurrent reader could see a truncated file or
+ * the pre-write version mid-rewrite (observed as the recent/forecast seam
+ * briefly rendering the forecast guess where settled recent data already
+ * exists). We write a temp file in the same dir, then rename() onto the target
+ * — rename is atomic on POSIX, so readers always see the whole old or whole new
+ * file, never a partial one.
  */
 async function writeRows(tier, lat, lon, rows) {
   const dir = path.join(DATA_ROOT, tier);
   await fs.mkdir(dir, { recursive: true });
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const gz = await gzip(serializeCsv(sorted));
-  await fs.writeFile(filePath(tier, lat, lon), gz);
+  const target = filePath(tier, lat, lon);
+  // Unique temp name in the same dir (same filesystem ⇒ rename is atomic).
+  const tmp = `${target}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    await fs.writeFile(tmp, gz);
+    await fs.rename(tmp, target);
+  } catch (err) {
+    // Don't leave a stray temp file behind if the write/rename failed.
+    await fs.unlink(tmp).catch(() => {});
+    throw err;
+  }
 }
 
 /**
