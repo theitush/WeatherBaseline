@@ -36,7 +36,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 300);
+  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 260);
   const TOTAL_HEIGHT = propHeight ?? (isVertical ? 180 : 400);
 
   const width = TOTAL_WIDTH - MARGIN.left - MARGIN.right;

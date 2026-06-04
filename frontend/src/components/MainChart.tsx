@@ -38,7 +38,7 @@ const MainChart: React.FC<MainChartProps> = ({
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const totalWidth = propWidth ?? 720;
+  const totalWidth = propWidth ?? 760;
   const totalHeight = propHeight ?? 400;
   const width = totalWidth - MARGIN.left - MARGIN.right;
   const height = totalHeight - MARGIN.top - MARGIN.bottom;
