@@ -11,7 +11,16 @@ import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart from './components/PeriodHistogramChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
+import type { MetricKey } from './utils/config';
 import './App.css';
+
+// Metric phrases for the recent-memory question — matches the metric buttons.
+const metricQuestionLabel: Record<MetricKey, string> = {
+  max_temperature: 'max temperature',
+  min_temperature: 'min temperature',
+  precipitation_sum: 'precipitation',
+  wind_speed_10m_max: 'wind speed',
+};
 
 const AppContent: React.FC = () => {
   const {
@@ -135,7 +144,7 @@ const AppContent: React.FC = () => {
             {/* Section 2 — the full record */}
             <section className="page-section">
               <header className="section-header">
-                <h2 className="section-title">Graphs for Nerds</h2>
+                <h2 className="section-title">The Data</h2>
               </header>
               <div className="charts-section">
                 <div className="chart-title">{formatChartTitle(currentDate)}</div>
@@ -187,9 +196,11 @@ const AppContent: React.FC = () => {
             {/* Section 3 — recent-memory trend */}
             <section className="page-section">
               <header className="section-header">
-                <h2 className="section-title">
-                  Did It Change in Recent Memory?
-                </h2>
+                <h2 className="section-title">The Broader Stats</h2>
+                <p className="section-subtitle">
+                  Did {metricQuestionLabel[currentMetric]} at this time of
+                  year change in recent memory?
+                </p>
               </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
