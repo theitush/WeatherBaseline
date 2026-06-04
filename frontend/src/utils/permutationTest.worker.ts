@@ -3,7 +3,7 @@
 // SignificancePanel offloads the compute here and renders a loading state until
 // the result message comes back.
 
-import { yearBlockPermutationTest, type PermRecord, type PermutationResult } from './permutationTest.ts';
+import { yearBlockPermutationTest, type PermRecord, type PermutationResult, type PermStatistic } from './permutationTest.ts';
 
 export interface PermWorkerRequest {
   /** Echoed back so a stale (superseded) response can be ignored. */
@@ -13,6 +13,7 @@ export interface PermWorkerRequest {
   groupB: string | number;
   nPerm?: number;
   seed?: number;
+  statistic?: PermStatistic;
 }
 
 export interface PermWorkerResponse {
@@ -21,8 +22,8 @@ export interface PermWorkerResponse {
 }
 
 self.onmessage = (e: MessageEvent<PermWorkerRequest>) => {
-  const { id, records, groupA, groupB, nPerm, seed } = e.data;
-  const result = yearBlockPermutationTest(records, groupA, groupB, { nPerm, seed });
+  const { id, records, groupA, groupB, nPerm, seed, statistic } = e.data;
+  const result = yearBlockPermutationTest(records, groupA, groupB, { nPerm, seed, statistic });
   const response: PermWorkerResponse = { id, result };
   (self as unknown as Worker).postMessage(response);
 };

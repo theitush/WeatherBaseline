@@ -112,6 +112,13 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .domain([lo, hi])
       .thresholds(thresholds);
 
+    // Precipitation is dominated by dry days, so its median is uninformative
+    // (often 0). For precip we summarize with the 90th percentile (the "wet
+    // tail") instead; every other metric uses the median.
+    const usesP90 = currentMetric === 'precipitation_sum';
+    const statOf = (vals: number[]) =>
+      usesP90 ? (d3.quantile(vals, 0.9) ?? null) : (d3.median(vals) ?? null);
+
     const perPeriod = periods.map((p) => {
       const values = historical
         .filter((d) => d.year >= p.start && d.year <= p.end)
@@ -121,9 +128,11 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         period: p,
         bins: binGen(values),
         n: values.length,
-        median: values.length ? (d3.median(values) ?? null) : null,
+        stat: values.length ? statOf(values) : null,
       };
     });
+
+    const statLabel = usesP90 ? '90th pct' : 'Median';
 
     // Shared count scale so panel heights are directly comparable: domain is the
     // tallest single bin across all periods.
@@ -218,10 +227,11 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .style('fill', '#000')
         .text(pp.period.label);
 
-      // Median line — dashed, in the main chart's trend-line color, scoped to its
-      // own panel and appended last so it sits in front of this panel's bars.
-      if (pp.median !== null) {
-        const mx = tempScale(pp.median);
+      // Summary-stat line — dashed, in the main chart's trend-line color, scoped
+      // to its own panel and appended last so it sits in front of this panel's
+      // bars. Median for most metrics; 90th percentile for precipitation.
+      if (pp.stat !== null) {
+        const mx = tempScale(pp.stat);
         panel
           .append('line')
           .attr('class', 'period-median')
@@ -237,7 +247,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
             tooltip
               .style('opacity', 1)
               .html(
-                `<strong>${pp.period.label} median</strong><br/>${(pp.median as number).toFixed(1)}${units[currentMetric]}`
+                `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${units[currentMetric]}`
               )
               .style('left', event.clientX + 12 + 'px')
               .style('top', event.clientY - 28 + 'px');
@@ -265,8 +275,8 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('fill', '#555')
       .text(tempLabels[currentMetric]);
 
-    // Single legend for the median line, top-right of the plot.
-    const legendLabel = 'Median';
+    // Single legend for the summary-stat line, top-right of the plot.
+    const legendLabel = statLabel;
     const legend = g.append('g').attr('class', 'median-legend');
     legend
       .append('line')

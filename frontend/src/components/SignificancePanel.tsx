@@ -112,11 +112,15 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ filteredData, cur
       groupB: 'new',
       nPerm: 10000,
       seed: 42,
+      // Precip's median is usually 0; compare the wet tail (90th pct) instead.
+      statistic: currentMetric === 'precipitation_sum' ? 'p90' : 'median',
     };
     worker.postMessage(req);
   }, [records]);
 
   const unit = UNITS[currentMetric];
+  // Label the compared statistic to match what the test actually used.
+  const statLabel = currentMetric === 'precipitation_sum' ? '90th pct' : 'Median';
 
   return (
     <div className="significance-panel">
@@ -135,7 +139,7 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ filteredData, cur
             <div className="sig-body">
               <div className="sig-verdict">{line}</div>
               <p className="sig-explain">
-                Median of {newest.label} is {Math.abs(diff).toFixed(1)} {unit} {dir} than median of {oldest.label}
+                {statLabel} of {newest.label} is {Math.abs(diff).toFixed(1)} {unit} {dir} than {statLabel.toLowerCase()} of {oldest.label}
                 {' '}(p&nbsp;=&nbsp;{fmtP(result.pValue)}).
               </p>
             </div>
