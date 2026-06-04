@@ -16,7 +16,7 @@ interface PeriodHistogramChartProps {
   panelHeight?: number;
 }
 
-interface Period {
+export interface Period {
   start: number;
   end: number;
   label: string;
@@ -26,7 +26,7 @@ interface Period {
 
 // Three rolling 15-year periods ending the *previous* full year. Computed from
 // "now" so the windows advance automatically each year.
-function buildPeriods(): Period[] {
+export function buildPeriods(): Period[] {
   const prevYear = new Date().getFullYear() - 1;
   const p1Start = prevYear - 14;        // most recent 15 years (e.g. 2011–2025)
   const p2Start = p1Start - 15;         // (e.g. 1995–2010)

@@ -1,0 +1,64 @@
+.significance-panel {
+  max-width: 640px;
+  margin: 0.75rem auto 0;
+  padding: 0.5rem 0 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+}
+
+.sig-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.sig-sub {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #666;
+  margin-left: 0.4rem;
+}
+
+/* Loading / empty states */
+.sig-loading,
+.sig-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.sig-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #e5e4e7;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: sig-spin 0.7s linear infinite;
+}
+
+@keyframes sig-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Result body */
+.sig-body {
+  margin-top: 0.55rem;
+}
+
+.sig-verdict {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #111;
+}
+
+.sig-explain {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #444;
+}

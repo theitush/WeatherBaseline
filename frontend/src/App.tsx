@@ -8,6 +8,7 @@ import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart from './components/PeriodHistogramChart';
+import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
 import './App.css';
 
@@ -198,6 +199,10 @@ const AppContent: React.FC = () => {
                   panelHeight={isMobile ? 64 : 72}
                 />
               </div>
+              <SignificancePanel
+                filteredData={filteredData}
+                currentMetric={currentMetric}
+              />
             </section>
 
             {/* Section 4 — FAQ */}
