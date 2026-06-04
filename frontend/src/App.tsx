@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CONFIG from './utils/config';
 import { AppProvider, useApp } from './context/AppContext';
 import LocationSelector from './components/LocationSelector';
 import DateSelector from './components/DateSelector';
@@ -68,7 +69,7 @@ const AppContent: React.FC = () => {
       day % 10 === 1 && day !== 11 ? 'st' :
       day % 10 === 2 && day !== 12 ? 'nd' :
       day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-    return `${months[d.getMonth()]} ${day}${suffix} ± 7 days`;
+    return `${months[d.getMonth()]} ${day}${suffix} ± ${CONFIG.chart.seasonalWindowDays} days`;
   };
 
   // Get current date data for temperature context

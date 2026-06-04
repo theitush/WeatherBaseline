@@ -6,8 +6,9 @@ import CONFIG from '../utils/config';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
-  // Same windowed (±7 days, all years) subset the main chart uses. We further
-  // restrict to historical archive rows and split into 15-year periods.
+  // Same windowed (±CONFIG.chart.seasonalWindowDays, all years) subset the main
+  // chart uses. We further restrict to historical archive rows and split into
+  // 15-year periods.
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
   width?: number;

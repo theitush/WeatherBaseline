@@ -7,7 +7,7 @@ import type { PermWorkerRequest, PermWorkerResponse } from '../utils/permutation
 import './SignificancePanel.css';
 
 interface SignificancePanelProps {
-  // Same windowed (±7 days, all years) subset the histogram above consumes.
+  // Same windowed (±CONFIG.chart.seasonalWindowDays, all years) subset the histogram above consumes.
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
 }

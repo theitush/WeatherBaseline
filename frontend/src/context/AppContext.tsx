@@ -122,7 +122,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         location.lon,
         currentDate,
         1940,
-        7
+        CONFIG.chart.seasonalWindowDays
       );
 
       if (!data || data.length === 0) {

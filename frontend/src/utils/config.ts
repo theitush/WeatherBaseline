@@ -66,6 +66,7 @@ export interface Config {
     windowSize: number;
     histogramThresholds: number;
     tempMargin: number;
+    seasonalWindowDays: number;
   };
 
   // Helper methods
@@ -168,7 +169,8 @@ const CONFIG: Config = {
   chart: {
     windowSize: 5, // Moving average window
     histogramThresholds: 30,
-    tempMargin: 2 // Temperature scale margin
+    tempMargin: 2, // Temperature scale margin
+    seasonalWindowDays: 5 // ±days-of-year window around the target date
   },
 
   // ==========================================
