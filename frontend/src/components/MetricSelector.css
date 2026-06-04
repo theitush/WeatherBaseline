@@ -19,6 +19,10 @@
   font-weight: 600;
   opacity: 0.45;
   filter: saturate(0.7);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metric-button:hover {

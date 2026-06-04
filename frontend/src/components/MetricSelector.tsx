@@ -25,9 +25,9 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
 
   // Compact labels shown on narrow screens (CSS swaps which span is visible).
   const metricLabelsShort: Record<MetricKey, string> = {
-    max_temperature: 'Max',
-    min_temperature: 'Min',
-    precipitation_sum: 'Rain',
+    max_temperature: 'Max Temp',
+    min_temperature: 'Min Temp',
+    precipitation_sum: 'Precipitation',
     wind_speed_10m_max: 'Wind',
   };
 

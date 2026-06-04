@@ -378,6 +378,9 @@ body {
     justify-content: center;
     gap: 0;
   }
+  .controls-panel .metric-selector {
+    margin-top: 6px;
+  }
   .metric-selector label {
     min-width: 0;
   }

@@ -148,7 +148,7 @@ const AppContent: React.FC = () => {
                         fullData={fullData}
                         orientation="vertical"
                         width={mobileWidth}
-                        height={180}
+                        height={115}
                       />
                       <MainChart
                         filteredData={filteredData}
