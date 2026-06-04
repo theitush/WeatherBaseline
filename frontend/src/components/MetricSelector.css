@@ -31,3 +31,17 @@
   border-color: rgba(17, 17, 17, 0.85);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
+
+/* Full label by default; the compact label only appears on narrow screens. */
+.metric-label-short {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .metric-label-full {
+    display: none;
+  }
+  .metric-label-short {
+    display: inline;
+  }
+}

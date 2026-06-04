@@ -23,6 +23,14 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
     wind_speed_10m_max: 'Wind Speed',
   };
 
+  // Compact labels shown on narrow screens (CSS swaps which span is visible).
+  const metricLabelsShort: Record<MetricKey, string> = {
+    max_temperature: 'Max',
+    min_temperature: 'Min',
+    precipitation_sum: 'Rain',
+    wind_speed_10m_max: 'Wind',
+  };
+
   return (
     <div className="metric-selector">
       <div className="metric-buttons">
@@ -40,7 +48,8 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
                 color: 'white',
               }}
             >
-              {metricLabels[metric]}
+              <span className="metric-label-full">{metricLabels[metric]}</span>
+              <span className="metric-label-short">{metricLabelsShort[metric]}</span>
             </button>
           );
         })}

@@ -86,25 +86,29 @@ const AppContent: React.FC = () => {
       <LoadingOverlay show={loading} />
 
       <div className="app-container">
-        <header className="app-header">
-          <h1>How Hot Was It?</h1>
-          <p className="subtitle">Explore historical weather patterns</p>
-        </header>
+        <div className="sticky-bar">
+          <header className="app-header">
+            <h1>How Extreme Is This Weather?</h1>
+          </header>
 
-        <div className="controls-panel">
-          <div className="controls-row">
-            <LocationSelector
-              cityName={location.name || ''}
-              latitude={location.lat}
-              longitude={location.lon}
-              onChange={handleLocationChange}
-            />
+          <div className="controls-panel">
+            <div className="controls-row">
+              <LocationSelector
+                cityName={location.name || ''}
+                latitude={location.lat}
+                longitude={location.lon}
+                onChange={handleLocationChange}
+              />
 
-            <DateSelector
-              currentDate={currentDate}
-              onChange={handleDateChange}
-              maxDate={maxAvailableDate}
-            />
+              <DateSelector
+                currentDate={currentDate}
+                onChange={handleDateChange}
+                maxDate={maxAvailableDate}
+              />
+            </div>
+            {!loading && !error && filteredData.length > 0 && (
+              <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
+            )}
           </div>
         </div>
 
@@ -116,70 +120,118 @@ const AppContent: React.FC = () => {
 
         {!loading && !error && filteredData.length > 0 && (
           <div className="data-panel">
-            <MetricSelector currentMetric={currentMetric} onChange={handleMetricChange} />
+            {/* Section 1 — the answer at a glance */}
+            <section className="page-section">
+              <TemperatureContextDisplay
+                context={temperatureContext}
+                currentTemp={getCurrentTemp()}
+                filteredData={filteredData}
+                currentMetric={currentMetric}
+              />
+            </section>
 
-            <TemperatureContextDisplay
-              context={temperatureContext}
-              currentTemp={getCurrentTemp()}
-              filteredData={filteredData}
-              currentMetric={currentMetric}
-            />
-
-            <div className="charts-section">
-              <div className="charts-controls">
+            {/* Section 2 — the full record */}
+            <section className="page-section">
+              <header className="section-header">
+                <h2 className="section-title">Graphs for Nerds</h2>
+              </header>
+              <div className="charts-section">
+                <div className="chart-title">{formatChartTitle(currentDate)}</div>
+                <Legend metric={currentMetric} />
+                <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
+                  {isMobile ? (
+                    <>
+                      <HistogramChart
+                        filteredData={filteredData}
+                        currentMetric={currentMetric}
+                        currentDate={currentDate}
+                        fullData={fullData}
+                        orientation="vertical"
+                        width={mobileWidth}
+                        height={180}
+                      />
+                      <MainChart
+                        filteredData={filteredData}
+                        yearlyAggregates={yearlyAggregates}
+                        currentMetric={currentMetric}
+                        currentDate={currentDate}
+                        fullData={fullData}
+                        orientation="vertical"
+                        width={mobileWidth}
+                        height={460}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <MainChart
+                        filteredData={filteredData}
+                        yearlyAggregates={yearlyAggregates}
+                        currentMetric={currentMetric}
+                        currentDate={currentDate}
+                        fullData={fullData}
+                      />
+                      <HistogramChart
+                        filteredData={filteredData}
+                        currentMetric={currentMetric}
+                        currentDate={currentDate}
+                        fullData={fullData}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
+            </section>
+
+            {/* Section 3 — recent-memory trend */}
+            <section className="page-section">
+              <header className="section-header">
+                <h2 className="section-title">
+                  Did It Change in Recent Memory?
+                </h2>
+              </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
-              <Legend metric={currentMetric} />
-              <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
-                {isMobile ? (
-                  <>
-                    <HistogramChart
-                      filteredData={filteredData}
-                      currentMetric={currentMetric}
-                      currentDate={currentDate}
-                      fullData={fullData}
-                      orientation="vertical"
-                      width={mobileWidth}
-                      height={180}
-                    />
-                    <MainChart
-                      filteredData={filteredData}
-                      yearlyAggregates={yearlyAggregates}
-                      currentMetric={currentMetric}
-                      currentDate={currentDate}
-                      fullData={fullData}
-                      orientation="vertical"
-                      width={mobileWidth}
-                      height={460}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <MainChart
-                      filteredData={filteredData}
-                      yearlyAggregates={yearlyAggregates}
-                      currentMetric={currentMetric}
-                      currentDate={currentDate}
-                      fullData={fullData}
-                    />
-                    <HistogramChart
-                      filteredData={filteredData}
-                      currentMetric={currentMetric}
-                      currentDate={currentDate}
-                      fullData={fullData}
-                    />
-                  </>
-                )}
-              </div>
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
                 <PeriodHistogramChart
                   filteredData={filteredData}
                   currentMetric={currentMetric}
-                  width={isMobile ? mobileWidth : 720}
+                  width={isMobile ? mobileWidth : 990}
                   panelHeight={isMobile ? 64 : 72}
                 />
               </div>
-            </div>
+            </section>
+
+            {/* Section 4 — FAQ */}
+            <section className="page-section">
+              <header className="section-header">
+                <h2 className="section-title">FAQ for Mega Nerds</h2>
+              </header>
+              <div className="faq-list">
+                <details className="faq-item">
+                  <summary>What's this data?</summary>
+                  <div className="faq-body">
+                    <p>
+                      TODO: describe the dataset — ERA5-Land reanalysis on a 0.1°
+                      grid, the metrics shown, and how a city snaps to its nearest cell.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>Satellites?</summary>
+                  <div className="faq-body">
+                    <p>
+                      TODO: explain the pre-1979 satellite era — why the early years
+                      are shaded and how confidence differs before/after the boundary.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>Who are you?</summary>
+                  <div className="faq-body">
+                    <p>TODO: about the project and who built it.</p>
+                  </div>
+                </details>
+              </div>
+            </section>
           </div>
         )}
       </div>
