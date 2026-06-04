@@ -49,8 +49,8 @@ function shadeFor(base: string, shade: number): string {
   return (d3.interpolateRgb(base, '#ffffff')(t) as string);
 }
 
-const MARGIN = { top: 16, right: 30, bottom: 36, left: 55 };
-const PANEL_GAP = 6;   // vertical gap between stacked panels
+const MARGIN = { top: 18, right: 30, bottom: 36, left: 55 };
+const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
 
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   filteredData,
@@ -104,7 +104,12 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Fixed 0.5-unit bins, anchored to a half-unit grid so every period shares
     // the exact same bin edges (and they line up across metrics/locations).
     const BIN = 0.5;
-    const lo = Math.floor((minVal - 2) / BIN) * BIN;
+    // Precipitation and wind can't be negative, so don't let the padded lower
+    // bound dip below zero (otherwise dry-day distributions get phantom -2,-1
+    // bins and axis ticks).
+    const nonNegative = currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
+    let lo = Math.floor((minVal - 2) / BIN) * BIN;
+    if (nonNegative) lo = Math.max(0, lo);
     const hi = Math.ceil((maxVal + 2) / BIN) * BIN;
     const thresholds = d3.range(lo, hi + BIN, BIN);
     tempScale.domain([lo, hi]);
@@ -184,10 +189,12 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .attr('y1', panelHeight)
         .attr('y2', panelHeight);
 
+      const nonEmptyBins = pp.bins.filter((b) => b.length > 0);
+
       // Bars
       panel
         .selectAll('rect.period-bar')
-        .data(pp.bins.filter((b) => b.length > 0))
+        .data(nonEmptyBins)
         .enter()
         .append('rect')
         .attr('class', 'period-bar')
@@ -196,20 +203,38 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .attr('y', panelHeight)
         .attr('height', 0)
         .attr('fill', color)
-        .on('mouseover', (event, b) => {
-          tooltip
-            .style('opacity', 1)
-            .html(
-              `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
-            )
-            .style('left', event.clientX + 12 + 'px')
-            .style('top', event.clientY - 28 + 'px');
-        })
-        .on('mouseout', () => tooltip.style('opacity', 0))
         .transition()
         .duration(500)
         .attr('y', (b) => countScale(b.length))
         .attr('height', (b) => panelHeight - countScale(b.length));
+
+      // Transparent full-height hit areas, one per bin, so the tooltip triggers
+      // anywhere in the bin's column — even for a 1-day bin that's only a sliver
+      // tall. Appended after the bars so they capture the mouse.
+      const showTip = (event: MouseEvent, b: d3.Bin<number, number>) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
+          )
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
+      };
+      panel
+        .selectAll('rect.period-hit')
+        .data(nonEmptyBins)
+        .enter()
+        .append('rect')
+        .attr('class', 'period-hit')
+        .attr('x', (b) => tempScale(b.x0 as number) + 0.5)
+        .attr('width', (b) => barW(b))
+        .attr('y', 0)
+        .attr('height', panelHeight)
+        .attr('fill', 'transparent')
+        .style('cursor', 'pointer')
+        .on('mouseover', showTip)
+        .on('mousemove', showTip)
+        .on('mouseout', () => tooltip.style('opacity', 0));
 
       // Per-panel y-axis (a couple of count ticks).
       panel
@@ -217,12 +242,13 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .attr('class', 'axis')
         .call(d3.axisLeft(countScale).ticks(2) as any);
 
-      // Period label, top-left inside the panel.
+      // Period label as a centered title, a bit above the panel.
       panel
         .append('text')
         .attr('class', 'panel-label')
-        .attr('x', 6)
-        .attr('y', 12)
+        .attr('x', width / 2)
+        .attr('y', -5)
+        .style('text-anchor', 'middle')
         .style('font-size', '12px')
         .style('font-weight', '500')
         .style('fill', '#000')
