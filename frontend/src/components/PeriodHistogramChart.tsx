@@ -63,10 +63,9 @@ export function medianColorFor(metric: MetricKey): string {
   );
 }
 
-// Precipitation summarizes with the 90th percentile (the "wet tail"); every
-// other metric uses the median.
-export function statLabelFor(metric: MetricKey): string {
-  return metric === 'precipitation_sum' ? '90th pct' : 'Median';
+// All metrics summarize with the median.
+export function statLabelFor(_metric: MetricKey): string {
+  return 'Median';
 }
 
 // HTML legend rendered above the period histogram — matches the data chart's
@@ -199,12 +198,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .domain([binLo, binHi])
       .thresholds(thresholds);
 
-    // Precipitation is dominated by dry days, so its median is uninformative
-    // (often 0). For precip we summarize with the 90th percentile (the "wet
-    // tail") instead; every other metric uses the median.
-    const usesP90 = currentMetric === 'precipitation_sum';
-    const statOf = (vals: number[]) =>
-      usesP90 ? (d3.quantile(vals, 0.9) ?? null) : (d3.median(vals) ?? null);
+    const statOf = (vals: number[]) => d3.median(vals) ?? null;
 
     const perPeriod = periods.map((p) => {
       const values = historical

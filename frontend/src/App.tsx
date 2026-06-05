@@ -392,11 +392,9 @@ const AppContent: React.FC = () => {
                   <div className="faq-body">
                     <p>
                       We chose <strong>medians</strong> in order to compare typical days.
-                      It is a more conserative and stable statistic than the 90 percentile 
-                      or the mean. Precipitation is different: most days are
-                      dry, so the median is usually just 0 and tells you nothing.
-                      Thus, for rain we reluctantly compare the <strong>90th percentile</strong>{' '}
-                      because "how wet can it get" is the more interesting question.
+                      It is a more conserative and stable statistic than the the mean,
+                      so it is less affected by extreme events and arguably answers
+                      whether the baseline change more truthfuly.
                     </p>
                     <p>
                       <strong>Equal 15-year windows.</strong> We split the record

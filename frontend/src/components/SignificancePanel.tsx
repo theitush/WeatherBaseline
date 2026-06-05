@@ -54,7 +54,7 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, 
 
   const unit = UNITS[currentMetric];
   // Label the compared statistic to match what the test actually used.
-  const statLabel = currentMetric === 'precipitation_sum' ? '90th pct' : 'Median';
+  const statLabel = 'Median';
 
   return (
     <div className="significance-panel">

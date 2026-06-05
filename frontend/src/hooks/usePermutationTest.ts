@@ -96,8 +96,7 @@ export function usePermutationTest(
       groupB: 'new',
       nPerm: 10000,
       seed: 42,
-      // Precip's median is usually 0; compare the wet tail (90th pct) instead.
-      statistic: currentMetric === 'precipitation_sum' ? 'p90' : 'median',
+      statistic: 'median',
     };
     worker.postMessage(req);
   }, [records, currentMetric]);
