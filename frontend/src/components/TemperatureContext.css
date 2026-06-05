@@ -1,18 +1,16 @@
 .temperature-context {
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
+  padding: 4px 0 0;
+  margin: 0 0 8px;
   text-align: center;
 }
 
-/* Question above the spectrum — mirrors the recent-memory section subtitle. */
+/* Question above the spectrum — matches the recent-memory .section-subtitle exactly. */
 .context-question {
   margin: 0 0 4px 0;
-  font-size: 22px;
-  font-weight: 600;
-  color: #333;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #555;
+  line-height: 1.3;
 }
 
 .temp-value {
@@ -23,7 +21,7 @@
 
 /* Text answer below the spectrum — mirrors .sig-body in the recent-mem card. */
 .context-answer {
-  margin-top: 0.75rem;
+  margin-top: 0;
 }
 
 .context-verdict {
@@ -44,7 +42,8 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 8px;
+  margin-bottom: 4px;
   padding: 0 4px;
 }
 
@@ -56,7 +55,7 @@
   line-height: 1.25;
   flex-shrink: 0;
   min-width: 72px;
-  padding-top: 48px;
+  padding-top: 54px;
 }
 
 .record-scale-low .record-scale-temp {
@@ -90,7 +89,7 @@
 .record-scale-track {
   position: relative;
   flex: 1;
-  height: 60px;
+  height: 48px;
   margin-top: 42px;
 }
 
