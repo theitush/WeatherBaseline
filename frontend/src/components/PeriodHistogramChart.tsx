@@ -11,6 +11,11 @@ interface PeriodHistogramChartProps {
   // 15-year periods.
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
+  // Two-sided p-value of the oldest-vs-newest permutation test (same one the
+  // SignificancePanel reports). Drives the significance bracket + stars drawn
+  // between the bottom (oldest) and top (newest) panel medians. null while the
+  // test is still running or when there isn't enough data.
+  pValue?: number | null;
   width?: number;
   // Height of a single panel (each of the 3 periods gets one). Total SVG height
   // is derived from this plus the shared x-axis strip.
@@ -53,12 +58,24 @@ function shadeFor(base: string, shade: number): string {
 // MainChart.tsx: left 55, right 20) so that on mobile, where this chart's
 // x-axis sits directly under the main chart's, the two temp axes share the
 // exact same pixel range and their ticks line up.
-const MARGIN = { top: 18, right: 20, bottom: 36, left: 55 };
+// top leaves room for both the significance bracket (a band above the top
+// panel) and that panel's right-aligned year label which sits just below it.
+const MARGIN = { top: 44, right: 20, bottom: 36, left: 55 };
 const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
+
+// Conventional significance stars from a p-value (matches the SignificancePanel
+// thresholds at the top end; "ns" = not significant).
+function starsFor(p: number): string {
+  if (p < 0.001) return '***';
+  if (p < 0.01) return '**';
+  if (p < 0.05) return '*';
+  return 'ns';
+}
 
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   filteredData,
   currentMetric,
+  pValue,
   width: propWidth,
   panelHeight: propPanelHeight,
 }) => {
@@ -186,8 +203,16 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Render panels top → bottom in display order: most recent first (top).
     const displayOrder = [...perPeriod].reverse();
 
+    // Capture the geometry of the top (newest) and bottom (oldest) panel
+    // medians so we can connect them with a significance bracket afterwards.
+    let topMedianX: number | null = null;
+    let bottomMedianX: number | null = null;
+    let bottomPanelBaselineY = 0;
+
     displayOrder.forEach((pp, idx) => {
       const panelTop = idx * (panelHeight + PANEL_GAP);
+      const isTopPanel = idx === 0;
+      const isBottomPanel = idx === displayOrder.length - 1;
       const color = shadeFor(baseColor, pp.period.shade);
 
       const panel = g
@@ -280,6 +305,14 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       // bars. Median for most metrics; 90th percentile for precipitation.
       if (pp.stat !== null) {
         const mx = tempScale(pp.stat);
+        // Record geometry for the significance bracket. mx is panel-local x
+        // (panels share the same x range), so it's directly comparable; panel y
+        // offsets are added when the bracket is drawn on `g`.
+        if (isTopPanel) topMedianX = mx;
+        if (isBottomPanel) {
+          bottomMedianX = mx;
+          bottomPanelBaselineY = panelTop + panelHeight;
+        }
         panel
           .append('line')
           .attr('class', 'period-median')
@@ -321,6 +354,48 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
     });
+
+    // Significance bracket — the scientific-paper style "⊓" over the top panel,
+    // connecting the newest (top) and oldest (bottom) period medians along the
+    // shared x-axis, with stars from the permutation p-value centred above. Two
+    // legs drop from a horizontal bar to point at each median's x position.
+    void bottomPanelBaselineY;
+    if (pValue != null && topMedianX != null && bottomMedianX != null) {
+      const stars = starsFor(pValue);
+      // Horizontal bar sits in the top margin (negative y on `g`); legs drop to
+      // just above the top panel where the medians begin.
+      const barY = -10;
+      const legBottomY = -4;
+      const x0 = Math.min(topMedianX, bottomMedianX);
+      const x1 = Math.max(topMedianX, bottomMedianX);
+
+      const bracket = g.append('g').attr('class', 'sig-bracket');
+
+      // Down-turned legs + horizontal connector, drawn as one path.
+      bracket
+        .append('path')
+        .attr(
+          'd',
+          `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`
+        )
+        .attr('fill', 'none');
+
+      // Stars (or "ns") centred above the bar.
+      bracket
+        .append('text')
+        .attr('class', `sig-stars ${stars === 'ns' ? 'sig-ns' : ''}`)
+        .attr('x', (x0 + x1) / 2)
+        .attr('y', barY - 3)
+        .style('text-anchor', 'middle')
+        .text(stars);
+
+      // Fade in alongside the median lines.
+      bracket
+        .style('opacity', 0)
+        .transition()
+        .duration(500)
+        .style('opacity', 1);
+    }
 
     // Shared x-axis under the bottom panel. Use d3's default tick count (no
     // .ticks() override) so it matches the main chart's temp axis exactly —
@@ -376,7 +451,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     const legendW = (legend.node() as SVGGElement).getBBox().width;
     const YEAR_LABEL_CLEARANCE = 80;
     legend.attr('transform', `translate(${width - legendW - YEAR_LABEL_CLEARANCE},-6)`);
-  }, [filteredData, currentMetric, width, panelHeight, plotHeight]);
+  }, [filteredData, currentMetric, pValue, width, panelHeight, plotHeight]);
 
   return (
     <div className="period-histogram-wrapper">

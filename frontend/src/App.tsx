@@ -12,6 +12,7 @@ import PeriodHistogramChart from './components/PeriodHistogramChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
 import ThemeToggle from './components/ThemeToggle';
+import { usePermutationTest } from './hooks/usePermutationTest';
 import type { MetricKey } from './utils/config';
 import './App.css';
 
@@ -69,6 +70,10 @@ const AppContent: React.FC = () => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Oldest-vs-newest permutation test, computed once and shared by the period
+  // histogram's significance bracket and the verdict panel below it.
+  const significance = usePermutationTest(filteredData, currentMetric);
 
   const formatChartTitle = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
@@ -209,6 +214,7 @@ const AppContent: React.FC = () => {
                 <PeriodHistogramChart
                   filteredData={filteredData}
                   currentMetric={currentMetric}
+                  pValue={significance.result?.pValue ?? null}
                   /* Desktop: span the main chart (760) plus the per-date
                      histogram's bar area, stopping where the % brackets begin
                      (~890), and left-align (see .period-histogram-row) so the
@@ -218,7 +224,8 @@ const AppContent: React.FC = () => {
                 />
               </div>
               <SignificancePanel
-                filteredData={filteredData}
+                result={significance.result}
+                loading={significance.loading}
                 currentMetric={currentMetric}
               />
             </section>
@@ -376,9 +383,12 @@ const AppContent: React.FC = () => {
                   <summary>Why these stats?</summary>
                   <div className="faq-body">
                     <p>
-                      The whole point is an honest apples-to-apples comparison, so
-                      every choice is about removing ways to accidentally fool
-                      yourself.
+                      We chose <strong>medians</strong> in order to compare typical days.
+                      It is a more conserative and stable statistic than the 90 percentile 
+                      or the mean. Precipitation is different: most days are
+                      dry, so the median is usually just 0 and tells you nothing.
+                      Thus, for rain we reluctantly compare the <strong>90th percentile</strong>{' '}
+                      because "how wet can it get" is the more interesting question.
                     </p>
                     <p>
                       <strong>Equal 15-year windows.</strong> We split the record
@@ -405,17 +415,6 @@ const AppContent: React.FC = () => {
                       seam. Letting them into a 15-year aggregate would be comparing a
                       consistent reanalysis to a patchwork. So the statistics use the
                       ERA5-Land archive only.
-                    </p>
-                    <p>
-                      <strong>Medians, not means (and the 90th percentile for
-                      rain).</strong> The median is the typical day, and unlike the
-                      mean it isn't yanked around by a single record-shattering
-                      outlier — which is exactly the kind of day that's most prone to
-                      measurement error. Precipitation is different: most days are
-                      bone dry, so the median is usually just 0 and tells you nothing.
-                      For rain we compare the <strong>90th percentile</strong>{' '}
-                      instead — the wet tail — because "how bad do the bad days get"
-                      is the question that actually matters there.
                     </p>
                     <p>
                       <strong>A permutation test, not a t-test.</strong> To decide
