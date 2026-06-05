@@ -220,7 +220,7 @@ const AppContent: React.FC = () => {
             {/* Section 4 — FAQ */}
             <section className="page-section">
               <header className="section-header">
-                <h2 className="section-title">FAQ for The Real Nerds</h2>
+                <h2 className="section-title">FAQ</h2>
               </header>
               <div className="faq-list">
                 <details className="faq-item">
@@ -278,6 +278,38 @@ const AppContent: React.FC = () => {
                       or two as the model firms up, and won't always match a reading
                       you remember. It's shown for context only and is{' '}
                       <em>never</em> mixed into the long-run statistics below.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>What are these metrics?</summary>
+                  <div className="faq-body">
+                    <p>
+                      Every number here is a <strong>daily</strong> value — one figure
+                      summarising a single 24-hour day, not an hourly reading or a
+                      monthly average. There are four:
+                    </p>
+                    <p>
+                      <strong>Max temperature</strong> is the hottest the air got that
+                      day — the peak of the afternoon. <strong>Min temperature</strong>{' '}
+                      is the coldest it got — the bottom of the night, usually just
+                      before dawn. Between them they bracket the day's full swing.
+                    </p>
+                    <p>
+                      <strong>Wind speed</strong> is the day's strongest sustained
+                      wind, measured 10 m above the ground. It{' '}
+                      <em>excludes gusts</em> — the brief, sharp spikes that can be far
+                      higher — so it reflects how hard the wind was steadily blowing
+                      rather than its momentary peaks.
+                    </p>
+                    <p>
+                      <strong>Precipitation</strong> is the total water that fell over
+                      the day, and "water" is the key word: it counts{' '}
+                      <em>everything</em>, not just rain. Snow, sleet and hail are all
+                      melted down to their liquid equivalent before being added up. As
+                      a rough rule of thumb, about <strong>10 cm of fresh snow melts
+                      down to ~1 mm</strong> of precipitation — so a number that looks
+                      small on a winter day can still mean a lot of snow on the ground.
                     </p>
                   </div>
                 </details>
@@ -401,7 +433,7 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
-                  <summary>Why?!</summary>
+                  <summary>Why do this?!</summary>
                   <div className="faq-body">
                     <p>I just wanted to know if certain days realy ARE as extreme as 
                        they feel.. and now we know!

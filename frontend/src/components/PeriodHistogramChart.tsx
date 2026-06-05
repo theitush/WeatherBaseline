@@ -153,10 +153,10 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       wind_speed_10m_max: 'm/s',
     };
     const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Temp (°C)',
-      min_temperature: 'Min Temp (°C)',
-      precipitation_sum: 'Precipitation (mm)',
-      wind_speed_10m_max: 'Max Wind Speed (m/s)',
+      max_temperature: 'Daily Max Temp (°C)',
+      min_temperature: 'Daily Min Temp (°C)',
+      precipitation_sum: 'Daily Precipitation (mm)',
+      wind_speed_10m_max: 'Daily Max Wind Speed (m/s)',
     };
 
     const barW = (d: d3.Bin<number, number>) =>

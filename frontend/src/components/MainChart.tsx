@@ -119,12 +119,12 @@ const MainChart: React.FC<MainChartProps> = ({
       ) as any
     );
 
-    // Axis label (the temp axis)
+    // Axis label (the temp axis). "Daily" makes clear these are per-day values.
     const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Temp (°C)',
-      min_temperature: 'Min Temp (°C)',
-      precipitation_sum: 'Precipitation (mm)',
-      wind_speed_10m_max: 'Max Wind Speed (m/s)',
+      max_temperature: 'Daily Max Temp (°C)',
+      min_temperature: 'Daily Min Temp (°C)',
+      precipitation_sum: 'Daily Precipitation (mm)',
+      wind_speed_10m_max: 'Daily Max Wind Speed (m/s)',
     };
     if (isVertical) {
       g.append('text')
