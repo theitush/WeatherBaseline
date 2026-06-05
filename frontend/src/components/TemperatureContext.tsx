@@ -79,7 +79,7 @@ const fireConfetti = () => {
   root.style.cssText =
     'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden';
   document.body.appendChild(root);
-  const N = 90;
+  const N = 180;
   for (let i = 0; i < N; i++) {
     const p = document.createElement('div');
     const size = 6 + Math.random() * 6;
