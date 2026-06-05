@@ -60,7 +60,20 @@ const VERDICT_EXTREME = ['Extreme!', 'Seriously extreme.', 'Pretty wild.'];
 const VERDICT_NOTABLE = ['Notable.', 'Worth a mention.', 'A bit unusual.', 'Mildly spicy.', 'Stands out a little.'];
 const VERDICT_MILD = ['Average.', 'Very average.', 'Totally normal.', 'Nothing to see here.', 'Meh.'];
 
-const pick = (bank: string[]) => bank[Math.floor(Math.random() * bank.length)];
+// Deterministic pick — same (bank, seed) always yields the same phrase, so a
+// verdict stays put across the several re-renders a metric/date switch triggers
+// instead of re-rolling 2-3 times before settling. The seed is derived from the
+// inputs that define the day (metric + value + rank), so it still varies between
+// days and metrics.
+const hashSeed = (s: string): number => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+const pick = (bank: string[], seed: string) => bank[hashSeed(seed) % bank.length];
 
 const ordinal = (n: number): string => {
   const j = n % 10;
@@ -186,6 +199,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       const since = firstYear !== null ? ` since ${firstYear}` : '';
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
+      // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
+      const seed = `${currentMetric}:${currentTemp}:${rank}`;
 
       if (rank <= 3) {
         // Top-3 on record — name the rank, celebrate.
@@ -194,13 +209,13 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
             ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day on record!`
             : `${ordinal(rank)} ${sup} day on record!`;
         // #1 gets the exclusive phrase; #2/#3 draw from the party bank.
-        verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3);
+        verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
       } else if (singleTail <= 0.05) {
         // Extreme — one decimal, floored so a record never prints "0.0%".
         const pct = singleTail * 100;
         const shown = pct < 0.1 ? '<0.1' : pct.toFixed(1);
         extremeLine = `Only ${shown}% of days${since} were this ${adj}!`;
-        verdict = pick(VERDICT_EXTREME);
+        verdict = pick(VERDICT_EXTREME, seed);
       } else if (singleTail <= 0.2) {
         // Notable — whole percent, cumulative ("or hotter"). Drop the comparative
         // when nothing can be more extreme (a 0mm day can't be "drier").
@@ -209,13 +224,13 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         extremeLine = atFloor
           ? `About ${pct.toFixed(0)}% of days${since} were this ${adj}.`
           : `About ${pct.toFixed(0)}% of days${since} were this ${adj} or ${comp}.`;
-        verdict = pick(VERDICT_NOTABLE);
+        verdict = pick(VERDICT_NOTABLE, seed);
       } else {
         // Mild — two-tailed %, "extreme" mocked in quotes since it isn't.
         const tailFrac = Math.min(1, singleTail * 2);
         const pct = tailFrac * 100;
         extremeLine = `About ${pct.toFixed(0)}% of days${since} were this "extreme".`;
-        verdict = pick(VERDICT_MILD);
+        verdict = pick(VERDICT_MILD, seed);
       }
     }
   }
