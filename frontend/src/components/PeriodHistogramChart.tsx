@@ -45,7 +45,7 @@ export function buildPeriods(): Period[] {
 }
 
 // Three shades of the metric's base color, light → dark, for the three periods.
-function shadeFor(base: string, shade: number): string {
+export function shadeFor(base: string, shade: number): string {
   const c = d3.color(base);
   if (!c) return base;
   // All periods are lightened toward white; oldest lightest, most recent least.
@@ -53,6 +53,48 @@ function shadeFor(base: string, shade: number): string {
   const t = factors[shade] ?? 0;
   return (d3.interpolateRgb(base, '#ffffff')(t) as string);
 }
+
+// Darkened trend-line color used for the dashed summary-stat line (shared by the
+// in-chart median lines and the legend swatch).
+export function medianColorFor(metric: MetricKey): string {
+  return (
+    d3.color(CONFIG.getColorForElement(metric, 'trendLine'))?.darker(0.6).formatHex() ??
+    CONFIG.getColorForElement(metric, 'trendLine')
+  );
+}
+
+// Precipitation summarizes with the 90th percentile (the "wet tail"); every
+// other metric uses the median.
+export function statLabelFor(metric: MetricKey): string {
+  return metric === 'precipitation_sum' ? '90th pct' : 'Median';
+}
+
+// HTML legend rendered above the period histogram — matches the data chart's
+// `.chart-legend` convention. Shows the dashed summary-stat line plus a color
+// swatch for each of the three periods.
+export const PeriodLegend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
+  const base = CONFIG.metricColors[metric].base;
+  const medianColor = medianColorFor(metric);
+  const periods = buildPeriods();
+  return (
+    <div className="chart-legend">
+      <div className="chart-legend-item">
+        <svg width={18} height={14} style={{ flex: '0 0 auto' }}>
+          <line x1={0} x2={18} y1={7} y2={7} stroke={medianColor} strokeWidth={3} strokeDasharray="4,3" />
+        </svg>
+        <span>{statLabelFor(metric)}</span>
+      </div>
+      {periods.map((p) => (
+        <div key={p.label} className="chart-legend-item">
+          <svg width={14} height={14} style={{ flex: '0 0 auto' }}>
+            <rect x={1} y={1} width={12} height={12} fill={shadeFor(base, p.shade)} />
+          </svg>
+          <span>{p.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // left/right must match MainChart's vertical-mode margins (MARGIN_V in
 // MainChart.tsx: left 55, right 20) so that on mobile, where this chart's
@@ -103,12 +145,9 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
 
     const periods = buildPeriods();
     const baseColor = CONFIG.metricColors[currentMetric].base;
-    // Same color as the rolling-median (trend) line on the main chart.
-    // The period-histogram median line reads faint against the filled bars, so
-    // darken the metric's trend-line color a touch for better contrast here.
-    const medianLineColor =
-      d3.color(CONFIG.getColorForElement(currentMetric, 'trendLine'))?.darker(0.6).formatHex() ??
-      CONFIG.getColorForElement(currentMetric, 'trendLine');
+    // Same color as the rolling-median (trend) line on the main chart, darkened
+    // a touch for contrast against the filled bars (see medianColorFor).
+    const medianLineColor = medianColorFor(currentMetric);
 
     // Restrict to historical archive rows only (no forecast).
     const historical = filteredData.filter((d) => d.data_type === 'historical');
@@ -180,7 +219,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       };
     });
 
-    const statLabel = usesP90 ? '90th pct' : 'Median';
+    const statLabel = statLabelFor(currentMetric);
 
     // Shared count scale so panel heights are directly comparable: domain is the
     // tallest single bin across all periods.
@@ -411,31 +450,6 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('fill', 'var(--chart-label)')
       .text('Count');
 
-    // Single legend for the summary-stat line, top-right of the plot.
-    const legendLabel = statLabel;
-    const legend = g.append('g').attr('class', 'median-legend');
-    legend
-      .append('line')
-      .attr('x1', 0)
-      .attr('x2', 16)
-      .attr('y1', 0)
-      .attr('y2', 0)
-      .attr('stroke', medianLineColor)
-      .attr('stroke-width', 3)
-      .attr('stroke-dasharray', '4,3');
-    legend
-      .append('text')
-      .attr('x', 21)
-      .attr('y', 0)
-      .attr('dy', '0.32em')
-      .style('font-size', '11px')
-      .style('fill', 'var(--chart-label)')
-      .text(legendLabel);
-    // Right-align the legend, but clear of the right-aligned year labels: a
-    // "YYYY–YYYY" label is ~64px, so leave room for it plus a gap.
-    const legendW = (legend.node() as SVGGElement).getBBox().width;
-    const YEAR_LABEL_CLEARANCE = 80;
-    legend.attr('transform', `translate(${width - legendW - YEAR_LABEL_CLEARANCE},-6)`);
   }, [filteredData, currentMetric, width, panelHeight, plotHeight]);
 
   // Significance stars — placed (and updated) on their own, keyed on pValue, so

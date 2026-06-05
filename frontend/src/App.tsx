@@ -8,7 +8,7 @@ import TemperatureContextDisplay from './components/TemperatureContext';
 import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
-import PeriodHistogramChart from './components/PeriodHistogramChart';
+import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogramChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
 import ThemeToggle from './components/ThemeToggle';
@@ -203,13 +203,14 @@ const AppContent: React.FC = () => {
             {/* Section 3 — recent-memory trend */}
             <section className="page-section">
               <header className="section-header">
-                <h2 className="section-title">The Broader Stats</h2>
+                <h2 className="section-title">The Stats</h2>
                 <p className="section-subtitle">
                   Did {metricQuestionLabel[currentMetric]} at this time of
                   year change in recent memory?
                 </p>
               </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
+              <PeriodLegend metric={currentMetric} />
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
                 <PeriodHistogramChart
                   filteredData={filteredData}
