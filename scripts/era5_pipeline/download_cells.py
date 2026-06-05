@@ -467,8 +467,13 @@ def write_archive(lat: float, lon: float, frame) -> Path:
 
 
 def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
-             var_workers, resume) -> int:
-    """Fetch all missing year-spans for one tile; return archives written."""
+             var_workers, resume, uploader=None) -> int:
+    """Fetch all missing year-spans for one tile; return archives written.
+
+    If `uploader` is given, each cell's archive is pushed to R2 right after it's
+    (re)written — so a tile's full history lands incrementally during the pull
+    rather than in a separate pass at the end. Idempotent: a re-run overwrites.
+    """
     todo = missing_years(tile_cells, years, latest_year, resume)
     if not todo:
         log(f"tile {tile_id}: nothing missing — already complete, skipping")
@@ -482,10 +487,13 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
     for (s, e) in spans:
         frames = process_span(ds, tile_id, tile_cells, s, e, var_workers)
         for (lat, lon), frame in frames.items():
-            write_archive(lat, lon, frame)
+            path = write_archive(lat, lon, frame)
+            if uploader is not None:
+                uploader.upload_file(path, f"archive/{path.name}")
             written += 1
         span = f"{s}" if s == e else f"{s}-{e}"
-        log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives")
+        log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives"
+            + (" + uploaded" if uploader is not None else ""))
     return written
 
 
@@ -506,6 +514,10 @@ def main() -> int:
                     "drops connections under load, so keep this small")
     ap.add_argument("--no-resume", action="store_true",
                     help="refetch everything, ignoring existing archives")
+    ap.add_argument("--upload-r2", action="store_true",
+                    help="push each archive to R2 as it's written (needs "
+                    "R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in env, "
+                    "e.g. `source r2.env`)")
     args = ap.parse_args()
 
     if args.year is not None:
@@ -513,6 +525,14 @@ def main() -> int:
     years = list(range(args.start_year, args.end_year + 1))
     latest_year = args.end_year
     resume = not args.no_resume
+
+    uploader = None
+    if args.upload_r2:
+        from r2_upload import R2Uploader  # boto3 import deferred to here
+
+        # R2Uploader() raises SystemExit with a clear message if creds are
+        # missing — fail fast here, before the long pull starts.
+        uploader = R2Uploader()
 
     cells = load_cells()
     by_tile = group_by_tile(cells)
@@ -536,6 +556,9 @@ def main() -> int:
           f"var-workers, {args.parallel_tiles} parallel tile(s)")
     print(f"  resume: {'on' if resume else 'OFF (full refetch)'}")
     print(f"  out   : {OUT_DIR}")
+    if uploader is not None:
+        print(f"  upload: R2 bucket '{uploader.bucket}' (archive/ keys), "
+              "per-archive as written")
     warn_ram(args.batch_years, args.var_workers, args.parallel_tiles)
     print()
 
@@ -561,7 +584,8 @@ def main() -> int:
         with ThreadPoolExecutor(max_workers=args.parallel_tiles) as ex:
             futs = {
                 ex.submit(run_tile, ds, t, c, years, latest_year,
-                          args.batch_years, args.var_workers, resume): t
+                          args.batch_years, args.var_workers, resume,
+                          uploader): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -570,7 +594,7 @@ def main() -> int:
         for tile_id, tile_cells in tiles.items():
             total_written += run_tile(
                 ds, tile_id, tile_cells, years, latest_year,
-                args.batch_years, args.var_workers, resume)
+                args.batch_years, args.var_workers, resume, uploader)
 
     print(f"\nDone — {total_written} cell-span frames written to {OUT_DIR}")
 
