@@ -214,7 +214,14 @@ const AppContent: React.FC = () => {
                 <PeriodHistogramChart
                   filteredData={filteredData}
                   currentMetric={currentMetric}
-                  pValue={significance.result?.pValue ?? null}
+                  /* Only pass the p-value once the result is for the *current*
+                     metric, so switching metrics shows a starless bracket until
+                     the new test lands — never the previous metric's stars. */
+                  pValue={
+                    significance.resultMetric === currentMetric
+                      ? significance.result?.pValue ?? null
+                      : null
+                  }
                   /* Desktop: span the main chart (760) plus the per-date
                      histogram's bar area, stopping where the % brackets begin
                      (~890), and left-align (see .period-histogram-row) so the

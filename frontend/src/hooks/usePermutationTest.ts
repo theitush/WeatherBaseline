@@ -8,6 +8,10 @@ import type { PermWorkerRequest, PermWorkerResponse } from '../utils/permutation
 export interface PermutationTestState {
   result: PermutationResult | null;
   loading: boolean;
+  // The metric `result` was computed for. Lets consumers tell a fresh result
+  // from a stale one when the metric was just switched (the worker is async, so
+  // for a tick `result` still holds the previous metric's numbers).
+  resultMetric: MetricKey | null;
 }
 
 /**
@@ -21,9 +25,13 @@ export function usePermutationTest(
   currentMetric: MetricKey
 ): PermutationTestState {
   const [result, setResult] = useState<PermutationResult | null>(null);
+  const [resultMetric, setResultMetric] = useState<MetricKey | null>(null);
   const [loading, setLoading] = useState(false);
   const workerRef = useRef<Worker | null>(null);
   const reqIdRef = useRef(0);
+  // Metric of the most recently dispatched request, read in the worker's
+  // onmessage (set up once, so it can't close over the live currentMetric).
+  const pendingMetricRef = useRef<MetricKey | null>(null);
 
   // The two periods being compared: oldest vs newest of the three the histogram
   // shows. Derived from buildPeriods() so they track the rolling windows.
@@ -59,6 +67,7 @@ export function usePermutationTest(
       // Drop superseded responses (metric switched mid-compute).
       if (e.data.id !== reqIdRef.current) return;
       setResult(e.data.result);
+      setResultMetric(pendingMetricRef.current);
       setLoading(false);
     };
     return () => {
@@ -73,10 +82,12 @@ export function usePermutationTest(
     if (!worker) return;
     if (records.length === 0) {
       setResult(null);
+      setResultMetric(null);
       setLoading(false);
       return;
     }
     const id = ++reqIdRef.current;
+    pendingMetricRef.current = currentMetric;
     setLoading(true);
     const req: PermWorkerRequest = {
       id,
@@ -91,5 +102,5 @@ export function usePermutationTest(
     worker.postMessage(req);
   }, [records, currentMetric]);
 
-  return { result, loading };
+  return { result, loading, resultMetric };
 }

@@ -81,6 +81,10 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  // Bracket geometry stashed by the main render so the separate pValue-keyed
+  // effect can place the stars without recomputing it (and without touching the
+  // bracket lines, which the main render already drew).
+  const bracketGeomRef = useRef<{ x0: number; x1: number; barY: number } | null>(null);
 
   const TOTAL_WIDTH = propWidth ?? 720;
   const panelHeight = propPanelHeight ?? 70;
@@ -357,44 +361,25 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
 
     // Significance bracket — the scientific-paper style "⊓" over the top panel,
     // connecting the newest (top) and oldest (bottom) period medians along the
-    // shared x-axis, with stars from the permutation p-value centred above. Two
-    // legs drop from a horizontal bar to point at each median's x position.
+    // shared x-axis. The bracket *lines* are drawn here, with the bars, since
+    // their geometry doesn't depend on the p-value — only the stars do, and
+    // those are added by a separate pValue-keyed effect so the bracket itself
+    // never flashes when the permutation worker result lands.
     void bottomPanelBaselineY;
-    if (pValue != null && topMedianX != null && bottomMedianX != null) {
-      const stars = starsFor(pValue);
-      // Horizontal bar sits in the top margin (negative y on `g`); legs drop to
-      // just above the top panel where the medians begin.
-      const barY = -10;
-      const legBottomY = -4;
+    if (topMedianX != null && bottomMedianX != null) {
+      const barY = -10;       // horizontal bar, in the top margin (negative y on g)
+      const legBottomY = -4;  // legs drop to just above the top panel
       const x0 = Math.min(topMedianX, bottomMedianX);
       const x1 = Math.max(topMedianX, bottomMedianX);
+      bracketGeomRef.current = { x0, x1, barY };
 
       const bracket = g.append('g').attr('class', 'sig-bracket');
-
-      // Down-turned legs + horizontal connector, drawn as one path.
       bracket
         .append('path')
-        .attr(
-          'd',
-          `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`
-        )
+        .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
         .attr('fill', 'none');
-
-      // Stars (or "ns") centred above the bar.
-      bracket
-        .append('text')
-        .attr('class', `sig-stars ${stars === 'ns' ? 'sig-ns' : ''}`)
-        .attr('x', (x0 + x1) / 2)
-        .attr('y', barY - 3)
-        .style('text-anchor', 'middle')
-        .text(stars);
-
-      // Fade in alongside the median lines.
-      bracket
-        .style('opacity', 0)
-        .transition()
-        .duration(500)
-        .style('opacity', 1);
+    } else {
+      bracketGeomRef.current = null;
     }
 
     // Shared x-axis under the bottom panel. Use d3's default tick count (no
@@ -451,7 +436,35 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     const legendW = (legend.node() as SVGGElement).getBBox().width;
     const YEAR_LABEL_CLEARANCE = 80;
     legend.attr('transform', `translate(${width - legendW - YEAR_LABEL_CLEARANCE},-6)`);
-  }, [filteredData, currentMetric, pValue, width, panelHeight, plotHeight]);
+  }, [filteredData, currentMetric, width, panelHeight, plotHeight]);
+
+  // Significance stars — placed (and updated) on their own, keyed on pValue, so
+  // the permutation worker result landing only adds/fades in the stars text. The
+  // bracket lines themselves are drawn by the main render with the bars, so they
+  // never flash. The stars fade in late, which is fine — the p-value genuinely
+  // isn't known until the worker returns.
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const bracket = d3.select(svgRef.current).select<SVGGElement>('.sig-bracket');
+    if (bracket.empty()) return;
+
+    // Clear any prior stars so pValue flips don't stack.
+    bracket.selectAll('.sig-stars').remove();
+
+    const geom = bracketGeomRef.current;
+    if (pValue == null || !geom) return;
+
+    const stars = starsFor(pValue);
+    bracket
+      .append('text')
+      .attr('class', `sig-stars ${stars === 'ns' ? 'sig-ns' : ''}`)
+      .attr('x', (geom.x0 + geom.x1) / 2)
+      .attr('y', geom.barY - 3)
+      .style('text-anchor', 'middle')
+      .text(stars);
+    // Also re-runs after the main render (filteredData/metric rebuild the SVG and
+    // the bracket lines, then this re-adds the stars onto the fresh bracket).
+  }, [pValue, filteredData, currentMetric, width, panelHeight, plotHeight]);
 
   return (
     <div className="period-histogram-wrapper">
