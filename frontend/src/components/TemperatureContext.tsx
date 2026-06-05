@@ -171,16 +171,18 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     const values = valid.map((d) => d[currentMetric] as number);
     const n = values.length;
     if (n > 0) {
-      const above = values.filter((v) => v > currentTemp).length;
-      const below = values.filter((v) => v < currentTemp).length;
-      const atOrAbove = values.filter((v) => v >= currentTemp).length / n;
-      const atOrBelow = values.filter((v) => v <= currentTemp).length / n;
+      const atOrAboveN = values.filter((v) => v >= currentTemp).length;
+      const atOrBelowN = values.filter((v) => v <= currentTemp).length;
+      const atOrAbove = atOrAboveN / n;
+      const atOrBelow = atOrBelowN / n;
       // Single-tailed rarity on the day's own side, and which side that is.
       const isHighSide = atOrAbove <= atOrBelow;
       const singleTail = Math.min(atOrAbove, atOrBelow);
-      // Rank among ties-tolerant peers: how many days are strictly more extreme
-      // on this side, +1. High side ranks by "more above"; low side by "more below".
-      rank = (isHighSide ? above : below) + 1;
+      // Shared-worst ("competition") rank: count days at-or-more-extreme on this
+      // side, so ties share the LAST position of their group. This is what stops
+      // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm
+      // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
+      rank = isHighSide ? atOrAboveN : atOrBelowN;
       const since = firstYear !== null ? ` since ${firstYear}` : '';
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
@@ -200,9 +202,13 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         extremeLine = `Only ${shown}% of days${since} were this ${adj}!`;
         verdict = pick(VERDICT_EXTREME);
       } else if (singleTail <= 0.2) {
-        // Notable — whole percent, cumulative ("or hotter").
+        // Notable — whole percent, cumulative ("or hotter"). Drop the comparative
+        // when nothing can be more extreme (a 0mm day can't be "drier").
         const pct = singleTail * 100;
-        extremeLine = `About ${pct.toFixed(0)}% of days${since} were this ${adj} or ${comp}.`;
+        const atFloor = currentTemp === 0 && !isHighSide;
+        extremeLine = atFloor
+          ? `About ${pct.toFixed(0)}% of days${since} were this ${adj}.`
+          : `About ${pct.toFixed(0)}% of days${since} were this ${adj} or ${comp}.`;
         verdict = pick(VERDICT_NOTABLE);
       } else {
         // Mild — two-tailed %, "extreme" mocked in quotes since it isn't.
