@@ -1,0 +1,30 @@
+/* Snap-distance read-out between the location and date controls. Just colored
+   mono text — no chrome. Color encodes quality: green ≤9 km (on the 0.1° grid),
+   amber ≤20 km, red beyond. */
+.distance-badge {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+
+.distance-badge-good { color: #15803d; }
+.distance-badge-warn { color: #b45309; }
+.distance-badge-bad  { color: #c62828; }
+
+/* Dark palette — mirror index.css: explicit toggle plus OS preference unless
+   the user forced light. */
+:root[data-theme='dark'] {
+  .distance-badge-good { color: #4ade80; }
+  .distance-badge-warn { color: #fbbf24; }
+  .distance-badge-bad  { color: #f87171; }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    .distance-badge-good { color: #4ade80; }
+    .distance-badge-warn { color: #fbbf24; }
+    .distance-badge-bad  { color: #f87171; }
+  }
+}

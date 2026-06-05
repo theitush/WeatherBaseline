@@ -75,12 +75,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // if the path parses, it seeds location/date/metric so a link reconstructs the
   // exact view with no geocoding. Bare root leaves the defaults below (then the
   // IP lookup in App may override the location).
-  const initial = typeof window !== 'undefined' ? parsePath(window.location.pathname) : null;
+  const initial =
+    typeof window !== 'undefined'
+      ? parsePath(window.location.pathname, window.location.search)
+      : null;
 
   // Default location: Tel Aviv, Israel (unless the URL specified one).
   const [location, setLocation] = useState<Location>(
     initial
-      ? { lat: initial.lat, lon: initial.lon, name: initial.name }
+      ? { lat: initial.lat, lon: initial.lon, name: initial.name, distanceKm: initial.distanceKm }
       : { lat: 32.0853, lon: 34.7818, name: 'Tel Aviv, Israel' }
   );
 
@@ -283,8 +286,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       lon: location.lon,
       date: currentDate,
       metric: currentMetric,
+      distanceKm: location.distanceKm,
     });
-    if (path !== window.location.pathname) {
+    if (path !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, '', path);
     }
   }, [location, currentDate, currentMetric]);

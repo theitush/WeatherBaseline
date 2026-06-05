@@ -8,9 +8,6 @@ interface LocationSelectorProps {
   cityName: string;
   latitude: number;
   longitude: number;
-  /** Distance from the searched place to the snapped cell, when known — drives
-   *  the persistent "data from N km away" line shown after a selection. */
-  distanceKm?: number;
   onChange: (info: {
     name: string;
     lat: number;
@@ -45,7 +42,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   cityName,
   latitude,
   longitude,
-  distanceKm,
   onChange,
 }) => {
   const [cityInput, setCityInput] = useState(cityName);
@@ -195,17 +191,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           </div>
         )}
       </div>
-      {/* Persistent read-out of where the data actually comes from, kept visible
-          after the dropdown closes so the snapped-cell distance never disappears
-          on the chosen location. Hidden while browsing suggestions to avoid
-          competing with the per-row distances. */}
-      {distanceKm != null && !showSuggestions && (
-        <div className="city-snap city-snap-active">
-          <span className="city-snap-arrow">↳</span>
-          <span className="city-snap-label">nearest data point</span>
-          <span className="city-snap-dist">{formatKm(distanceKm)}</span>
-        </div>
-      )}
     </div>
   );
 };

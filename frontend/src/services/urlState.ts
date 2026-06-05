@@ -17,6 +17,10 @@ export interface UrlState {
   lon: number;
   date: string; // YYYY-MM-DD
   metric: MetricKey;
+  /** Snapped-cell distance (km) at share time, if the link carried ?d=. The URL
+   *  coords are the cell, so this is the only way a link can recover how far the
+   *  shared place was from its data point. */
+  distanceKm?: number;
 }
 
 // Short URL token <-> internal MetricKey. tmax/tmin (not min/max) per the data's
@@ -80,9 +84,13 @@ export function buildPath(state: {
   lon: number;
   date: string;
   metric: MetricKey;
+  distanceKm?: number;
 }): string {
   const loc = `${state.slug}@${fmtCoord(state.lat)},${fmtCoord(state.lon)}`;
-  return `/${loc}/${state.date}/${METRIC_TO_TOKEN[state.metric]}`;
+  const path = `/${loc}/${state.date}/${METRIC_TO_TOKEN[state.metric]}`;
+  // Carry the snap distance so a recipient's badge matches what the sharer saw;
+  // the cell coords alone can't reconstruct it.
+  return state.distanceKm != null ? `${path}?d=${Math.round(state.distanceKm)}` : path;
 }
 
 /**
@@ -91,7 +99,7 @@ export function buildPath(state: {
  * slash. The name is reconstructed from the slug — the slug's first component is
  * the city, the rest are region/country shown as ", ..." detail.
  */
-export function parsePath(pathname: string): UrlState | null {
+export function parsePath(pathname: string, search = ''): UrlState | null {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length < 3) return null;
   const [locSeg, dateSeg, metricSeg] = segments;
@@ -111,7 +119,11 @@ export function parsePath(pathname: string): UrlState | null {
   const metric = TOKEN_TO_METRIC[metricSeg];
   if (!metric) return null;
 
-  return { name: deslugify(slug), lat, lon, date: dateSeg, metric };
+  const dRaw = new URLSearchParams(search).get('d');
+  const d = dRaw != null ? Number(dRaw) : NaN;
+  const distanceKm = Number.isFinite(d) && d >= 0 ? d : undefined;
+
+  return { name: deslugify(slug), lat, lon, date: dateSeg, metric, distanceKm };
 }
 
 export { METRIC_TO_TOKEN, TOKEN_TO_METRIC };

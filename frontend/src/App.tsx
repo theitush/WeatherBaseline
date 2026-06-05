@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import CONFIG from './utils/config';
 import { AppProvider, useApp } from './context/AppContext';
 import LocationSelector from './components/LocationSelector';
+import DistanceBadge from './components/DistanceBadge';
 import DateSelector from './components/DateSelector';
 import MetricSelector from './components/MetricSelector';
 import TemperatureContextDisplay from './components/TemperatureContext';
@@ -117,7 +118,7 @@ const AppContent: React.FC = () => {
       <div className="app-container">
         <div className="sticky-bar">
           <header className="app-header">
-            <h1>BaselineWeather.com</h1>
+            <h1>BaselineWeather .com</h1>
             <ThemeToggle />
           </header>
 
@@ -127,9 +128,10 @@ const AppContent: React.FC = () => {
                 cityName={location.name || ''}
                 latitude={location.lat}
                 longitude={location.lon}
-                distanceKm={location.distanceKm}
                 onChange={handleLocationChange}
               />
+
+              <DistanceBadge distanceKm={location.distanceKm} />
 
               <DateSelector
                 currentDate={currentDate}

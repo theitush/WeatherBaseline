@@ -12,13 +12,6 @@
   align-items: center;
 }
 
-/* The persistent snap read-out sits directly under the search input, so the
-   selector stacks input-over-distance while still sitting in the controls row. */
-.city-snap-active {
-  margin-top: 6px;
-  max-width: 260px;
-}
-
 .city-search-container label {
   margin-right: 10px;
   font-weight: 500;
