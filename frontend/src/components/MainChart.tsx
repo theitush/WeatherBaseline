@@ -61,6 +61,15 @@ const MainChart: React.FC<MainChartProps> = ({
       .filter((v): v is number => v !== undefined);
     const [minVal, maxVal] = d3.extent(allValues) as [number, number];
 
+    // Precipitation and wind can't be negative, so don't let the padded lower
+    // bound dip below zero. This keeps the temp-axis domain identical to the
+    // period-histogram chart's (see PeriodHistogramChart), which matters on
+    // mobile where the two x-axes sit one above the other and must line up.
+    const nonNegative =
+      currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
+    const tempLo = nonNegative ? Math.max(0, minVal - 2) : minVal - 2;
+    const tempHi = maxVal + 2;
+
     // timeScale maps date → its axis pixel; tempScale maps temp → its axis pixel.
     // Orientation only changes which axis (x vs y) each one drives.
     const timeScale = d3
@@ -69,7 +78,7 @@ const MainChart: React.FC<MainChartProps> = ({
       .range(isVertical ? [height, 0] : [0, width]);
     const tempScale = d3
       .scaleLinear()
-      .domain([minVal - 2, maxVal + 2])
+      .domain([tempLo, tempHi])
       .range(isVertical ? [0, width] : [height, 0]);
 
     const tx = (t: Date | number, kind: 'time' | 'temp') =>

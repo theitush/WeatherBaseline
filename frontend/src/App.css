@@ -257,6 +257,10 @@ body {
   font-size: 0;
   white-space: nowrap;
   overflow-x: auto;
+  /* The inline-block chart cluster (main chart 760 + per-date histogram) is
+     ~990px wide and stays centered (inherited text-align:center). The period
+     histogram below is matched to this same 990px box and left-aligned within
+     it, so the two share a centered left edge — see .period-histogram-row. */
 }
 
 .charts-container .main-chart-wrapper,
@@ -281,8 +285,34 @@ body {
 .period-histogram-row {
   display: flex;
   flex-direction: column;
+  /* Desktop: center the histogram as a group, but keep it aligned with the
+     main chart above. The main-chart cluster is ~990px wide and centered, so
+     we center a 990px-wide box here too and left-align the (narrower, 890px)
+     histogram within it — that puts its left edge exactly under the main
+     chart's left edge, so their temp x-axes line up while the whole thing
+     stays centered on the page. */
   align-items: center;
   margin-top: 8px;
+}
+
+/* Desktop only: the wrapper becomes a 990px box centered on the page (matching
+   the main-chart cluster's width + centering), and the SVG sits flush-left
+   inside it as a block, so its left edge lands under the main chart's. */
+.period-histogram-row:not(.mobile) .period-histogram-wrapper {
+  display: block;
+  width: 990px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.period-histogram-row:not(.mobile) .period-histogram-svg {
+  display: block;
+}
+
+/* Mobile keeps the histogram centered (it's full-bleed there, stacked under
+   the main chart which is itself centered). */
+.period-histogram-row.mobile {
+  align-items: center;
 }
 
 .chart-legend {

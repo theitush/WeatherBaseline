@@ -207,7 +207,11 @@ const AppContent: React.FC = () => {
                 <PeriodHistogramChart
                   filteredData={filteredData}
                   currentMetric={currentMetric}
-                  width={isMobile ? mobileWidth : 990}
+                  /* Desktop: span the main chart (760) plus the per-date
+                     histogram's bar area, stopping where the % brackets begin
+                     (~890), and left-align (see .period-histogram-row) so the
+                     temp x-axis lines up with the main chart above. */
+                  width={isMobile ? mobileWidth : 890}
                   panelHeight={isMobile ? 64 : 72}
                 />
               </div>

@@ -49,7 +49,11 @@ function shadeFor(base: string, shade: number): string {
   return (d3.interpolateRgb(base, '#ffffff')(t) as string);
 }
 
-const MARGIN = { top: 18, right: 30, bottom: 36, left: 55 };
+// left/right must match MainChart's vertical-mode margins (MARGIN_V in
+// MainChart.tsx: left 55, right 20) so that on mobile, where this chart's
+// x-axis sits directly under the main chart's, the two temp axes share the
+// exact same pixel range and their ticks line up.
+const MARGIN = { top: 18, right: 20, bottom: 36, left: 55 };
 const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
 
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
@@ -90,32 +94,45 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .filter((v): v is number => v !== null && v !== undefined);
     if (allValues.length === 0) return;
 
+    // The temp axis (x) must match the main chart's exactly so the two x-axes
+    // align on mobile. The main chart derives its domain from *all* filteredData
+    // (including recent/forecast rows), so do the same here for the axis domain.
+    const axisValues = filteredData
+      .map(valueOf)
+      .filter((v): v is number => v !== null && v !== undefined);
+
     const g = svg
       .append('g')
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
     const tooltip = d3.select(tooltipRef.current);
 
-    const [minVal, maxVal] = d3.extent(allValues) as [number, number];
+    const [axisMin, axisMax] = d3.extent(axisValues) as [number, number];
 
-    // Shared temp axis (x) across all three panels.
-    const tempScale = d3.scaleLinear().range([0, width]);
-
-    // Fixed 0.5-unit bins, anchored to a half-unit grid so every period shares
-    // the exact same bin edges (and they line up across metrics/locations).
-    const BIN = 0.5;
     // Precipitation and wind can't be negative, so don't let the padded lower
     // bound dip below zero (otherwise dry-day distributions get phantom -2,-1
     // bins and axis ticks).
     const nonNegative = currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
-    let lo = Math.floor((minVal - 2) / BIN) * BIN;
-    if (nonNegative) lo = Math.max(0, lo);
-    const hi = Math.ceil((maxVal + 2) / BIN) * BIN;
-    const thresholds = d3.range(lo, hi + BIN, BIN);
-    tempScale.domain([lo, hi]);
+
+    // Axis domain matches the main chart's tempScale exactly ([min-2, max+2]
+    // with the same ≥0 floor) so the two x-axes line up on mobile.
+    const domainLo = nonNegative ? Math.max(0, axisMin - 2) : axisMin - 2;
+    const domainHi = axisMax + 2;
+
+    // Shared temp axis (x) across all three panels.
+    const tempScale = d3.scaleLinear().domain([domainLo, domainHi]).range([0, width]);
+
+    // Fixed 0.5-unit bins, anchored to a half-unit grid so every period shares
+    // the exact same bin edges (and they line up across metrics/locations).
+    // Snap only the *bin* edges to the grid; the axis domain stays continuous
+    // (above) to match the main chart.
+    const BIN = 0.5;
+    const binLo = Math.max(domainLo, Math.floor(domainLo / BIN) * BIN);
+    const binHi = Math.ceil(domainHi / BIN) * BIN;
+    const thresholds = d3.range(binLo, binHi + BIN, BIN);
     const binGen = d3
       .bin<number, number>()
-      .domain([lo, hi])
+      .domain([binLo, binHi])
       .thresholds(thresholds);
 
     // Precipitation is dominated by dry days, so its median is uninformative
@@ -286,12 +303,14 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       }
     });
 
-    // Shared x-axis under the bottom panel.
+    // Shared x-axis under the bottom panel. Use d3's default tick count (no
+    // .ticks() override) so it matches the main chart's temp axis exactly —
+    // with the same domain and pixel range, the tick positions are identical.
     const xAxisG = g
       .append('g')
       .attr('class', 'axis')
       .attr('transform', `translate(0,${plotHeight})`)
-      .call(d3.axisBottom(tempScale).ticks(8) as any);
+      .call(d3.axisBottom(tempScale) as any);
     void xAxisG;
 
     g.append('text')
@@ -301,6 +320,17 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('font-size', '12px')
       .style('fill', '#555')
       .text(tempLabels[currentMetric]);
+
+    // Shared "Count" label down the y-axis (the per-panel axes only show ticks).
+    g.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', -MARGIN.left + 12)
+      .attr('x', -plotHeight / 2)
+      .attr('dy', '1em')
+      .style('text-anchor', 'middle')
+      .style('font-size', '12px')
+      .style('fill', '#555')
+      .text('Count');
 
     // Single legend for the summary-stat line, top-right of the plot.
     const legendLabel = statLabel;
