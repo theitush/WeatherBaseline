@@ -99,7 +99,7 @@ const AppContent: React.FC = () => {
       <div className="app-container">
         <div className="sticky-bar">
           <header className="app-header">
-            <h1>How Extreme Is This Weather?</h1>
+            <h1>Weather Rank</h1>
           </header>
 
           <div className="controls-panel">
