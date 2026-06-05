@@ -263,13 +263,13 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .attr('class', 'axis')
         .call(d3.axisLeft(countScale).ticks(2) as any);
 
-      // Period label as a centered title, a bit above the panel.
+      // Period label, right-aligned above the panel.
       panel
         .append('text')
         .attr('class', 'panel-label')
-        .attr('x', width / 2)
+        .attr('x', width)
         .attr('y', -5)
-        .style('text-anchor', 'middle')
+        .style('text-anchor', 'end')
         .style('font-size', '12px')
         .style('font-weight', '500')
         .style('fill', 'var(--text-h)')
@@ -288,22 +288,37 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
           .attr('y1', 0)
           .attr('y2', panelHeight)
           .attr('stroke', medianLineColor)
-          .attr('stroke-width', 1.5)
+          .attr('stroke-width', 3)
           .attr('stroke-dasharray', '4,3')
           .style('opacity', 0)
-          .on('mouseover', (event) => {
-            tooltip
-              .style('opacity', 1)
-              .html(
-                `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${units[currentMetric]}`
-              )
-              .style('left', event.clientX + 12 + 'px')
-              .style('top', event.clientY - 28 + 'px');
-          })
-          .on('mouseout', () => tooltip.style('opacity', 0))
           .transition()
           .duration(500)
           .style('opacity', 1);
+
+        // Wide transparent hit area over the median line so the tooltip is easy
+        // to catch (the visible line is only ~2px wide).
+        const showMedianTip = (event: MouseEvent) => {
+          tooltip
+            .style('opacity', 1)
+            .html(
+              `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${units[currentMetric]}`
+            )
+            .style('left', event.clientX + 12 + 'px')
+            .style('top', event.clientY - 28 + 'px');
+        };
+        panel
+          .append('line')
+          .attr('class', 'period-median-hit')
+          .attr('x1', mx)
+          .attr('x2', mx)
+          .attr('y1', 0)
+          .attr('y2', panelHeight)
+          .attr('stroke', 'transparent')
+          .attr('stroke-width', 12)
+          .style('cursor', 'pointer')
+          .on('mouseover', showMedianTip)
+          .on('mousemove', showMedianTip)
+          .on('mouseout', () => tooltip.style('opacity', 0));
       }
     });
 
@@ -346,7 +361,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .attr('y1', 0)
       .attr('y2', 0)
       .attr('stroke', medianLineColor)
-      .attr('stroke-width', 1.5)
+      .attr('stroke-width', 3)
       .attr('stroke-dasharray', '4,3');
     legend
       .append('text')
@@ -356,9 +371,11 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('font-size', '11px')
       .style('fill', 'var(--chart-label)')
       .text(legendLabel);
-    // Right-align the whole legend at the top of the plot.
+    // Right-align the legend, but clear of the right-aligned year labels: a
+    // "YYYY–YYYY" label is ~64px, so leave room for it plus a gap.
     const legendW = (legend.node() as SVGGElement).getBBox().width;
-    legend.attr('transform', `translate(${width - legendW},-6)`);
+    const YEAR_LABEL_CLEARANCE = 80;
+    legend.attr('transform', `translate(${width - legendW - YEAR_LABEL_CLEARANCE},-6)`);
   }, [filteredData, currentMetric, width, panelHeight, plotHeight]);
 
   return (
