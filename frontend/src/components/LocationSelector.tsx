@@ -77,11 +77,22 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         loadCells(),
       ]);
       if (controller.signal.aborted) return; // superseded by a newer keystroke
+      // Several geocoder hits can snap to the SAME cell (e.g. two "Paris" results
+      // landing on one grid point), which would show duplicate rows. De-dupe by
+      // the snapped cell's coords, keeping the closest hit for each cell. Results
+      // are pre-sorted by relevance, so the first hit per cell is also the one we
+      // surface as "for …". (Same-named cells in different regions snap to
+      // distinct coords, so this keeps them as separate rows.)
       const matched: Suggestion[] = [];
+      const seenCells = new Set<string>();
       for (const place of results) {
         if (!PLACE_TYPES.has(place.type)) continue;
         const snapped = snapToNearestCell(parseFloat(place.lat), parseFloat(place.lon), cells);
-        if (snapped) matched.push({ place, snapped });
+        if (!snapped) continue;
+        const cellKey = `${snapped.cell.lat},${snapped.cell.lon}`;
+        if (seenCells.has(cellKey)) continue;
+        seenCells.add(cellKey);
+        matched.push({ place, snapped });
         if (matched.length === 6) break;
       }
       setSuggestions(matched);

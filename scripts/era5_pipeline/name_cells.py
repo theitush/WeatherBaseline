@@ -37,6 +37,7 @@ import io
 import json
 import sys
 import time
+from collections import Counter
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -100,13 +101,40 @@ def load_country_names() -> dict[str, str]:
     return out
 
 
-def load_gazetteer() -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray, list[str]]:
-    """Return (lats, lons, names, populations, country_codes) for every city.
+def load_admin1_names() -> dict[str, str]:
+    """Map "{country}.{admin1code}" -> human admin-1 name (e.g. "US.IL" -> "Illinois").
+
+    Used to disambiguate same-named cells in different regions (the Springfield
+    problem). Like countryInfo, this is best-effort: on failure we return an empty
+    map and simply skip the region, never hard-failing naming on it.
+    """
+    url = "https://download.geonames.org/export/dump/admin1CodesASCII.txt"
+    out: dict[str, str] = {}
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            text = resp.read().decode("utf-8")
+    except Exception as e:  # noqa: BLE001
+        print(f"  admin1Codes fetch failed ({e}); skipping region disambiguation", file=sys.stderr)
+        return out
+    # Format: "{country}.{admin1code}\t{name}\t{asciiName}\t{geonameid}"
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        cols = line.split("\t")
+        if len(cols) >= 2 and cols[0]:
+            out[cols[0]] = cols[1]  # "US.IL" -> "Illinois"
+    return out
+
+
+def load_gazetteer() -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray, list[str], list[str]]:
+    """Return (lats, lons, names, populations, country_codes, admin1_codes) per city.
 
     GeoNames dump is a tab-separated file; the columns we use are:
-      1 name, 4 latitude, 5 longitude, 8 country code, 14 population  (0-indexed)
+      1 name, 4 latitude, 5 longitude, 8 country code, 10 admin1 code,
+      14 population  (0-indexed)
     """
-    lats, lons, names, pops, ccs = [], [], [], [], []
+    lats, lons, names, pops, ccs, a1s = [], [], [], [], [], []
     with GAZ_TXT.open(encoding="utf-8") as f:
         for line in f:
             cols = line.rstrip("\n").split("\t")
@@ -123,8 +151,9 @@ def load_gazetteer() -> tuple[np.ndarray, np.ndarray, list[str], np.ndarray, lis
             names.append(cols[1])
             pops.append(pop)
             ccs.append(cols[8])
+            a1s.append(cols[10])
     print(f"  gazetteer: {len(names):,} cities", file=sys.stderr)
-    return (np.asarray(lats), np.asarray(lons), names, np.asarray(pops), ccs)
+    return (np.asarray(lats), np.asarray(lons), names, np.asarray(pops), ccs, a1s)
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -143,17 +172,27 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 # itself a distinct megacity centre (e.g. Dhaka) gets named on its own row.
 PROMINENCE_KM = 8.0
 
+# A sub-district cell (e.g. Pallabi) gets the recognisable parent appended
+# ("Pallabi, Dhaka") when a meaningfully-larger place sits within PARENT_KM of
+# the chosen one. The radius is ~one cell wide because a megacity's centroid can
+# sit a full cell away from an edge sub-district (Dhaka is ~10 km from Pallabi's
+# cell, which 8 km PROMINENCE misses). The parent must be PARENT_POP_RATIO times
+# more populous and a different name, so we never append a same-size neighbour or
+# the place's own duplicate.
+PARENT_KM = 12.0
+PARENT_POP_RATIO = 4.0
 
-def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs):
-    """For each cell, return (name, country_code, distance_km) of its best city.
 
-    "Best" = the most populous gazetteer city within PROMINENCE_KM of the cell
-    centre; if none are that close, the single nearest city. This makes dense
-    cells show the recognisable name rather than whichever sub-district landed on
-    the grid point. distance_km is to the CHOSEN city. Uses a KD-tree over a
-    local equirectangular projection so Euclidean nearest ~ great-circle nearest
-    at city scale; exact distance is haversine. Falls back to brute force if
-    scipy isn't available.
+def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs, a1s):
+    """For each cell, return (name, country_code, admin1_code, distance_km).
+
+    The chosen city = the most populous gazetteer city within PROMINENCE_KM of the
+    cell centre; if none are that close, the single nearest city. When the chosen
+    city is a sub-district, a much larger nearby place is appended as a parent
+    ("Pallabi, Dhaka"). distance_km is to the CHOSEN (primary) city. Uses a KD-tree
+    over a local equirectangular projection so Euclidean nearest ~ great-circle
+    nearest at city scale; exact distance is haversine. Falls back to brute force
+    if scipy isn't available.
     """
     cell_lats = np.asarray(cell_lats)
     cell_lons = np.asarray(cell_lons)
@@ -165,7 +204,7 @@ def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs
         return np.column_stack([x, y]) * R_EARTH_KM
 
     def pick(cands, ci):
-        """Build (name, country_code, distance_km) from candidate gaz indices."""
+        """Build (name, country_code, admin1_code, distance_km) from candidate gaz indices."""
         kms = [(j, haversine_km(cell_lats[ci], cell_lons[ci], gaz_lats[j], gaz_lons[j]))
                for j in cands]
         near = [(j, km) for j, km in kms if km <= PROMINENCE_KM]
@@ -174,7 +213,22 @@ def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs
             km = next(k for jj, k in near if jj == j)
         else:
             j, km = min(kms, key=lambda t: t[1])             # else the single nearest
-        return names[j], ccs[j], km
+
+        label = names[j]
+        # Append a recognisable parent when the chosen place is a small piece of a
+        # much larger nearby city (a sub-district / neighbourhood). The parent must
+        # be a different name and PARENT_POP_RATIO× more populous, and sit within
+        # PARENT_KM of the cell centre.
+        parents = [
+            (jj, kk) for jj, kk in kms
+            if kk <= PARENT_KM
+            and names[jj] != names[j]
+            and pops[jj] >= PARENT_POP_RATIO * max(pops[j], 1)
+        ]
+        if parents:
+            pj = max(parents, key=lambda t: pops[t[0]])[0]   # most populous parent
+            label = f"{names[j]}, {names[pj]}"
+        return label, ccs[j], a1s[j], km
 
     try:
         from scipy.spatial import cKDTree
@@ -182,24 +236,26 @@ def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs
         # Pull enough neighbours that the parent search sees the big city too,
         # not just the cluster of sub-districts on top of the cell centre.
         _, idxs = tree.query(project(cell_lats, cell_lons), k=20)
-        out_names, out_cc, out_dist = [], [], []
+        out_names, out_cc, out_a1, out_dist = [], [], [], []
         for i in range(len(cell_lats)):
-            label, cc, km = pick(np.atleast_1d(idxs[i]), i)
+            label, cc, a1, km = pick(np.atleast_1d(idxs[i]), i)
             out_names.append(label)
             out_cc.append(cc)
+            out_a1.append(a1)
             out_dist.append(km)
-        return out_names, out_cc, out_dist
+        return out_names, out_cc, out_a1, out_dist
     except ImportError:
         print("  scipy not installed; brute-force nearest (slower)", file=sys.stderr)
-        out_names, out_cc, out_dist = [], [], []
+        out_names, out_cc, out_a1, out_dist = [], [], [], []
         for i in range(len(cell_lats)):
             d = haversine_km(cell_lats[i], cell_lons[i], gaz_lats, gaz_lons)
             order = np.argsort(d)[:20]
-            label, cc, km = pick(order, i)
+            label, cc, a1, km = pick(order, i)
             out_names.append(label)
             out_cc.append(cc)
+            out_a1.append(a1)
             out_dist.append(km)
-        return out_names, out_cc, out_dist
+        return out_names, out_cc, out_a1, out_dist
 
 
 def load_revgeo_cache() -> dict:
@@ -243,8 +299,9 @@ def main() -> int:
     args = ap.parse_args()
 
     download_gazetteer()
-    gaz_lats, gaz_lons, names, pops, ccs = load_gazetteer()
+    gaz_lats, gaz_lons, names, pops, ccs, a1s = load_gazetteer()
     cc_to_country = load_country_names()
+    admin1_to_name = load_admin1_names()
 
     # Read the existing cells.csv, preserving every column.
     with CELLS.open(encoding="utf-8") as f:
@@ -258,8 +315,8 @@ def main() -> int:
 
     print("  nearest-city join ...", file=sys.stderr)
     t0 = time.time()
-    nn_names, nn_cc, nn_dist = nearest_city_join(
-        cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs)
+    nn_names, nn_cc, nn_a1, nn_dist = nearest_city_join(
+        cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs, a1s)
     print(f"    done in {time.time() - t0:.1f}s", file=sys.stderr)
 
     far = [i for i, d in enumerate(nn_dist) if d > FAR_KM]
@@ -288,11 +345,40 @@ def main() -> int:
             return f"{name}, {country}"
         return name
 
+    # Region disambiguation (#3): two same-named cities in different regions
+    # (Springfield, IL vs MO vs MA) all read "Springfield, United States" and are
+    # indistinguishable. So first compute each near cell's "{place}, {country}"
+    # base label and count how many cells share it; for any base shared by more
+    # than one cell, splice the admin-1 region in between → "Springfield, Illinois,
+    # United States". Cells whose base label is unique keep the concise form. We
+    # only count cells whose region is actually resolvable, so an unknown region
+    # never blocks a disambiguation it can't help with.
+    base_label: dict[int, str] = {}
+    region: dict[int, str] = {}
+    for i in range(len(rows)):
+        if nn_dist[i] > FAR_KM:
+            continue
+        country = cc_to_country.get(nn_cc[i], nn_cc[i])
+        base_label[i] = with_country(nn_names[i], country)
+        reg = admin1_to_name.get(f"{nn_cc[i]}.{nn_a1[i]}", "")
+        # Drop a region that just repeats a segment already in the label — many
+        # capital/city-state admin-1 areas share the city's name ("Cairo, Cairo",
+        # "Kinshasa, Kinshasa"), where the region adds nothing.
+        segments = {s.strip().casefold() for s in nn_names[i].split(",")}
+        region[i] = "" if reg.casefold() in segments else reg
+
+    base_counts = Counter(base_label.values())
+
     # Assign final names: gazetteer for near cells; Photon (or coords) for far ones.
     for i, r in enumerate(rows):
         if nn_dist[i] <= FAR_KM:
-            country = cc_to_country.get(nn_cc[i], nn_cc[i])
-            r["name"] = with_country(nn_names[i], country)
+            reg = region[i]
+            if reg and base_counts[base_label[i]] > 1:
+                country = cc_to_country.get(nn_cc[i], nn_cc[i])
+                # Splice region between the place label and the country.
+                r["name"] = with_country(f"{nn_names[i]}, {reg}", country)
+            else:
+                r["name"] = base_label[i]
         else:
             key = f"{cell_lats[i]:.2f},{cell_lons[i]:.2f}"
             rev = cache.get(key)
