@@ -35,7 +35,7 @@ const METRIC_NOUN_NEG: Record<MetricKey, string> = {
 // Plain-language verdict from the p-value. The thresholds are deliberately
 // loose — this is a vibe check on top of the histogram, not a paper.
 function verdict(p: number): string {
-  if (p < 0.001) return 'Wow Super Likely!';     // *** level
+  if (p < 0.001) return 'Wah! Super Likely!';     // *** level
   if (p < 0.01) return 'Very Likely!';  // ** level
   if (p < 0.05) return 'Pretty likely.';
   if (p < 0.15) return 'Maybe..?';
