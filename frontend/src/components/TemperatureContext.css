@@ -123,6 +123,7 @@
   width: 2px;
   height: 16px;
   border-radius: 1px;
+  border: 1px solid #111;
 }
 
 .record-scale-marker-value {
