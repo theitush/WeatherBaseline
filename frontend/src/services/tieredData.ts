@@ -34,7 +34,15 @@ export function snap(coord: number): number {
 
 function fileUrl(tier: Tier, lat: number, lon: number): string {
   const name = `${tier}_${snap(lat).toFixed(1)}_${snap(lon).toFixed(1)}.csv.gz`;
-  return `${DATA_BASE}/data/${tier}/${name}`;
+  // Two serving shapes share the SAME object key `{tier}/{name}`:
+  //   - dev (DATA_BASE=''): the Node backend's Express static route is mounted
+  //     at /data, so prefix it → /data/archive/archive_..csv.gz.
+  //   - prod (DATA_BASE=R2 origin): files sit at the bucket root under their
+  //     tier, so the key IS the path → https://…r2.dev/archive/archive_..csv.gz.
+  // Keeping the R2 keys un-prefixed matches the Worker's cellStore + the upload
+  // scripts; only the dev proxy needs the /data mount point.
+  const prefix = DATA_BASE ? '' : '/data';
+  return `${DATA_BASE}${prefix}/${tier}/${name}`;
 }
 
 /** One parsed CSV row from a cell file (raw string cells). */

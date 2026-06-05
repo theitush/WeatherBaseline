@@ -32,3 +32,6 @@ __pycache__/
 # Retired v1 per-location cache (cacheManager.js, superseded by v2 tiered serving)
 /cache/
 /cache_deprecated/
+
+# R2 S3 API credentials (S3 access key/secret). NEVER commit.
+/scripts/era5_pipeline/r2.env

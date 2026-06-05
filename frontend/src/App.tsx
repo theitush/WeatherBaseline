@@ -105,7 +105,7 @@ const AppContent: React.FC = () => {
       <div className="app-container">
         <div className="sticky-bar">
           <header className="app-header">
-            <h1>BaselineWeather.com</h1>
+            <h1>WeatherBaseline.com</h1>
             <ThemeToggle />
           </header>
 
@@ -205,8 +205,8 @@ const AppContent: React.FC = () => {
               <header className="section-header">
                 <h2 className="section-title">The Stats</h2>
                 <p className="section-subtitle">
-                  Did {metricQuestionLabel[currentMetric]} at this time of
-                  year change in recent memory?
+                  Did the common {metricQuestionLabel[currentMetric]} at this time of
+                  year change?
                 </p>
               </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>

@@ -1,0 +1,30 @@
+# Cloudflare Worker — HowHotWasIt v2 control plane (ensure-fresh + geo).
+#
+# The Worker is the thin tail-only backend from ARCHITECTURE.md: it tops up the
+# volatile recent/forecast tiers from Open-Meteo and writes them to R2. Reads of
+# the .csv.gz tier files go DIRECT to R2's public URL (the frontend's
+# VITE_DATA_BASE), never through this Worker — so file reads don't consume the
+# Worker request budget.
+#
+# Local dev: `wrangler dev --local` emulates the R2 binding via Miniflare in a
+# local dir (.wrangler/state) — no Cloudflare account or bucket needed. Seed it
+# from the repo's local data with scripts/seed-local-r2.sh.
+name = "howhotwasit"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+# nodejs_compat gives us a few Node globals; the core logic only needs fetch +
+# the Web Crypto/Streams already in the Workers runtime.
+compatibility_flags = ["nodejs_compat"]
+
+# R2 binding: env.BUCKET in the Worker. The bucket_name is only used against the
+# real account on `wrangler deploy`; under `--local` Miniflare ignores it and
+# uses local storage keyed by the binding name.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "weather-baseline"
+
+[vars]
+# Freshness thresholds (ms). Overridable per-environment. Mirror the old
+# backend/ensureFresh.js defaults: forecast 12h, recent 24h.
+FORECAST_TTL_MS = "43200000"
+RECENT_TTL_MS = "86400000"
