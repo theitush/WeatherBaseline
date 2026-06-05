@@ -124,12 +124,12 @@ body {
 
 .section-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 50px;
 }
 
 .section-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 600;
   color: #222;
   letter-spacing: -0.01em;
@@ -199,6 +199,16 @@ body {
   font-size: 15px;
   line-height: 1.6;
   color: #555;
+}
+
+.faq-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-border);
+}
+
+.faq-body a:hover {
+  border-bottom-color: var(--accent);
 }
 
 .data-info {
@@ -414,6 +424,6 @@ body {
     padding: 24px 0;
   }
   .section-title {
-    font-size: 21px;
+    font-size: 24px;
   }
 }

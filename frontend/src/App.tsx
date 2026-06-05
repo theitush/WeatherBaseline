@@ -228,16 +228,24 @@ const AppContent: React.FC = () => {
                   <div className="faq-body">
                     <p>
                       The historical record comes from{' '}
-                      <strong>ERA5-Land</strong>, the European Centre for
-                      Medium-Range Weather Forecasts' reanalysis. A reanalysis
-                      isn't a forecast and it isn't a single weather station — it's
-                      the output of running a modern physics model backwards over
-                      every observation we have (stations, balloons, ships,
-                      satellites) to reconstruct a single, gap-free, globally
-                      consistent estimate of what the weather actually did. ERA5-Land
-                      gives one value per day per cell on a fixed 0.1° grid (roughly
-                      11 km), so the seam between cities is never an artifact of where
-                      a thermometer happened to sit.
+                      <strong>
+                        <a
+                          href="https://www.ecmwf.int/en/era5-land"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          ERA5-Land
+                        </a>
+                      </strong>
+                      , the European Centre for Medium-Range Weather Forecasts'
+                      reanalysis. A reanalysis isn't a forecast and it isn't a single
+                      weather station — it's the output of running a modern physics
+                      model backwards over every observation we have (stations,
+                      balloons, ships, satellites) to reconstruct a single, gap-free,
+                      globally consistent estimate of what the weather actually did.
+                      ERA5-Land gives one value per day per cell on a fixed 0.1° grid
+                      (roughly 11 km), so the seam between cities is never an artifact
+                      of where a thermometer happened to sit.{' '}
                     </p>
                     <p>
                       When you search a city we snap it to the nearest grid cell
@@ -246,15 +254,61 @@ const AppContent: React.FC = () => {
                       temperature, precipitation, and peak wind.
                     </p>
                     <p>
-                      The last couple of weeks (and the few days ahead) can't be in
-                      a reanalysis yet — ERA5-Land lags real time by several days.
-                      Those tail days are topped up separately from{' '}
-                      <strong>Open-Meteo</strong>: recent temperature comes from
-                      Open-Meteo's <code>era5_land</code> model so it lines up exactly
-                      with the archive, while the forecast days use ECMWF's IFS HRES
-                      (the 9 km high-resolution deterministic model). This forecast
-                      tier is shown for context only — it is{' '}
+                      A reanalysis can't cover the present: ERA5-Land lags real time
+                      by several days, so the last week or two — and the few days
+                      ahead — have to come from elsewhere. The forecast days use{' '}
+                      <a
+                        href="https://www.ecmwf.int/en/forecasts/documentation-and-support/medium-range-forecasts"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <strong>ECMWF's IFS HRES</strong>
+                      </a>, the 9 km high-resolution
+                      deterministic model. We use that one specifically because it's
+                      from the same institution that builds ERA5, so the physics and
+                      the variables line up as closely as a forecast reasonably can
+                      with the archive it's extending.{' '}
+                      
+                    </p>
+                    <p>
+                      One caveat: this most-recent tail is the least settled part of
+                      the record. The last several days are a forecast rather than a
+                      reconstruction, and even the just-past days haven't been through
+                      the full reanalysis yet — so a value here can shift by a degree
+                      or two as the model firms up, and won't always match a reading
+                      you remember. It's shown for context only and is{' '}
                       <em>never</em> mixed into the long-run statistics below.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>Why ±5 days?</summary>
+                  <div className="faq-body">
+                    <p>
+                      To say whether a given day was extreme, you need something to
+                      compare it against — and the only fair comparison is{' '}
+                      <em>the same time of year</em>. A 25° day is unremarkable in
+                      July and astonishing in January, so we never pool the whole
+                      year together. Instead we line up every year's version of the
+                      date you picked and ask: against all the other times this
+                      calendar slot has come around, how does this one rank?
+                    </p>
+                    <p>
+                      But a single calendar day across ~75 years is only ~75 data
+                      points, and any one of them can be a fluke. So we widen the
+                      slot to a <strong>±5-day window</strong> around your date — June
+                      5th pulls in May 31st through June 10th, every year. That's an
+                      order of magnitude more days to characterise "what this part of
+                      the season normally does," which makes the percentiles and the
+                      ranking far more stable.
+                    </p>
+                    <p>
+                      Five days is the sweet spot: wide enough to beat down the noise,
+                      but narrow enough that the weather hasn't meaningfully drifted
+                      into a different season. The climate barely moves across eleven
+                      days, so you're still comparing apples to apples — which is
+                      exactly what lets the answer to "how extreme was <em>this</em>{' '}
+                      weather?" actually mean something.
                     </p>
                   </div>
                 </details>
@@ -343,37 +397,6 @@ const AppContent: React.FC = () => {
                       indivisible blocks rather than individual days — that keeps each
                       year's internal correlation intact and gives an honest p-value
                       instead of an inflated one.
-                    </p>
-                  </div>
-                </details>
-                <details className="faq-item">
-                  <summary>Why ±5 days?</summary>
-                  <div className="faq-body">
-                    <p>
-                      To say whether a given day was extreme, you need something to
-                      compare it against — and the only fair comparison is{' '}
-                      <em>the same time of year</em>. A 25° day is unremarkable in
-                      July and astonishing in January, so we never pool the whole
-                      year together. Instead we line up every year's version of the
-                      date you picked and ask: against all the other times this
-                      calendar slot has come around, how does this one rank?
-                    </p>
-                    <p>
-                      But a single calendar day across ~75 years is only ~75 data
-                      points, and any one of them can be a fluke. So we widen the
-                      slot to a <strong>±5-day window</strong> around your date — June
-                      5th pulls in May 31st through June 10th, every year. That's an
-                      order of magnitude more days to characterise "what this part of
-                      the season normally does," which makes the percentiles and the
-                      ranking far more stable.
-                    </p>
-                    <p>
-                      Five days is the sweet spot: wide enough to beat down the noise,
-                      but narrow enough that the weather hasn't meaningfully drifted
-                      into a different season. The climate barely moves across eleven
-                      days, so you're still comparing apples to apples — which is
-                      exactly what lets the answer to "how extreme was <em>this</em>{' '}
-                      weather?" actually mean something.
                     </p>
                   </div>
                 </details>
