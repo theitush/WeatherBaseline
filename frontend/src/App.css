@@ -148,6 +148,7 @@ body {
 .faq-list {
   max-width: 680px;
   margin: 0 auto;
+  text-align: left;
 }
 
 .faq-item {
