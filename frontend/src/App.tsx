@@ -401,9 +401,11 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
-                  <summary>Who are you?</summary>
+                  <summary>Why?!</summary>
                   <div className="faq-body">
-                    <p>TODO: about the project and who built it.</p>
+                    <p>I just wanted to know if certain days realy ARE as extreme as 
+                       they feel.. and now we know!
+                    </p>
                   </div>
                 </details>
               </div>
