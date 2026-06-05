@@ -4,7 +4,7 @@
 }
 
 .main-chart-svg .grid line {
-  stroke: #e0e0e0;
+  stroke: var(--chart-grid);
   stroke-dasharray: 2, 2;
 }
 
@@ -14,12 +14,12 @@
 
 .main-chart-svg .axis text {
   font-size: 11px;
-  fill: #555;
+  fill: var(--chart-label);
 }
 
 .main-chart-svg .axis line,
 .main-chart-svg .axis path {
-  stroke: #aaa;
+  stroke: var(--chart-axis);
 }
 
 .main-chart-svg .data-point {
@@ -32,8 +32,8 @@
 
 .chart-tooltip {
   position: fixed;
-  background: rgba(0, 0, 0, 0.78);
-  color: #fff;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
   padding: 6px 10px;
   border-radius: 4px;
   font-size: 12px;

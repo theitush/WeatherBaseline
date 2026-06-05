@@ -11,6 +11,7 @@ import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart from './components/PeriodHistogramChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
+import ThemeToggle from './components/ThemeToggle';
 import type { MetricKey } from './utils/config';
 import './App.css';
 
@@ -100,6 +101,7 @@ const AppContent: React.FC = () => {
         <div className="sticky-bar">
           <header className="app-header">
             <h1>Weather Rank</h1>
+            <ThemeToggle />
           </header>
 
           <div className="controls-panel">

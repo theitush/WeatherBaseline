@@ -5,12 +5,12 @@
 
 .histogram-chart-svg .axis text {
   font-size: 11px;
-  fill: #555;
+  fill: var(--chart-label);
 }
 
 .histogram-chart-svg .axis line,
 .histogram-chart-svg .axis path {
-  stroke: #aaa;
+  stroke: var(--chart-axis);
 }
 
 .histogram-chart-svg .bar {

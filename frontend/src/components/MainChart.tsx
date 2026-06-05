@@ -141,7 +141,7 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('y', height + 32)
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text(tempLabels[currentMetric]);
     } else {
       g.append('text')
@@ -151,7 +151,7 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('dy', '1em')
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text(tempLabels[currentMetric]);
     }
 
@@ -167,13 +167,13 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('y', boundaryPos)
           .attr('width', width)
           .attr('height', height - boundaryPos)
-          .attr('fill', '#000')
-          .attr('opacity', 0.02);
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.012);
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', 0).attr('x2', width)
           .attr('y1', boundaryPos).attr('y2', boundaryPos)
-          .attr('stroke', '#999')
+          .attr('stroke', 'var(--chart-axis)')
           .attr('stroke-width', 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
@@ -183,7 +183,7 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('text-anchor', 'end')
           .style('font-size', '11px')
           .style('font-style', 'italic')
-          .style('fill', '#777')
+          .style('fill', 'var(--text-tertiary)')
           .text('Satellites!');
       } else {
         // Time runs along x (left = earliest). Pre-1979 is the left band.
@@ -193,13 +193,13 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('y', 0)
           .attr('width', boundaryPos)
           .attr('height', height)
-          .attr('fill', '#000')
-          .attr('opacity', 0.02);
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.012);
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', boundaryPos).attr('x2', boundaryPos)
           .attr('y1', 0).attr('y2', height)
-          .attr('stroke', '#999')
+          .attr('stroke', 'var(--chart-axis)')
           .attr('stroke-width', 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
@@ -209,7 +209,7 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('text-anchor', 'middle')
           .style('font-size', '11px')
           .style('font-style', 'italic')
-          .style('fill', '#777')
+          .style('fill', 'var(--text-tertiary)')
           .text('Satellites!');
       }
     }
@@ -389,7 +389,7 @@ const MainChart: React.FC<MainChartProps> = ({
           return starPath(cx, cy);
         })
         .attr('fill', (r) => r.color)
-        .attr('stroke', 'white')
+        .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 1.5)
         .style('opacity', 0)
         .on('mouseover', (event, r) => {
@@ -422,7 +422,7 @@ const MainChart: React.FC<MainChartProps> = ({
 
       // Line is perpendicular to the temp axis: horizontal line in horizontal mode, vertical line in vertical mode.
       const lineEl = g.append('line').attr('class', 'current-temp-line')
-        .attr('stroke', '#333')
+        .attr('stroke', 'var(--text-h)')
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '5,5');
       if (isVertical) {
@@ -443,8 +443,8 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('cx', (d) => isVertical ? tempScale(d[currentMetric] as number) : timeScale(d.date))
         .attr('cy', (d) => isVertical ? timeScale(d.date) : tempScale(d[currentMetric] as number))
         .attr('r', 5)
-        .attr('fill', '#333')
-        .attr('stroke', 'white')
+        .attr('fill', 'var(--text-h)')
+        .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 2)
         .on('mouseover', (event, d) => {
           tooltip

@@ -44,7 +44,7 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
               onClick={() => onChange(metric)}
               style={{
                 backgroundColor: color,
-                borderColor: isActive ? '#111' : color,
+                borderColor: isActive ? 'var(--text-h)' : color,
                 color: 'white',
               }}
             >

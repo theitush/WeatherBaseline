@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <script>
+      // Apply saved theme before first paint to avoid a flash of the wrong mode.
+      // Only an explicit choice sets data-theme; absent it, the OS preference wins via CSS.
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark')
+          document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

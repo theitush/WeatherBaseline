@@ -9,16 +9,16 @@
 
 .period-histogram-svg .axis text {
   font-size: 11px;
-  fill: #555;
+  fill: var(--chart-label);
 }
 
 .period-histogram-svg .axis line,
 .period-histogram-svg .axis path {
-  stroke: #aaa;
+  stroke: var(--chart-axis);
 }
 
 .period-histogram-svg .panel-baseline {
-  stroke: #ddd;
+  stroke: var(--chart-axis-faint);
   stroke-width: 1;
 }
 

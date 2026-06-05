@@ -83,7 +83,11 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     const periods = buildPeriods();
     const baseColor = CONFIG.metricColors[currentMetric].base;
     // Same color as the rolling-median (trend) line on the main chart.
-    const medianLineColor = CONFIG.getColorForElement(currentMetric, 'trendLine');
+    // The period-histogram median line reads faint against the filled bars, so
+    // darken the metric's trend-line color a touch for better contrast here.
+    const medianLineColor =
+      d3.color(CONFIG.getColorForElement(currentMetric, 'trendLine'))?.darker(0.6).formatHex() ??
+      CONFIG.getColorForElement(currentMetric, 'trendLine');
 
     // Restrict to historical archive rows only (no forecast).
     const historical = filteredData.filter((d) => d.data_type === 'historical');
@@ -268,7 +272,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
         .style('font-weight', '500')
-        .style('fill', '#000')
+        .style('fill', 'var(--text-h)')
         .text(pp.period.label);
 
       // Summary-stat line — dashed, in the main chart's trend-line color, scoped
@@ -318,7 +322,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .attr('y', plotHeight + 30)
       .style('text-anchor', 'middle')
       .style('font-size', '12px')
-      .style('fill', '#555')
+      .style('fill', 'var(--chart-label)')
       .text(tempLabels[currentMetric]);
 
     // Shared "Count" label down the y-axis (the per-panel axes only show ticks).
@@ -329,7 +333,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .attr('dy', '1em')
       .style('text-anchor', 'middle')
       .style('font-size', '12px')
-      .style('fill', '#555')
+      .style('fill', 'var(--chart-label)')
       .text('Count');
 
     // Single legend for the summary-stat line, top-right of the plot.
@@ -350,7 +354,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .attr('y', 0)
       .attr('dy', '0.32em')
       .style('font-size', '11px')
-      .style('fill', '#555')
+      .style('fill', 'var(--chart-label)')
       .text(legendLabel);
     // Right-align the whole legend at the top of the plot.
     const legendW = (legend.node() as SVGGElement).getBBox().width;
