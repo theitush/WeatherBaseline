@@ -2,8 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
-import { getTemperatureHistory } from '../services/api';
+import { getTemperatureHistory, geolocateByIp } from '../services/api';
 import { getCellMaxDate } from '../services/tieredData';
+import { loadCells, snapToNearestCell } from '../services/cellIndex';
+import { parsePath, buildPath, buildSlug } from '../services/urlState';
 import {
   calculateYearlyAggregates,
   filterDataByYearRange,
@@ -69,21 +71,29 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // Default location: Tel Aviv, Israel
-  const [location, setLocation] = useState<Location>({
-    lat: 32.0853,
-    lon: 34.7818,
-    name: 'Tel Aviv, Israel',
-  });
+  // A shareable URL (/slug@lat,lon/date/metric) is the source of truth on load:
+  // if the path parses, it seeds location/date/metric so a link reconstructs the
+  // exact view with no geocoding. Bare root leaves the defaults below (then the
+  // IP lookup in App may override the location).
+  const initial = typeof window !== 'undefined' ? parsePath(window.location.pathname) : null;
 
-  // Default to today's date
+  // Default location: Tel Aviv, Israel (unless the URL specified one).
+  const [location, setLocation] = useState<Location>(
+    initial
+      ? { lat: initial.lat, lon: initial.lon, name: initial.name }
+      : { lat: 32.0853, lon: 34.7818, name: 'Tel Aviv, Israel' }
+  );
+
+  // Default to today's date (unless the URL specified one).
   const [currentDate, setCurrentDate] = useState<string>(() => {
+    if (initial) return initial.date;
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
 
-  // Default to first active metric
+  // Default to first active metric (unless the URL specified one).
   const [currentMetric, setCurrentMetric] = useState<MetricKey>(() => {
+    if (initial) return initial.metric;
     const activeMetrics = CONFIG.getActiveMetrics();
     return activeMetrics[0] || 'max_temperature';
   });
@@ -232,6 +242,52 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, currentDate]);
+
+  // Bare-root visit (no shareable URL): guess the visitor's location from their
+  // IP, snap it to a servable cell, and adopt it. Setting location then triggers
+  // the fetch + URL-sync effects, so the address bar becomes shareable too. Runs
+  // once, only when the URL didn't already pin a location.
+  useEffect(() => {
+    if (initial) return; // URL already decided the location
+    let cancelled = false;
+    (async () => {
+      const [ip, cells] = await Promise.all([geolocateByIp(), loadCells()]);
+      if (cancelled || !ip) return; // failure -> keep the default city
+      const snapped = snapToNearestCell(ip.lat, ip.lon, cells);
+      if (!snapped) return;
+      setLocation({
+        lat: snapped.cell.lat,
+        lon: snapped.cell.lon,
+        name: ip.name,
+        distanceKm: snapped.distanceKm,
+        slugParts: ip.slugParts,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the address bar in sync with state so the current view is always
+  // shareable. replaceState (not push) so tweaking date/metric doesn't bury the
+  // back button under one history entry per change. The slug prefers the
+  // structured parts from a search; otherwise it's derived from the name (URL- or
+  // IP-loaded locations), with the coords after '@' remaining canonical either way.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const slug = buildSlug(location.slugParts ?? (location.name ? location.name.split(',') : []));
+    const path = buildPath({
+      slug,
+      lat: location.lat,
+      lon: location.lon,
+      date: currentDate,
+      metric: currentMetric,
+    });
+    if (path !== window.location.pathname) {
+      window.history.replaceState(null, '', path);
+    }
+  }, [location, currentDate, currentMetric]);
 
   const value: AppState = {
     location,

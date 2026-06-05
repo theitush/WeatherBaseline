@@ -8,7 +8,16 @@ interface LocationSelectorProps {
   cityName: string;
   latitude: number;
   longitude: number;
-  onChange: (name: string, lat: number, lon: number) => void;
+  /** Distance from the searched place to the snapped cell, when known — drives
+   *  the persistent "data from N km away" line shown after a selection. */
+  distanceKm?: number;
+  onChange: (info: {
+    name: string;
+    lat: number;
+    lon: number;
+    distanceKm: number;
+    slugParts: string[];
+  }) => void;
 }
 
 /** A geocoder result paired with the curated cell it snaps to. */
@@ -36,6 +45,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   cityName,
   latitude,
   longitude,
+  distanceKm,
   onChange,
 }) => {
   const [cityInput, setCityInput] = useState(cityName);
@@ -98,8 +108,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     setSelectedIndex(-1);
 
     // Emit the snapped CELL's coords (not the typed point) so loadCellTimeline
-    // hits a built archive. The name stays the human-searched place.
-    onChange(place.display_name, snapped.cell.lat, snapped.cell.lon);
+    // hits a built archive. The name stays the human-searched place; distance and
+    // slug parts ride along for the persistent read-out and the shareable URL.
+    onChange({
+      name: place.display_name,
+      lat: snapped.cell.lat,
+      lon: snapped.cell.lon,
+      distanceKm: snapped.distanceKm,
+      slugParts: place.slugParts,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -178,6 +195,17 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           </div>
         )}
       </div>
+      {/* Persistent read-out of where the data actually comes from, kept visible
+          after the dropdown closes so the snapped-cell distance never disappears
+          on the chosen location. Hidden while browsing suggestions to avoid
+          competing with the per-row distances. */}
+      {distanceKm != null && !showSuggestions && (
+        <div className="city-snap city-snap-active">
+          <span className="city-snap-arrow">↳</span>
+          <span className="city-snap-label">nearest data point</span>
+          <span className="city-snap-dist">{formatKm(distanceKm)}</span>
+        </div>
+      )}
     </div>
   );
 };

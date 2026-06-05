@@ -15,6 +15,10 @@ const { ensureFresh } = require('./ensureFresh');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Behind a proxy/CDN (Cloudflare, nginx, Vercel) the real client IP arrives in
+// X-Forwarded-For; trust it so req.ip resolves to the visitor, not the proxy.
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json());
 
@@ -53,6 +57,43 @@ app.get('/api/ensure-fresh', async (req, res) => {
       error: 'Failed to refresh recent/forecast data',
       message: error.message,
     });
+  }
+});
+
+// --- IP geolocation: a starting location for a bare visit -------------------
+// On the bare root the URL carries no location, so we guess one from the
+// visitor's IP (the browser can't see its own public IP — only the server can).
+// The frontend snaps the returned lat/lon to a servable cell and rewrites the
+// URL to the canonical shareable form. Best-effort: any failure -> the frontend
+// keeps its default city. Uses ip-api.com (no key, free for non-commercial use).
+app.get('/api/geo', async (req, res) => {
+  // req.ip honours trust proxy (X-Forwarded-For); strip an IPv4-mapped IPv6
+  // prefix. For loopback (local dev) we send no IP so the service geolocates the
+  // server's own egress — good enough to exercise the flow.
+  const raw = (req.ip || '').replace(/^::ffff:/, '');
+  const isLocal = !raw || raw === '::1' || raw === '127.0.0.1' || raw.startsWith('10.') ||
+    raw.startsWith('192.168.') || raw.startsWith('172.16.');
+  const ipPath = isLocal ? '' : `/${raw}`;
+
+  try {
+    const r = await fetch(
+      `http://ip-api.com/json${ipPath}?fields=status,lat,lon,city,regionName,countryCode,country`
+    );
+    const data = await r.json();
+    if (data.status !== 'success' || typeof data.lat !== 'number') {
+      return res.status(502).json({ error: 'geolocation unavailable' });
+    }
+    res.json({
+      lat: data.lat,
+      lon: data.lon,
+      // slugParts: name, region, country code — same shape the geocoder emits, so
+      // the frontend builds an identical slug/label without a second lookup.
+      slugParts: [data.city, data.regionName, data.countryCode].filter(Boolean),
+      name: [data.city, data.regionName, data.country].filter(Boolean).join(', '),
+    });
+  } catch (error) {
+    console.error('geo lookup error:', error);
+    res.status(502).json({ error: 'geolocation failed', message: error.message });
   }
 });
 

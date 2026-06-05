@@ -1,9 +1,8 @@
 .location-selector {
   display: flex;
-  flex-direction: row;
-  gap: 15px;
-  align-items: flex-end;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
   min-width: 0;
 }
 
@@ -11,6 +10,13 @@
   position: relative;
   display: flex;
   align-items: center;
+}
+
+/* The persistent snap read-out sits directly under the search input, so the
+   selector stacks input-over-distance while still sitting in the controls row. */
+.city-snap-active {
+  margin-top: 6px;
+  max-width: 260px;
 }
 
 .city-search-container label {

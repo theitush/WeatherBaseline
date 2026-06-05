@@ -63,6 +63,35 @@ export async function getTemperatureHistory(
   return timeline.filter((d) => withinSeasonalWindow(d.date, targetDt, daysRange));
 }
 
+/** A coarse location guessed from the visitor's IP, for a bare-root visit. */
+export interface IpLocation {
+  lat: number;
+  lon: number;
+  name: string;
+  slugParts: string[];
+}
+
+/**
+ * Ask the backend to guess the visitor's location from their IP. Best-effort:
+ * resolves to null on any failure so the caller falls back to a default city.
+ */
+export async function geolocateByIp(): Promise<IpLocation | null> {
+  try {
+    const res = await fetch('/api/geo');
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (typeof data.lat !== 'number' || typeof data.lon !== 'number') return null;
+    return {
+      lat: data.lat,
+      lon: data.lon,
+      name: data.name ?? '',
+      slugParts: Array.isArray(data.slugParts) ? data.slugParts : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Photon GeoJSON feature — only the fields we actually read. */
 interface PhotonFeature {
   geometry: { coordinates: [number, number] }; // [lon, lat]
@@ -72,6 +101,7 @@ interface PhotonFeature {
     state?: string;
     county?: string;
     country?: string;
+    countrycode?: string;
     osm_key?: string;
     osm_value?: string;
   };
@@ -87,6 +117,17 @@ function photonDisplayName(p: PhotonFeature['properties']): string {
     .filter((v): v is string => Boolean(v))
     .filter((v, i, arr) => arr.indexOf(v) === i); // drop dupes, keep order
   return parts.join(', ');
+}
+
+/**
+ * The three components that disambiguate a place in the URL slug: the place
+ * name, its region (state, falling back to county), and the country code (short
+ * and stable — "us" not "united-states"). Falls back to country name if no code.
+ */
+function photonSlugParts(p: PhotonFeature['properties']): string[] {
+  const region = p.state || p.county;
+  const country = p.countrycode || p.country;
+  return [p.name || p.city, region, country].filter((v): v is string => Boolean(v));
 }
 
 /**
@@ -123,6 +164,7 @@ export async function searchCities(
       lat: String(f.geometry.coordinates[1]),
       lon: String(f.geometry.coordinates[0]),
       type: f.properties.osm_value ?? '',
+      slugParts: photonSlugParts(f.properties),
     }));
   } catch (error) {
     // A cancelled request is expected churn, not a failure — stay quiet.

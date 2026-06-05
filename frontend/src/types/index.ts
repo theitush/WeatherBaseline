@@ -38,6 +38,12 @@ export interface Location {
   lon: number;
   name?: string;
   display_name?: string;
+  /** Great-circle distance from the searched place to the snapped cell, in km.
+   *  Carried so the UI can show "data from N km away" after a pick, and so the
+   *  URL can be rebuilt; absent when the location came straight from a URL. */
+  distanceKm?: number;
+  /** Slug components (name, region, country) for building a shareable URL. */
+  slugParts?: string[];
 }
 
 export interface DataExtents {
@@ -76,4 +82,7 @@ export interface GeocodeResult {
   lat: string;
   lon: string;
   type: string;
+  /** Structured components (name, region, country) for building a URL slug
+   *  that disambiguates same-named cities — e.g. ["Springfield","Illinois","US"]. */
+  slugParts: string[];
 }

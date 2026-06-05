@@ -41,8 +41,20 @@ const AppContent: React.FC = () => {
     error,
   } = useApp();
 
-  const handleLocationChange = (name: string, lat: number, lon: number) => {
-    setLocation({ lat, lon, name });
+  const handleLocationChange = (info: {
+    name: string;
+    lat: number;
+    lon: number;
+    distanceKm: number;
+    slugParts: string[];
+  }) => {
+    setLocation({
+      lat: info.lat,
+      lon: info.lon,
+      name: info.name,
+      distanceKm: info.distanceKm,
+      slugParts: info.slugParts,
+    });
   };
 
   const handleDateChange = (date: string) => {
@@ -115,6 +127,7 @@ const AppContent: React.FC = () => {
                 cityName={location.name || ''}
                 latitude={location.lat}
                 longitude={location.lon}
+                distanceKm={location.distanceKm}
                 onChange={handleLocationChange}
               />
 
