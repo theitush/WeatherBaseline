@@ -68,7 +68,6 @@ export interface IpLocation {
   lat: number;
   lon: number;
   name: string;
-  slugParts: string[];
 }
 
 /**
@@ -85,7 +84,6 @@ export async function geolocateByIp(): Promise<IpLocation | null> {
       lat: data.lat,
       lon: data.lon,
       name: data.name ?? '',
-      slugParts: Array.isArray(data.slugParts) ? data.slugParts : [],
     };
   } catch {
     return null;
@@ -117,17 +115,6 @@ function photonDisplayName(p: PhotonFeature['properties']): string {
     .filter((v): v is string => Boolean(v))
     .filter((v, i, arr) => arr.indexOf(v) === i); // drop dupes, keep order
   return parts.join(', ');
-}
-
-/**
- * The three components that disambiguate a place in the URL slug: the place
- * name, its region (state, falling back to county), and the country code (short
- * and stable — "us" not "united-states"). Falls back to country name if no code.
- */
-function photonSlugParts(p: PhotonFeature['properties']): string[] {
-  const region = p.state || p.county;
-  const country = p.countrycode || p.country;
-  return [p.name || p.city, region, country].filter((v): v is string => Boolean(v));
 }
 
 /**
@@ -164,7 +151,6 @@ export async function searchCities(
       lat: String(f.geometry.coordinates[1]),
       lon: String(f.geometry.coordinates[0]),
       type: f.properties.osm_value ?? '',
-      slugParts: photonSlugParts(f.properties),
     }));
   } catch (error) {
     // A cancelled request is expected churn, not a failure — stay quiet.

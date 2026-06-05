@@ -4,8 +4,8 @@ import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { getTemperatureHistory, geolocateByIp } from '../services/api';
 import { getCellMaxDate } from '../services/tieredData';
-import { loadCells, snapToNearestCell } from '../services/cellIndex';
-import { parsePath, buildPath, buildSlug } from '../services/urlState';
+import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
+import { parsePath, buildPath } from '../services/urlState';
 import {
   calculateYearlyAggregates,
   filterDataByYearRange,
@@ -71,16 +71,17 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // A shareable URL (/slug@lat,lon/date/metric) is the source of truth on load:
+  // A shareable URL (/lat,lon/date/metric) is the source of truth on load:
   // if the path parses, it seeds location/date/metric so a link reconstructs the
   // exact view with no geocoding. Bare root leaves the defaults below (then the
   // IP lookup in App may override the location).
   const initial = typeof window !== 'undefined' ? parsePath(window.location.pathname) : null;
 
-  // Default location: Tel Aviv, Israel (unless the URL specified one).
+  // Default location: Tel Aviv, Israel (unless the URL specified one). A URL
+  // carries coords only — the name is resolved from the cell list below.
   const [location, setLocation] = useState<Location>(
     initial
-      ? { lat: initial.lat, lon: initial.lon, name: initial.name }
+      ? { lat: initial.lat, lon: initial.lon, name: '' }
       : { lat: 32.0853, lon: 34.7818, name: 'Tel Aviv, Israel' }
   );
 
@@ -255,12 +256,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       if (cancelled || !ip) return; // failure -> keep the default city
       const snapped = snapToNearestCell(ip.lat, ip.lon, cells);
       if (!snapped) return;
+      // Adopt the snapped cell's own name (the only label we show), not the IP
+      // service's, so it matches what a search or a shared link would display.
       setLocation({
         lat: snapped.cell.lat,
         lon: snapped.cell.lon,
-        name: ip.name,
-        distanceKm: snapped.distanceKm,
-        slugParts: ip.slugParts,
+        name: snapped.cell.name,
       });
     })();
     return () => {
@@ -269,16 +270,30 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A coords-only URL has no name; resolve it from the cell list so the search
+  // box shows where the data is from. Runs once on a URL-seeded load — the local
+  // lookup is instant, so the label appears without any blocking geocode.
+  useEffect(() => {
+    if (!initial) return; // a default/IP/search load already has a name
+    let cancelled = false;
+    lookupCellName(initial.lat, initial.lon).then((name) => {
+      if (!cancelled && name) {
+        setLocation((prev) => ({ ...prev, name }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Keep the address bar in sync with state so the current view is always
   // shareable. replaceState (not push) so tweaking date/metric doesn't bury the
-  // back button under one history entry per change. The slug prefers the
-  // structured parts from a search; otherwise it's derived from the name (URL- or
-  // IP-loaded locations), with the coords after '@' remaining canonical either way.
+  // back button under one history entry per change. Coords are the only location
+  // identity in the URL — the name is derived from them, never stored.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const slug = buildSlug(location.slugParts ?? (location.name ? location.name.split(',') : []));
     const path = buildPath({
-      slug,
       lat: location.lat,
       lon: location.lon,
       date: currentDate,

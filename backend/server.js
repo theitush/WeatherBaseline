@@ -86,9 +86,8 @@ app.get('/api/geo', async (req, res) => {
     res.json({
       lat: data.lat,
       lon: data.lon,
-      // slugParts: name, region, country code — same shape the geocoder emits, so
-      // the frontend builds an identical slug/label without a second lookup.
-      slugParts: [data.city, data.regionName, data.countryCode].filter(Boolean),
+      // name is informational only; the frontend snaps to a cell and shows that
+      // cell's own name, so this is just a fallback label.
       name: [data.city, data.regionName, data.country].filter(Boolean).join(', '),
     });
   } catch (error) {

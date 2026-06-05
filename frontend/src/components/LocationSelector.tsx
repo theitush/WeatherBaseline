@@ -8,16 +8,7 @@ interface LocationSelectorProps {
   cityName: string;
   latitude: number;
   longitude: number;
-  /** Distance from the searched place to the snapped cell, when known — drives
-   *  the persistent "data from N km away" line shown after a selection. */
-  distanceKm?: number;
-  onChange: (info: {
-    name: string;
-    lat: number;
-    lon: number;
-    distanceKm: number;
-    slugParts: string[];
-  }) => void;
+  onChange: (info: { name: string; lat: number; lon: number }) => void;
 }
 
 /** A geocoder result paired with the curated cell it snaps to. */
@@ -45,7 +36,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   cityName,
   latitude,
   longitude,
-  distanceKm,
   onChange,
 }) => {
   const [cityInput, setCityInput] = useState(cityName);
@@ -100,22 +90,20 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   const selectSuggestion = (suggestion: Suggestion) => {
-    const { place, snapped } = suggestion;
+    const { snapped } = suggestion;
 
-    setCityInput(place.display_name);
+    // The chosen identity is the CELL, not the typed place: show the cell's own
+    // name so people know exactly which data point they're looking at, and emit
+    // the cell's grid coords (loadCellTimeline needs a built archive).
+    setCityInput(snapped.cell.name);
     setShowSuggestions(false);
     setSuggestions([]);
     setSelectedIndex(-1);
 
-    // Emit the snapped CELL's coords (not the typed point) so loadCellTimeline
-    // hits a built archive. The name stays the human-searched place; distance and
-    // slug parts ride along for the persistent read-out and the shareable URL.
     onChange({
-      name: place.display_name,
+      name: snapped.cell.name,
       lat: snapped.cell.lat,
       lon: snapped.cell.lon,
-      distanceKm: snapped.distanceKm,
-      slugParts: place.slugParts,
     });
   };
 
@@ -167,11 +155,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           <div className="city-suggestions">
             {suggestions.map((suggestion, index) => {
               const { place, snapped } = suggestion;
-              const name = place.display_name.split(',')[0];
-              const country = place.display_name.split(',').slice(-1)[0].trim();
-              const details = place.display_name
-                .replace(name + ', ', '')
-                .replace(', ' + country, '');
+              // The row's headline is the CELL we'll serve; the typed place
+              // appears below as context for which search this answers.
+              const searched = place.display_name.split(',')[0];
 
               return (
                 <div
@@ -180,40 +166,34 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                   onClick={() => selectSuggestion(suggestion)}
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
-                  <div className="city-name">{name}</div>
-                  <div className="city-details">
-                    {details}, {country}
+                  <div className="city-suggestion-main">
+                    <span className="city-name">{snapped.cell.name}</span>
+                    <span className={`city-snap-dist ${distClass(snapped.distanceKm)}`}>
+                      {formatKm(snapped.distanceKm)}
+                    </span>
                   </div>
-                  <div className="city-snap">
-                    <span className="city-snap-arrow">↳</span>
-                    <span className="city-snap-label">nearest data point</span>
-                    <span className="city-snap-dist">{formatKm(snapped.distanceKm)}</span>
-                  </div>
+                  <div className="city-details">for “{searched}”</div>
                 </div>
               );
             })}
           </div>
         )}
       </div>
-      {/* Persistent read-out of where the data actually comes from, kept visible
-          after the dropdown closes so the snapped-cell distance never disappears
-          on the chosen location. Hidden while browsing suggestions to avoid
-          competing with the per-row distances. */}
-      {distanceKm != null && !showSuggestions && (
-        <div className="city-snap city-snap-active">
-          <span className="city-snap-arrow">↳</span>
-          <span className="city-snap-label">nearest data point</span>
-          <span className="city-snap-dist">{formatKm(distanceKm)}</span>
-        </div>
-      )}
     </div>
   );
 };
 
+/** Distance bucket → color class: green <10 km, yellow 10–20 km, red >20 km. */
+function distClass(km: number): string {
+  if (km < 10) return 'dist-near';
+  if (km <= 20) return 'dist-mid';
+  return 'dist-far';
+}
+
 /** Distance read-out: whole km, or "<1 km" when the cell is essentially on top. */
 function formatKm(km: number): string {
-  if (km < 1) return '<1 km away';
-  return `${Math.round(km)} km away`;
+  if (km < 1) return '<1 km';
+  return `${Math.round(km)} km`;
 }
 
 export default LocationSelector;
