@@ -499,3 +499,23 @@ body {
     font-size: 24px;
   }
 }
+
+.app-footer {
+  margin-top: 48px;
+  padding: 24px 0 40px;
+  border-top: 1px solid var(--border-strong);
+  display: flex;
+  justify-content: center;
+}
+
+.github-banner {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.github-banner:hover {
+  color: var(--text-strong);
+}
