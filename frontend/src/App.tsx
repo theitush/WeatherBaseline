@@ -350,6 +350,41 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
+                  <summary>Why doesn't this match my weather app?</summary>
+                  <div className="faq-body">
+                    <p>
+                      It often won't, and that's expected. Your phone usually
+                      reports the nearest weather station — one thermometer at one
+                      spot, often the airport. Everything here instead comes off a
+                      <strong>grid</strong>, and the number is a whole cell's
+                      value, not a single point. Both tiers work this way: the
+                      ERA5-Land archive (0.1°, ~11 km) <em>and</em> the ECMWF
+                      forecast days (9 km) are gridded model output, not a
+                      station's reading — so neither one will track your app's
+                      local thermometer.
+                    </p>
+                    <p>
+                      A cell averages over hills, coastline and city blocks, so a
+                      gap of <strong>a degree or two</strong> from a local station
+                      is normal even on a calm day. Where the ground is
+                      complicated the gap grows: coastal cities run roughly a
+                      degree off, and in <strong>mountains it can reach several
+                      degrees</strong> — the cell's average elevation simply isn't
+                      the elevation of the village in the valley or the peak above
+                      it.
+                    </p>
+                    <p>
+                      That's a deliberate trade. A single grid that behaves the
+                      same way in <strong>1950 and today</strong>, everywhere on
+                      Earth, is what makes the comparison fair — you're ranking a
+                      day against its own history measured the exact same way, not
+                      against a station that moved, closed, or never existed back
+                      then. Matching your app to the decimal would mean giving that
+                      up.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
                   <summary>Why ±5 days?</summary>
                   <div className="faq-body">
                     <p>
