@@ -1,0 +1,18 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "https://weather-baseline.pages.dev",
+          "https://weatherbaseline.pages.dev"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["*"]
+      },
+      "exposeHeaders": ["Content-Length", "Content-Encoding", "Content-Type", "Last-Modified"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
