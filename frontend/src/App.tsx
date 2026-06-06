@@ -435,12 +435,11 @@ const AppContent: React.FC = () => {
                       ERA5-Land archive only.
                     </p>
                     <p>
-                      <strong>A permutation test, not a t-test.</strong> To decide
-                      whether the gap between old and new is real or just luck, we run
-                      a permutation test: pool both periods, repeatedly reshuffle the
-                      labels at random, and see how often pure chance produces a gap
-                      as big as the one we observed. Two reasons it beats a classic
-                      t-test here. First, it's{' '}
+                      To decide whether the gap between old and new is real or just luck, 
+                      we run a <strong>permutation test</strong>: pool both periods, 
+                      reshuffle the labels <strong>10,000 times</strong> at random, and see how often 
+                      pure chance produces a gap as big as the one we observed. 
+                      Two reasons it beats a classic t-test here. First, it's{' '}
                       <strong>non-parametric</strong> — it makes no assumption that
                       the data are normally distributed, which daily temperatures and
                       especially rainfall flatly are not. Second, and more important,
