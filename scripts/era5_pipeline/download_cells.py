@@ -400,6 +400,7 @@ def process_span(
     are computed concurrently across a thread pool of size var_workers.
     """
     import pandas as pd
+    import xarray as xr
 
     lat_name = "latitude" if "latitude" in ds.coords else "lat"
     lon_name = "longitude" if "longitude" in ds.coords else "lon"
@@ -450,50 +451,79 @@ def process_span(
         for fut in as_completed(futs):
             raw[futs[fut]] = fut.result()  # re-raises on permanent failure
 
-    # --- daily metrics -------------------------------------------------------
-    t2m_daily = raw["t2m"].resample({time_name: "1D"})
-    t2m_max = t2m_daily.max()
-    t2m_min = t2m_daily.min()
+    # --- daily metrics, bucketed by LOCAL day --------------------------------
+    # ERA5(-Land) is stored on a single UTC time axis, so a naive resample("1D")
+    # buckets every cell on the UTC calendar day. For a cell well off UTC that
+    # mislabels the pre-dawn MINIMUM (tmin) — Beijing's UTC-day "May 1" low is
+    # really the local May 2 low — and the recent/forecast tiers (Open-Meteo
+    # timezone=auto) use LOCAL days, so the archive↔recent seam disagrees.
+    # The canonical fix (cf. Copernicus' ERA5 daily-statistics "shift to local
+    # time zone" option, and xarray resample offset=) is to shift the UTC time
+    # axis by the cell's offset BEFORE the daily aggregation. We use the SOLAR
+    # offset round(lon/15)h: integer-hour, DST-free (the right choice for a
+    # multi-decade baseline), and it reproduces Open-Meteo's timezone=auto
+    # values exactly for whole-hour zones. Cells in one tile can fall in
+    # different offsets, so we group by offset and aggregate once per group.
 
-    # tp is ACCUMULATED (resets 01:00 UTC); the value at a day's 00:00 step is
-    # that day's COMPLETE total. Daily total for day D = tp at (D+1) 00:00, so we
-    # pick every 00:00 step and shift its timestamp back one day.
+    # Precip is ACCUMULATED (resets 01:00 UTC), so it can't be min/max-resampled:
+    # de-accumulate to hourly increments once (offset-independent), then SUM the
+    # increments over the shifted local day per offset group. Increment[h] =
+    # tp[h]-tp[h-1], except at the 01:00 reset where tp[01:00] IS the increment
+    # (it resets from 0). Verified to reproduce the old 00:00-step UTC totals.
     tp_hourly = raw["tp"]
-    tp_midnight = tp_hourly.sel({time_name: tp_hourly[time_name].dt.hour == 0})
-    tp_sum = tp_midnight.assign_coords({
-        time_name: tp_midnight[time_name] - np.timedelta64(1, "D")
-    })
+    tp_prev = tp_hourly.shift({time_name: 1})
+    tp_incr = tp_hourly - tp_prev
+    is_reset = tp_hourly[time_name].dt.hour == 1
+    tp_incr = xr.where(is_reset, tp_hourly, tp_incr)
+    # First step has no predecessor; tiny negatives from float noise → 0.
+    tp_incr = tp_incr.fillna(0.0).clip(min=0.0)
 
-    # wind: hourly speed sqrt(u^2+v^2) then daily max (must be hourly-then-max:
-    # mean(speed) != speed(mean)).
     wind_hourly = np.sqrt(raw["u10"] ** 2 + raw["v10"] ** 2)
-    wind_max = wind_hourly.resample({time_name: "1D"}).max()
+    t2m_hourly = raw["t2m"]
 
-    log(f"  tile {tile_id} | years {span}: all vars fetched + aggregated in "
-        f"{fmt_dur(time.time() - c0)}")
+    def solar_offset_hours(lon_deg: float) -> int:
+        """Whole-hour local solar offset for a longitude in [-180, 180]."""
+        lon180 = ((lon_deg + 180.0) % 360.0) - 180.0
+        return int(round(lon180 / 15.0))
 
-    dates = pd.to_datetime(t2m_max[time_name].values).date
-    tp_dates = pd.to_datetime(tp_sum[time_name].values).date
-    log(f"  tile {tile_id} | years {span}: {len(dates)} daily values; "
-        f"reading out {len(tile_cells)} cells")
+    # Group this tile's cells by their solar offset (usually 1-2 distinct values
+    # across a ~6° tile). Each group gets one shifted resample.
+    groups: dict[int, list[tuple[dict, float]]] = defaultdict(list)
+    for c, slon in zip(tile_cells, sel_lons):
+        groups[solar_offset_hours(c["lon"])].append((c, slon))
+
+    log(f"  tile {tile_id} | years {span}: all vars fetched in "
+        f"{fmt_dur(time.time() - c0)}; bucketing {len(tile_cells)} cells "
+        f"across {len(groups)} local-offset group(s)")
+
+    def shift_time(da, off_h: int):
+        """Relabel the UTC time axis to local time so resample('1D') buckets the
+        local solar day. A whole-hour shift is exactly a coordinate relabel."""
+        return da.assign_coords(
+            {time_name: da[time_name] + np.timedelta64(off_h, "h")}
+        )
 
     frames: dict[tuple[float, float], pd.DataFrame] = {}
-    for c, slon in zip(tile_cells, sel_lons):
-        sel = {lat_name: c["lat"], lon_name: float(slon)}
-        temp_wind = pd.DataFrame({
-            "date": dates,
-            "tmax_C": np.round(t2m_max.sel(sel, method="nearest").values - 273.15, 3),
-            "tmin_C": np.round(t2m_min.sel(sel, method="nearest").values - 273.15, 3),
-            "wind_max_ms": np.round(wind_max.sel(sel, method="nearest").values, 3),
-        })
-        precip = pd.DataFrame({
-            "date": tp_dates,
-            "precip_mm": np.round(tp_sum.sel(sel, method="nearest").values * 1000.0, 3),
-        })
-        frame = temp_wind.merge(precip, on="date", how="outer").sort_values("date")
-        frames[(c["lat"], c["lon"])] = frame[
-            ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
-        ]
+    for off_h, members in groups.items():
+        t2m_g = shift_time(t2m_hourly, off_h).resample({time_name: "1D"})
+        t2m_max = t2m_g.max()
+        t2m_min = t2m_g.min()
+        wind_max = shift_time(wind_hourly, off_h).resample({time_name: "1D"}).max()
+        tp_sum = shift_time(tp_incr, off_h).resample({time_name: "1D"}).sum()
+        dates = pd.to_datetime(t2m_max[time_name].values).date
+
+        for c, slon in members:
+            sel = {lat_name: c["lat"], lon_name: float(slon)}
+            frame = pd.DataFrame({
+                "date": dates,
+                "tmax_C": np.round(t2m_max.sel(sel, method="nearest").values - 273.15, 3),
+                "tmin_C": np.round(t2m_min.sel(sel, method="nearest").values - 273.15, 3),
+                "precip_mm": np.round(tp_sum.sel(sel, method="nearest").values * 1000.0, 3),
+                "wind_max_ms": np.round(wind_max.sel(sel, method="nearest").values, 3),
+            }).sort_values("date")
+            frames[(c["lat"], c["lon"])] = frame[
+                ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
+            ]
 
     return frames
 
@@ -508,18 +538,159 @@ def archive_name(lat: float, lon: float) -> str:
 _WRITE_LOCK = threading.Lock()
 
 
-def write_archive(lat: float, lon: float, frame) -> Path:
+class OverwriteLedger:
+    """Resumable progress index for --overwrite runs.
+
+    --overwrite REBUILDS each cell from scratch (to drop stale UTC-day values),
+    which means it can't lean on the normal year-resume (that would skip the very
+    years we want to recompute). So a long overwrite run needs its own resume: a
+    small on-disk JSON index recording which (cell, span) frames already landed
+    THIS run. On restart we skip those spans and keep going — no refetch of
+    completed work, no self-wipe.
+
+    Two facts are persisted per overwrite run, under a `signature` (the year
+    range) so a *different* overwrite run won't trust a stale ledger:
+      - `replaced`: cells whose file has already been replaced wholesale this run.
+        The FIRST write of a cell replaces (discarding old rows); every later
+        span MERGES onto that fresh file. Persisting this means a post-crash
+        restart keeps merging instead of wiping a half-rebuilt cell.
+      - `done`: (cell, span) pairs fully written — used to skip on resume.
+
+    Durability: the ledger is written to local disk atomically on every change,
+    AND mirrored to R2 (when an `uploader` is given) so it survives a full VM
+    WIPE, not just a process crash — the VM's disk is ephemeral, so a disk-only
+    ledger would be lost with the box and force a from-scratch rebuild. The R2
+    push is throttled (it lags local by up to `_R2_MIN_INTERVAL_S`) so we don't
+    PUT once per cell; a wipe then costs at most a few seconds of redone cells.
+    On startup, if there's no local ledger we pull it from R2. Deleted from both
+    on a clean finish. Guarded by _WRITE_LOCK (same lock as the archive writes).
+    """
+
+    # Don't push the ledger to R2 more than once per this many seconds.
+    _R2_MIN_INTERVAL_S = 30.0
+    R2_KEY = "archive/.overwrite_progress.json"
+
+    def __init__(self, path: Path, signature: str, uploader=None):
+        self.path = path
+        self.signature = signature
+        self.uploader = uploader
+        self.replaced: set[str] = set()
+        self.done: set[str] = set()
+        self._last_r2_push = 0.0
+        self._dirty_r2 = False
+        self._load()
+
+    @staticmethod
+    def _cell_key(lat: float, lon: float) -> str:
+        return f"{lat:.1f},{lon:.1f}"
+
+    @staticmethod
+    def _span_key(lat: float, lon: float, s: int, e: int) -> str:
+        return f"{lat:.1f},{lon:.1f}@{s}-{e}"
+
+    def _adopt(self, data: dict) -> bool:
+        """Load state from a parsed ledger dict if its signature matches."""
+        if data.get("signature") != self.signature:
+            return False  # ledger is for a different overwrite scope — ignore it
+        self.replaced = set(data.get("replaced", []))
+        self.done = set(data.get("done", []))
+        return True
+
+    def _load(self) -> None:
+        import json
+        # Prefer the local copy (newest); fall back to R2 on a fresh/wiped box.
+        try:
+            if self._adopt(json.loads(self.path.read_text())):
+                return
+        except (OSError, ValueError):
+            pass
+        if self.uploader is not None:
+            try:
+                body = self.uploader.get_bytes(self.R2_KEY)
+                if body and self._adopt(json.loads(body)):
+                    log(f"overwrite: resumed ledger from R2 "
+                        f"({len(self.done)} (cell,span) done)")
+            except Exception as e:  # noqa: BLE001 - resume is best-effort
+                log(f"overwrite: could not read R2 ledger ({e}); starting fresh")
+
+    def _serialize(self) -> bytes:
+        import json
+        return json.dumps({
+            "signature": self.signature,
+            "replaced": sorted(self.replaced),
+            "done": sorted(self.done),
+        }).encode()
+
+    def _flush(self) -> None:
+        # Local write is atomic and per-change (cheap; survives a process crash).
+        blob = self._serialize()
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_bytes(blob)
+        tmp.replace(self.path)
+        # R2 mirror is throttled (survives a VM wipe; a few seconds of lag is ok).
+        self._dirty_r2 = True
+        if self.uploader is not None and (
+            time.time() - self._last_r2_push >= self._R2_MIN_INTERVAL_S
+        ):
+            self._push_r2(blob)
+
+    def _push_r2(self, blob: bytes | None = None) -> None:
+        if self.uploader is None:
+            return
+        try:
+            self.uploader.put_bytes(
+                blob if blob is not None else self._serialize(),
+                self.R2_KEY, "application/json",
+            )
+            self._last_r2_push = time.time()
+            self._dirty_r2 = False
+        except Exception as e:  # noqa: BLE001 - mirror is best-effort
+            log(f"overwrite: R2 ledger push failed ({e}); local copy kept")
+
+    def span_done(self, lat: float, lon: float, s: int, e: int) -> bool:
+        """Has this (cell, span) already been written this overwrite run?"""
+        return self._span_key(lat, lon, s, e) in self.done
+
+    def is_replaced(self, lat: float, lon: float) -> bool:
+        return self._cell_key(lat, lon) in self.replaced
+
+    def mark_replaced(self, lat: float, lon: float) -> None:
+        self.replaced.add(self._cell_key(lat, lon))
+        self._flush()
+
+    def mark_span_done(self, lat: float, lon: float, s: int, e: int) -> None:
+        self.done.add(self._span_key(lat, lon, s, e))
+        self._flush()
+
+    def clear(self) -> None:
+        # Flush any throttled-but-unpushed state isn't needed on a clean finish —
+        # we're deleting it. Remove from both stores so the NEXT run starts fresh.
+        self.path.unlink(missing_ok=True)
+        if self.uploader is not None:
+            try:
+                self.uploader.delete_object(self.R2_KEY)
+            except Exception as e:  # noqa: BLE001
+                log(f"overwrite: R2 ledger delete failed ({e})")
+
+
+def write_archive(lat: float, lon: float, frame, *, ledger=None,
+                  span=None) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
     Merge-by-date makes re-running an overlapping span idempotent: existing dates
-    are overwritten last-wins, new dates appended.
+    are overwritten last-wins, new dates appended. When `ledger` is given
+    (--overwrite), the FIRST write of a cell this run REPLACES the existing file
+    (so a recompute drops stale rows the new run no longer produces); subsequent
+    span-writes for that cell merge as usual. `span` (s, e) records completion so
+    a crashed run can resume past it.
     """
     import pandas as pd
 
     with _WRITE_LOCK:
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / archive_name(lat, lon)
-        if path.exists():
+        fresh = ledger is not None and not ledger.is_replaced(lat, lon)
+        if path.exists() and not fresh:
             old = pd.read_csv(path, parse_dates=["date"])
             old["date"] = old["date"].dt.date
             merged = (
@@ -530,22 +701,34 @@ def write_archive(lat: float, lon: float, frame) -> Path:
         else:
             merged = frame.sort_values("date")
         merged.to_csv(path, index=False, compression="gzip")
+        if ledger is not None:
+            if fresh:
+                ledger.mark_replaced(lat, lon)
+            if span is not None:
+                ledger.mark_span_done(lat, lon, span[0], span[1])
     return path
 
 
 def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
              var_workers, resume, refresh_latest, r2_resume=None,
-             uploader=None) -> int:
+             uploader=None, ledger=None) -> int:
     """Fetch all missing year-spans for one tile; return archives written.
 
     If `uploader` is given, each cell's archive is pushed to R2 right after it's
     (re)written — so a tile's full history lands incrementally during the pull
     rather than in a separate pass at the end. Idempotent: a re-run overwrites.
     `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
-    disk is ephemeral) instead of the local archives.
+    disk is ephemeral) instead of the local archives. `ledger` (--overwrite)
+    rebuilds every year from scratch and resumes via its own (cell, span) index.
     """
-    todo = missing_years(tile_cells, years, latest_year, resume,
-                         refresh_latest, r2_resume)
+    if ledger is not None:
+        # Overwrite mode recomputes ALL requested years; year-resume is bypassed
+        # (it would skip the very years we want to rebuild). Resume instead comes
+        # from the ledger's per-(cell, span) record.
+        todo = list(years)
+    else:
+        todo = missing_years(tile_cells, years, latest_year, resume,
+                             refresh_latest, r2_resume)
     if not todo:
         log(f"tile {tile_id}: nothing missing — already complete, skipping")
         return 0
@@ -556,9 +739,23 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
 
     written = 0
     for (s, e) in spans:
+        # In overwrite mode, skip cells whose (cell, span) the ledger already has
+        # (a prior, crashed run wrote them) — but only fetch the span at all if
+        # SOME cell in the tile still needs it.
+        pending = tile_cells
+        if ledger is not None:
+            pending = [c for c in tile_cells
+                       if not ledger.span_done(c["lat"], c["lon"], s, e)]
+            if not pending:
+                log(f"tile {tile_id} | years {s}-{e}: all cells done "
+                    "(ledger) — skipping")
+                continue
+
         frames = process_span(ds, tile_id, tile_cells, s, e, var_workers)
         for (lat, lon), frame in frames.items():
-            path = write_archive(lat, lon, frame)
+            if ledger is not None and ledger.span_done(lat, lon, s, e):
+                continue  # already landed before a crash
+            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e))
             if uploader is not None:
                 uploader.upload_file(path, f"archive/{path.name}")
             written += 1
@@ -596,13 +793,24 @@ def main() -> int:
                     "R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in env, "
                     "e.g. `source r2.env`). Also makes resume read coverage from "
                     "R2 instead of the (ephemeral) local disk.")
+    ap.add_argument("--overwrite", action="store_true",
+                    help="REPLACE each cell's archive from scratch instead of "
+                    "merging by date. Use this to correct already-downloaded "
+                    "data (e.g. the UTC-day → local-day tmin fix): old rows are "
+                    "discarded so stale values can't survive the merge. Refetches "
+                    "every requested year, but is crash-resumable via a per-(cell,"
+                    " span) ledger (.overwrite_progress.json), so a restart skips "
+                    "work already written.")
     args = ap.parse_args()
 
     if args.year is not None:
         args.start_year = args.end_year = args.year
     years = list(range(args.start_year, args.end_year + 1))
     latest_year = args.end_year
-    resume = not args.no_resume
+    # --overwrite recomputes from scratch, so every requested year must be
+    # refetched — a resume that skipped present years would leave them stale.
+    # It carries its own crash-resume via the ledger instead.
+    resume = not args.no_resume and not args.overwrite
 
     uploader = None
     r2_resume = None
@@ -617,6 +825,16 @@ def main() -> int:
         # only when resume is on, since --no-resume ignores existing archives.
         if resume:
             r2_resume = R2Resume(uploader)
+
+    # Built after the uploader so the overwrite ledger can mirror to R2 (surviving
+    # a full VM wipe). On a fresh/wiped box it pulls prior progress back from R2.
+    ledger = None
+    if args.overwrite:
+        ledger = OverwriteLedger(
+            OUT_DIR / ".overwrite_progress.json",
+            signature=f"{args.start_year}-{args.end_year}",
+            uploader=uploader,
+        )
 
     cells = load_cells()
     by_tile = group_by_tile(cells)
@@ -638,7 +856,12 @@ def main() -> int:
           f"years {args.start_year}-{args.end_year}")
     print(f"  batch : up to {args.batch_years} yr/fetch, {args.var_workers} "
           f"var-workers, {args.parallel_tiles} parallel tile(s)")
-    if not resume:
+    if ledger is not None:
+        n_done = len(ledger.done)
+        print("  mode  : OVERWRITE (rebuild from scratch, local-day buckets)"
+              + (f"; ledger resume: {n_done} (cell,span) already done"
+                 if n_done else "; ledger: fresh"))
+    elif not resume:
         print("  resume: OFF (full refetch)")
     else:
         src = "R2 (ephemeral-disk-safe)" if r2_resume is not None else "local disk"
@@ -675,7 +898,7 @@ def main() -> int:
             futs = {
                 ex.submit(run_tile, ds, t, c, years, latest_year,
                           args.batch_years, args.var_workers, resume,
-                          args.refresh_latest, r2_resume, uploader): t
+                          args.refresh_latest, r2_resume, uploader, ledger): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -685,7 +908,12 @@ def main() -> int:
             total_written += run_tile(
                 ds, tile_id, tile_cells, years, latest_year,
                 args.batch_years, args.var_workers, resume,
-                args.refresh_latest, r2_resume, uploader)
+                args.refresh_latest, r2_resume, uploader, ledger)
+
+    # Clean finish: drop the resume ledger so the NEXT overwrite run starts fresh
+    # rather than treating this run's completed spans as already-done.
+    if ledger is not None:
+        ledger.clear()
 
     print(f"\nDone — {total_written} cell-span frames written to {OUT_DIR}")
 

@@ -114,6 +114,30 @@ archives are simply overwritten (idempotent), no separate sync needed.
 > check (which reads *local* disk) will refetch everything. Keep the local dir
 > for cheap resume, or pull it back from R2 first.
 
+### 5b. Correcting already-built data — `--overwrite`
+
+The archive buckets each day by the cell's **local solar day** (offset by
+`round(lon/15)h` before the daily min/max/sum). A normal run only fetches
+*missing* years, so it will NOT fix cells whose history was built under an older,
+wrong definition (e.g. the previous UTC-day bucketing, which mislabeled **tmin**
+by ~a day for off-UTC cells like Beijing). To rebuild existing data, add
+`--overwrite`:
+```bash
+python download_cells.py --start-year 1950 --batch-years 20 --parallel-tiles 2 \
+  --overwrite --upload-r2
+```
+`--overwrite` REPLACES each cell's archive from scratch (so stale rows can't
+survive the merge) and **refetches every requested year**. It is crash- AND
+VM-wipe-resumable via its own per-`(cell, span)` ledger, written locally and
+mirrored to R2 at `archive/.overwrite_progress.json`: a recreated box pulls the
+ledger back from R2 and skips work already done (worst case redoes ≤30 s of
+cells). The ledger is deleted on a clean finish.
+
+> **Run `--overwrite` over the FULL grid once after a definition change.** After
+> that, routine monthly top-ups use the *normal* command (no `--overwrite`) — new
+> local-day rows then merge onto local-day history. Running a normal top-up on a
+> cell that still has old-definition rows would leave a seam.
+
 ### 6. Tear down
 Destroy the VM (Hetzner) or stop it (Oracle free). The archive now lives in R2
 and is served as immutable static files — no compute in prod.

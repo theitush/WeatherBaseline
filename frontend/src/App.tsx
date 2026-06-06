@@ -88,10 +88,13 @@ const AppContent: React.FC = () => {
     return `${months[d.getMonth()]} ${day}${suffix} ± ${CONFIG.chart.seasonalWindowDays} days`;
   };
 
-  // Get current date data for temperature context
+  // Get current date data for temperature context.
+  // Parse as LOCAL midnight (T00:00:00) to match the data rows; a bare
+  // new Date("YYYY-MM-DD") is UTC, which selects the wrong day's row west of UTC
+  // (e.g. Mexico), desyncing the card's temp/verdict from the chart's marker.
   const getCurrentTemp = () => {
     const currentDateData = filteredData.filter(
-      (d) => d.date.toDateString() === new Date(currentDate).toDateString()
+      (d) => d.date.toDateString() === new Date(currentDate + 'T00:00:00').toDateString()
     );
     if (currentDateData.length > 0) {
       return currentDateData[0][currentMetric] ?? null;

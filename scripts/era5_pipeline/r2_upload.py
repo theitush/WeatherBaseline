@@ -90,6 +90,27 @@ class R2Uploader:
             },
         )
 
+    def put_bytes(self, data: bytes, key: str, content_type: str) -> None:
+        """Upload raw bytes under `key` (used for the small overwrite ledger)."""
+        self.client.put_object(
+            Bucket=self.bucket, Key=key, Body=data, ContentType=content_type
+        )
+
+    def get_bytes(self, key: str) -> bytes | None:
+        """Fetch an object's bytes, or None if it doesn't exist."""
+        try:
+            return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        except self.client.exceptions.NoSuchKey:
+            return None
+        except Exception as e:  # noqa: BLE001 - 404 surfaces as ClientError on R2
+            if "NoSuchKey" in str(e) or "404" in str(e):
+                return None
+            raise
+
+    def delete_object(self, key: str) -> None:
+        """Delete an object; a missing key is a no-op."""
+        self.client.delete_object(Bucket=self.bucket, Key=key)
+
     def list_sizes(self, prefix: str) -> dict[str, int]:
         """Map every object key under `prefix` to its byte size, in one listing.
 

@@ -4,6 +4,15 @@ import CONFIG from './config';
 import type { MetricKey } from './config';
 import type { WeatherDataPoint, YearlyAggregate, TemperatureContext, DataExtents } from '../types';
 
+// Parse a YYYY-MM-DD target date as LOCAL midnight. A bare `new Date("YYYY-MM-DD")`
+// is parsed as UTC, while the data rows (tieredData) and the seasonal window
+// (api.parseDate) use local midnight — so mixing them shifts the matched day by
+// one in any timezone west of UTC (e.g. Mexico), desyncing the spectrum card and
+// stats from the chart. Always go through this so every path agrees on the day.
+function parseLocalDate(dateString: string): Date {
+  return new Date(dateString + 'T00:00:00');
+}
+
 /**
  * Calculate yearly aggregates with percentiles and rolling medians
  */
@@ -36,11 +45,8 @@ export function calculateYearlyAggregates(
     if (metricValues.length === 0) return; // Skip if no valid data
 
     const temps = metricValues.sort(d3.ascending);
-    const targetDate = new Date(
-      year,
-      new Date(currentDate).getMonth(),
-      new Date(currentDate).getDate()
-    );
+    const cd = parseLocalDate(currentDate);
+    const targetDate = new Date(year, cd.getMonth(), cd.getDate());
 
     aggregates.push({
       year: year,
@@ -122,7 +128,7 @@ export function getCurrentDateData(
   currentDate: string
 ): WeatherDataPoint[] {
   return data.filter(
-    (d) => d.date.toDateString() === new Date(currentDate).toDateString()
+    (d) => d.date.toDateString() === parseLocalDate(currentDate).toDateString()
   );
 }
 
