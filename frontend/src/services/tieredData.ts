@@ -169,11 +169,13 @@ export async function loadCellTimeline(
   apply(archive, 'historical');
   apply(recent, 'historical'); // highest precedence
 
-  // Record whether this cell has any settled history. Archive is the long record
-  // the charts/stats need; recent alone (without archive) still counts as "has
-  // some real data," but in practice a built cell always has the archive. A cell
-  // with neither is one we haven't backfilled yet → the UI shows "coming soon".
-  cellHasArchive.set(cellKey(lat, lon), archive.length > 0 || recent.length > 0);
+  // Record whether this cell has the settled long-run history the charts/stats
+  // need. Only the archive counts: the `recent` tier is topped up daily from the
+  // live model for EVERY servable cell (even ones we haven't backfilled), so a
+  // few recent rows don't mean the cell is built. Requiring archive specifically
+  // means an unbuilt cell shows "coming soon" instead of charting a stub of
+  // recent/forecast points.
+  cellHasArchive.set(cellKey(lat, lon), archive.length > 0);
 
   // Record the last available date for this cell (max of the raw YYYY-MM-DD
   // keys — lexical max works since they're zero-padded ISO dates). The picker
