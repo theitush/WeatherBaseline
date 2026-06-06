@@ -504,6 +504,10 @@ const AppContent: React.FC = () => {
                       converge on the same answer, that's about as strong as
                       empirical evidence gets.
                     </p>
+                    <p>
+                      So yes. Even if you don't evidence of change at a given location 
+                      and time, the global picture is clear.
+                    </p>
                   </div>
                 </details>
                 <details className="faq-item">
