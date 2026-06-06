@@ -4,7 +4,8 @@
 // they only see the static index.html — which carries ONE generic preview card
 // for every path. This middleware fixes that for deep links: when (and only
 // when) a known crawler requests a /<lat,lon>/<date>/<metric> URL, it rewrites
-// the og/twitter <meta> tags in the served HTML to name the city + date.
+// the og/twitter description in the served HTML to "<Date> · <City>". The title
+// is always the fixed question (set in index.html); only the description varies.
 //
 // Real visitors are never touched: non-crawler requests, and any path that
 // isn't a valid share link (e.g. the bare root), pass straight through to the
@@ -15,13 +16,9 @@
 // The coords ARE a real cell centre, so the city name is an exact lat/lon
 // lookup in /cells.csv (no nearest-neighbour search needed).
 
-// Short URL token -> friendly phrase for the question. Tokens match urlState.ts.
-const METRIC_PHRASE = {
-  tmax: 'How extreme was this heat?',
-  tmin: 'How extreme was this cold?',
-  precip: 'How extreme was this rain?',
-  wind: 'How extreme was this wind?',
-};
+// Valid metric tokens (match urlState.ts) — used only to validate a share path,
+// since the description no longer depends on the metric.
+const METRIC_TOKENS = new Set(['tmax', 'tmin', 'precip', 'wind']);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -41,8 +38,9 @@ function isCrawler(ua) {
   return CRAWLER_UA.some((sig) => lc.includes(sig));
 }
 
-// Parse a share path into { lat, lon, date, metricToken } or null. Tolerant of
-// trailing slashes; same validation as urlState.parsePath.
+// Parse a share path into { lat, lon, date } or null. Tolerant of trailing
+// slashes; same validation as urlState.parsePath. The metric is validated but
+// not returned — the preview text no longer depends on it.
 function parseShare(pathname) {
   const segs = pathname.split('/').filter(Boolean);
   if (segs.length < 3) return null;
@@ -56,9 +54,9 @@ function parseShare(pathname) {
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
 
   if (!DATE_RE.test(dateSeg)) return null;
-  if (!METRIC_PHRASE[metricSeg]) return null;
+  if (!METRIC_TOKENS.has(metricSeg)) return null;
 
-  return { lat, lon, date: dateSeg, metricToken: metricSeg };
+  return { lat, lon, date: dateSeg };
 }
 
 // "2025-07-15" -> "Jul 15, 2025". Parsed as plain parts (no Date/tz games).
@@ -167,12 +165,11 @@ export async function onRequest(context) {
   // No name match: leave the generic card rather than show raw coords.
   if (!city) return response;
 
-  const title = escapeAttr(`${city} · ${formatDate(share.date)}`);
-  const desc = escapeAttr(METRIC_PHRASE[share.metricToken]);
+  // Title is the fixed question (already in index.html) — only the description
+  // changes per link: "<Date> · <City>".
+  const desc = escapeAttr(`${formatDate(share.date)} · ${city}`);
 
   return new HTMLRewriter()
-    .on('meta[property="og:title"]', new SetContent(title))
-    .on('meta[name="twitter:title"]', new SetContent(title))
     .on('meta[property="og:description"]', new SetContent(desc))
     .on('meta[name="twitter:description"]', new SetContent(desc))
     .on('meta[name="description"]', new SetContent(desc))
