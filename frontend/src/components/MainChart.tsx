@@ -114,6 +114,17 @@ const MainChart: React.FC<MainChartProps> = ({
         ).tickSize(-width).tickFormat(() => '') as any
       );
 
+    // Year-axis ticks: d3's default round-year ticks (1960/1980/2000/2020…) plus
+    // the domain's first year (1950), which d3 otherwise drops as a non-round
+    // boundary. Pin it so the record's start is always labelled.
+    const yearTicks = (() => {
+      const start = timeScale.domain()[0];
+      const defaults = timeScale.ticks(d3.timeYear.every(10)!);
+      const startYear = d3.timeYear.floor(start);
+      const hasStart = defaults.some((t) => +t === +startYear);
+      return hasStart ? defaults : [startYear, ...defaults];
+    })();
+
     // Axes
     g.append('g')
       .attr('class', 'axis')
@@ -121,13 +132,17 @@ const MainChart: React.FC<MainChartProps> = ({
       .call(
         (isVertical
           ? d3.axisBottom(tempScale)
-          : d3.axisBottom(timeScale).tickFormat(d3.timeFormat('%Y') as any)
+          : d3.axisBottom(timeScale)
+              .tickValues(yearTicks)
+              .tickFormat(d3.timeFormat('%Y') as any)
         ) as any
       );
 
     g.append('g').attr('class', 'axis').call(
       (isVertical
-        ? d3.axisLeft(timeScale).tickFormat(d3.timeFormat('%Y') as any)
+        ? d3.axisLeft(timeScale)
+            .tickValues(yearTicks)
+            .tickFormat(d3.timeFormat('%Y') as any)
         : d3.axisLeft(tempScale)
       ) as any
     );

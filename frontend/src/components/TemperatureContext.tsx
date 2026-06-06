@@ -140,7 +140,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let recordHigh: number | null = null;
   let recordLowDate: Date | null = null;
   let recordHighDate: Date | null = null;
-  let firstYear: number | null = null;
 
   for (const d of valid) {
     const v = d[currentMetric] as number;
@@ -151,9 +150,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     if (recordHigh === null || v > recordHigh) {
       recordHigh = v;
       recordHighDate = d.date;
-    }
-    if (firstYear === null || d.date.getFullYear() < firstYear) {
-      firstYear = d.date.getFullYear();
     }
   }
 
@@ -196,7 +192,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm
       // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
       rank = isHighSide ? atOrAboveN : atOrBelowN;
-      const since = firstYear !== null ? ` since ${firstYear}` : '';
+      // "this time of year" — the comparison pool is every day within a
+      // ±seasonalWindowDays calendar window of the target date, across all years
+      // back to 1950, so frame it by the season rather than the start year.
+      const since = ' this time of year';
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
