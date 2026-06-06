@@ -493,6 +493,20 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
+                  <summary>Is the climate changing?</summary>
+                  <div className="faq-body">
+                    <p>
+                      <strong>Yep.</strong> This isn't a close call. Many
+                      independent analyses, built from completely different
+                      raw data — surface stations, ocean buoys, weather
+                      balloons, satellites, and reanalyses all point the same way: 
+                      the planet is warming. When methods that share almost nothing
+                      converge on the same answer, that's about as strong as
+                      empirical evidence gets.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
                   <summary>Why do this?!</summary>
                   <div className="faq-body">
                     <p>I just wanted to know if certain days realy ARE as extreme as 
