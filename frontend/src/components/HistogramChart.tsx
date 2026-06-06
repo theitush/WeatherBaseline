@@ -55,7 +55,11 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const tooltip = d3.select(tooltipRef.current);
 
+    // Forecast rows are model guesses, not settled observations — exclude them
+    // from the distribution (and the percentile brackets below) so the histogram
+    // reflects real history only. Matches the MainChart record-marker exclusion.
     const values = filteredData
+      .filter((d) => d.data_type !== 'forecast')
       .map((d) => d[currentMetric])
       .filter((v): v is number => v !== undefined);
 

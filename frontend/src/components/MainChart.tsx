@@ -318,15 +318,30 @@ const MainChart: React.FC<MainChartProps> = ({
       wind_speed_10m_max: 'Max Wind Speed',
     };
 
+    // Forecast rows are model guesses, not settled observations. They're drawn
+    // as hollow (outlined) dots, and excluded from the record high/low markers
+    // and the histogram (see HistogramChart) so they don't masquerade as records.
+    // We also only show forecast dots up to (and including) the target date —
+    // dots dated past the selected day are dropped, since the page is "how hot
+    // was it on <date>", not a look-ahead at the rest of the forecast horizon.
+    const targetDay = new Date(currentDate + 'T12:00:00');
+    const dotData = filteredData.filter(
+      (d) =>
+        d[currentMetric] !== undefined &&
+        !(d.data_type === 'forecast' && d.date > targetDay)
+    );
+    const dotColor = CONFIG.getColorForElement(currentMetric, 'dataPoints');
     const dotSelection = g.selectAll('.data-point')
-      .data(filteredData.filter((d) => d[currentMetric] !== undefined))
+      .data(dotData)
       .enter()
       .append('circle')
-      .attr('class', 'data-point')
+      .attr('class', (d) => `data-point${d.data_type === 'forecast' ? ' data-point-forecast' : ''}`)
       .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
       .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
-      .attr('r', 2)
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'dataPoints'))
+      .attr('r', (d) => (d.data_type === 'forecast' ? 2.5 : 2))
+      .attr('fill', (d) => (d.data_type === 'forecast' ? 'var(--surface)' : dotColor))
+      .attr('stroke', (d) => (d.data_type === 'forecast' ? dotColor : 'none'))
+      .attr('stroke-width', (d) => (d.data_type === 'forecast' ? 1 : 0))
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
@@ -335,7 +350,7 @@ const MainChart: React.FC<MainChartProps> = ({
     // on the 2px dots. Appended before the record stars / current-date marker so
     // those stay on top and keep their own (more specific) tooltips.
     g.selectAll('.data-point-hit')
-      .data(filteredData.filter((d) => d[currentMetric] !== undefined))
+      .data(dotData)
       .enter()
       .append('circle')
       .attr('class', 'data-point-hit')
@@ -348,16 +363,17 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
+            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
           );
         place(event);
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
 
     // Record high (red) and record low (blue) markers — slightly larger than the target-date dot.
+    // Forecast rows are excluded: a record should be a settled observation, not a model guess.
     const valid = filteredData.filter((d) => {
       const v = d[currentMetric];
-      return typeof v === 'number' && Number.isFinite(v);
+      return typeof v === 'number' && Number.isFinite(v) && d.data_type !== 'forecast';
     });
     if (valid.length > 0) {
       let lo = valid[0];
@@ -410,12 +426,11 @@ const MainChart: React.FC<MainChartProps> = ({
     }
 
     // Current date indicator
-    const targetDate = new Date(currentDate + 'T12:00:00');
     const currentDateData = fullData.filter(
       (d) =>
-        d.date.getFullYear() === targetDate.getFullYear() &&
-        d.date.getMonth() === targetDate.getMonth() &&
-        d.date.getDate() === targetDate.getDate() &&
+        d.date.getFullYear() === targetDay.getFullYear() &&
+        d.date.getMonth() === targetDay.getMonth() &&
+        d.date.getDate() === targetDay.getDate() &&
         d[currentMetric] !== undefined
     );
 
@@ -452,7 +467,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}<br/><em>Target date</em>`
+              `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
             );
           place(event);
         })
