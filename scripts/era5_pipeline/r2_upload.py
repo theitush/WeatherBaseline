@@ -90,6 +90,38 @@ class R2Uploader:
             },
         )
 
+    def list_sizes(self, prefix: str) -> dict[str, int]:
+        """Map every object key under `prefix` to its byte size, in one listing.
+
+        Sizes come straight from the ListObjectsV2 response — no GET, no download.
+        Used by the producer's resume to learn, cheaply, which cell archives R2
+        already has and roughly how complete each is (a full-history archive is
+        far larger than one interrupted mid-fetch).
+        """
+        sizes: dict[str, int] = {}
+        paginator = self.client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                sizes[obj["Key"]] = obj["Size"]
+        return sizes
+
+    def read_years(self, key: str) -> set[int]:
+        """Download one archive object and return the set of years it covers.
+
+        Only used to disambiguate the small archives that size alone can't classify
+        (a tiny but COMPLETE cell vs. a genuinely partial one). Reads just the date
+        column out of the gzip, so the parse stays cheap.
+        """
+        import gzip
+        import io
+
+        import pandas as pd
+
+        body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        with gzip.open(io.BytesIO(body), "rt") as fh:
+            dates = pd.read_csv(fh, usecols=["date"])["date"]
+        return set(pd.to_datetime(dates).dt.year.unique().tolist())
+
 
 def _iter_tier_files(data_dir: Path, tiers):
     """Yield (local_path, r2_key) for every .csv.gz under the given tiers."""

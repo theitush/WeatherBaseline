@@ -19,11 +19,18 @@ Design notes:
    connections under load, so keep the worker count modest; the per-step retry
    covers the occasional drop.
 
-3. RESUME. Before fetching, we read each tile's existing archives and compute the
-   set of YEARS already present across its cells. Only missing years are fetched —
-   including interior gaps (a hole left by an interrupted run), not just the tail.
-   The trailing (current) year is always re-fetched: ERA5-Land lags ~6 days, so
-   new data keeps arriving. --no-resume forces a full refetch.
+3. RESUME. Before fetching, we compute the set of YEARS already present for each
+   tile and fetch only the missing ones — including interior gaps (a hole left by
+   an interrupted run), not just the tail. The source of truth is the local disk,
+   OR (with --upload-r2) the R2 bucket, since the VM's disk is ephemeral: a fresh
+   box has no local archives but R2 still holds what earlier runs produced. R2
+   coverage is read cheaply — one object listing gives every cell archive's size,
+   and a tile is taken as complete on size alone (only the few small/ambiguous
+   cells are downloaded and year-checked). A present year is skipped by default,
+   INCLUDING the current year — so a resume won't redownload 2026 just because
+   ERA5-Land is still appending to it. --refresh-latest re-fetches the trailing
+   year on purpose (to top up recent data / a new dataset version); --no-resume
+   forces a full refetch.
 
 Usage:
   source .venv/bin/activate
@@ -260,15 +267,61 @@ def open_store():
 # --------------------------------------------------------------------------- #
 # Resume: which years does a tile already have?
 # --------------------------------------------------------------------------- #
-def years_present_for_tile(tile_cells: list[dict]) -> set[int]:
-    """Years already covered by EVERY cell in the tile (intersection).
+class R2Resume:
+    """Source-of-truth for resume sourced from R2 instead of the VM's disk.
 
-    A year counts as present for a cell only if that cell's archive has a row for
-    that year. We intersect across the tile's cells so a year is "done" only when
-    all cells have it — a tile fetch writes all cells together, so a year missing
-    from any cell means that whole tile-year still needs fetching. Interior gaps
-    (a year missing in the middle, e.g. from an interrupted run) are caught too,
-    because we look at the actual set of years, not just the max date.
+    The VM's local archives are ephemeral (a fresh or wiped box has none), but R2
+    already holds what earlier runs produced — so when uploading we ask R2, not
+    the disk, which tiles are done. Built once up front with one ListObjectsV2,
+    which gives every archive key's size for free (no downloads) — used to find a
+    tile's smallest cell and to detect missing cells.
+    """
+
+    def __init__(self, uploader):
+        self.up = uploader
+        # key (e.g. "archive/archive_32.1_34.8.csv.gz") -> byte size
+        self.sizes = uploader.list_sizes("archive/")
+        log(f"  R2 resume: {len(self.sizes)} archive object(s) already in "
+            f"bucket '{uploader.bucket}'")
+
+    def years_present_for_tile(self, tile_cells: list[dict],
+                               want: set[int]) -> set[int]:
+        """Years from `want` that R2 already has for this whole tile.
+
+        A tile is written all-cells-together per span, so every cell in a tile
+        shares the same year coverage — so we inspect exactly ONE cell. We can't
+        infer completeness from file size (a cell missing only its last few years
+        is barely smaller than a complete one, and a tiny-but-complete desert cell
+        is smaller than a large partial one), so we read the cell's actual years.
+        We pick the SMALLEST present cell as the one to read — it's the cheapest
+        download and, since all cells share coverage, fully representative.
+
+        Any cell key missing -> nothing safely done; the whole tile is refetched.
+        """
+        smallest_key: str | None = None
+        smallest_size = None
+        for c in tile_cells:
+            key = f"archive/{archive_name(c['lat'], c['lon'])}"
+            size = self.sizes.get(key)
+            if size is None:
+                return set()  # a missing cell -> tile not safely done
+            if smallest_size is None or size < smallest_size:
+                smallest_size, smallest_key = size, key
+        if smallest_key is None:
+            return set()
+        have = self.up.read_years(smallest_key)
+        return want & have  # only the wanted years this cell actually covers
+
+
+def years_present_for_tile(tile_cells: list[dict], want: set[int]) -> set[int]:
+    """Years (from `want`) already covered by EVERY cell on local disk.
+
+    A year counts for a cell only if its archive has a row in that year. We
+    intersect across the tile's cells so a year is "done" only when all cells have
+    it — a tile fetch writes all cells together, so a year missing from any cell
+    means that whole tile-year still needs fetching. Interior gaps (a year missing
+    in the middle, e.g. from an interrupted run) are caught too, because we look at
+    the actual set of years, not just the max date.
     """
     import pandas as pd
 
@@ -285,17 +338,31 @@ def years_present_for_tile(tile_cells: list[dict]) -> set[int]:
 
 
 def missing_years(tile_cells: list[dict], years: list[int], latest_year: int,
-                  resume: bool) -> list[int]:
+                  resume: bool, refresh_latest: bool,
+                  r2_resume: "R2Resume | None") -> list[int]:
     """The subset of `years` still to fetch for this tile.
 
-    With resume on: drop years already present in every cell, but ALWAYS keep the
-    latest year (ERA5-Land lags ~6 days, so new data keeps arriving and the last
-    stored year is partial). With resume off: fetch all requested years.
+    With resume off: fetch all requested years. With resume on: drop years already
+    present in every cell, using R2 as the source of truth when `r2_resume` is
+    given (the VM's disk is ephemeral) and the local disk otherwise.
+
+    By default an already-present year is skipped even if it's the latest year.
+    Pass `refresh_latest` to ALWAYS re-fetch the trailing year — ERA5-Land lags
+    ~6 days, so the last stored year is partial and a re-fetch tops it up (and
+    picks up a new dataset version). You want that only when refreshing recent
+    data, not on a plain resume of a long historical backfill.
     """
     if not resume:
         return years
-    have = years_present_for_tile(tile_cells)
-    return [y for y in years if y not in have or y >= latest_year]
+    want = set(years)
+    if r2_resume is not None:
+        have = r2_resume.years_present_for_tile(tile_cells, want)
+    else:
+        have = years_present_for_tile(tile_cells, want)
+    return [
+        y for y in years
+        if y not in have or (refresh_latest and y >= latest_year)
+    ]
 
 
 def batches(years: list[int], batch_years: int) -> list[tuple[int, int]]:
@@ -467,14 +534,18 @@ def write_archive(lat: float, lon: float, frame) -> Path:
 
 
 def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
-             var_workers, resume, uploader=None) -> int:
+             var_workers, resume, refresh_latest, r2_resume=None,
+             uploader=None) -> int:
     """Fetch all missing year-spans for one tile; return archives written.
 
     If `uploader` is given, each cell's archive is pushed to R2 right after it's
     (re)written — so a tile's full history lands incrementally during the pull
     rather than in a separate pass at the end. Idempotent: a re-run overwrites.
+    `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
+    disk is ephemeral) instead of the local archives.
     """
-    todo = missing_years(tile_cells, years, latest_year, resume)
+    todo = missing_years(tile_cells, years, latest_year, resume,
+                         refresh_latest, r2_resume)
     if not todo:
         log(f"tile {tile_id}: nothing missing — already complete, skipping")
         return 0
@@ -514,10 +585,17 @@ def main() -> int:
                     "drops connections under load, so keep this small")
     ap.add_argument("--no-resume", action="store_true",
                     help="refetch everything, ignoring existing archives")
+    ap.add_argument("--refresh-latest", action="store_true",
+                    help="on resume, ALWAYS re-fetch the trailing year even if "
+                    "present — ERA5-Land lags ~6 days so the last stored year is "
+                    "partial. Off by default: a present year is skipped, so a "
+                    "resume won't redownload the current year. Use this when you "
+                    "want to top up recent data (e.g. a new dataset version).")
     ap.add_argument("--upload-r2", action="store_true",
                     help="push each archive to R2 as it's written (needs "
                     "R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in env, "
-                    "e.g. `source r2.env`)")
+                    "e.g. `source r2.env`). Also makes resume read coverage from "
+                    "R2 instead of the (ephemeral) local disk.")
     args = ap.parse_args()
 
     if args.year is not None:
@@ -527,12 +605,18 @@ def main() -> int:
     resume = not args.no_resume
 
     uploader = None
+    r2_resume = None
     if args.upload_r2:
         from r2_upload import R2Uploader  # boto3 import deferred to here
 
         # R2Uploader() raises SystemExit with a clear message if creds are
         # missing — fail fast here, before the long pull starts.
         uploader = R2Uploader()
+        # With R2 as the upload target, also use it as the resume source of truth
+        # (the VM's disk is ephemeral). One listing up front; built lazily below
+        # only when resume is on, since --no-resume ignores existing archives.
+        if resume:
+            r2_resume = R2Resume(uploader)
 
     cells = load_cells()
     by_tile = group_by_tile(cells)
@@ -554,7 +638,13 @@ def main() -> int:
           f"years {args.start_year}-{args.end_year}")
     print(f"  batch : up to {args.batch_years} yr/fetch, {args.var_workers} "
           f"var-workers, {args.parallel_tiles} parallel tile(s)")
-    print(f"  resume: {'on' if resume else 'OFF (full refetch)'}")
+    if not resume:
+        print("  resume: OFF (full refetch)")
+    else:
+        src = "R2 (ephemeral-disk-safe)" if r2_resume is not None else "local disk"
+        latest = ("re-fetch latest year" if args.refresh_latest
+                  else f"skip {latest_year} if present")
+        print(f"  resume: on, source={src}, {latest}")
     print(f"  out   : {OUT_DIR}")
     if uploader is not None:
         print(f"  upload: R2 bucket '{uploader.bucket}' (archive/ keys), "
@@ -585,7 +675,7 @@ def main() -> int:
             futs = {
                 ex.submit(run_tile, ds, t, c, years, latest_year,
                           args.batch_years, args.var_workers, resume,
-                          uploader): t
+                          args.refresh_latest, r2_resume, uploader): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -594,7 +684,8 @@ def main() -> int:
         for tile_id, tile_cells in tiles.items():
             total_written += run_tile(
                 ds, tile_id, tile_cells, years, latest_year,
-                args.batch_years, args.var_workers, resume, uploader)
+                args.batch_years, args.var_workers, resume,
+                args.refresh_latest, r2_resume, uploader)
 
     print(f"\nDone — {total_written} cell-span frames written to {OUT_DIR}")
 
