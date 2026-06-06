@@ -45,6 +45,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const searchTimeout = useRef<number | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCityInput(cityName);
@@ -98,6 +99,20 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setSuggestions(matched);
       setShowSuggestions(matched.length > 0);
     }, 300);
+  };
+
+  // Wipe the field and any open suggestions, then refocus so the user can type a
+  // fresh search straight away. Cancels any in-flight geocode so a late response
+  // can't repopulate the box we just cleared. Does NOT change the loaded
+  // location — clearing only resets the search input.
+  const clearInput = () => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchAbort.current?.abort();
+    setCityInput('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setSelectedIndex(-1);
+    inputRef.current?.focus();
   };
 
   const selectSuggestion = (suggestion: Suggestion) => {
@@ -154,6 +169,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     <div className="location-selector">
       <div className="city-search-container" ref={suggestionsRef}>
         <input
+          ref={inputRef}
           type="text"
           id="city-search"
           value={cityInput}
@@ -162,6 +178,16 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           placeholder="City"
           autoComplete="off"
         />
+        {cityInput.length > 0 && (
+          <button
+            type="button"
+            className="city-clear"
+            aria-label="Clear search"
+            onClick={clearInput}
+          >
+            ×
+          </button>
+        )}
         {showSuggestions && suggestions.length > 0 && (
           <div className="city-suggestions">
             {suggestions.map((suggestion, index) => {

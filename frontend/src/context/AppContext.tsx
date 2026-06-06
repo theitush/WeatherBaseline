@@ -3,7 +3,7 @@ import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { getTemperatureHistory, geolocateByIp } from '../services/api';
-import { getCellMaxDate } from '../services/tieredData';
+import { getCellMaxDate, getCellHasArchive } from '../services/tieredData';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
@@ -50,6 +50,12 @@ interface AppState {
   // Loading & Error states
   loading: boolean;
   error: string | null;
+
+  // True when the chosen cell is valid/servable but its ERA5-Land archive hasn't
+  // been backfilled yet — the UI shows a "coming soon" notice rather than an
+  // error, since every clickable location WILL have data once the download
+  // finishes.
+  archivePending: boolean;
 
   // Actions
   fetchData: () => Promise<void>;
@@ -119,11 +125,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Loading & Error
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [archivePending, setArchivePending] = useState<boolean>(false);
 
   // Fetch weather data
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setArchivePending(false);
 
     try {
       console.log('Fetching data for:', location, currentDate);
@@ -135,6 +143,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         1940,
         CONFIG.chart.seasonalWindowDays
       );
+
+      // A servable cell whose archive we haven't backfilled yet: it may have a
+      // few forecast rows but no settled history, so there's nothing meaningful
+      // to chart. Show the friendly "coming soon" notice instead of an error —
+      // every clickable location gets data once the download catches up. Checked
+      // before the empty-data guard so forecast-only cells take this path too.
+      if (getCellHasArchive(location.lat, location.lon) === false) {
+        setArchivePending(true);
+        setFullData([]);
+        setFilteredData([]);
+        return;
+      }
 
       if (!data || data.length === 0) {
         throw new Error('No weather data received from the API. The location or date range might not be available.');
@@ -323,6 +343,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     temperatureContext,
     loading,
     error,
+    archivePending,
     fetchData,
     refreshData,
   };

@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { placeTooltip } from '../utils/tooltip';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
@@ -299,9 +300,8 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
           .style('opacity', 1)
           .html(
             `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
-          )
-          .style('left', event.clientX + 12 + 'px')
-          .style('top', event.clientY - 28 + 'px');
+          );
+        placeTooltip(tooltipRef.current, event);
       };
       panel
         .selectAll('rect.period-hit')
@@ -372,9 +372,8 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
             .style('opacity', 1)
             .html(
               `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${units[currentMetric]}`
-            )
-            .style('left', event.clientX + 12 + 'px')
-            .style('top', event.clientY - 28 + 'px');
+            );
+          placeTooltip(tooltipRef.current, event);
         };
         panel
           .append('line')

@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { placeTooltip } from '../utils/tooltip';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -106,9 +107,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .style('opacity', 1)
           .html(
             `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
-          )
-          .style('left', event.clientX + 12 + 'px')
-          .style('top', event.clientY - 28 + 'px');
+          );
+        placeTooltip(tooltipRef.current, event);
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
 

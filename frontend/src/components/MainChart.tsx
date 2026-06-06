@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint, YearlyAggregate } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { placeTooltip } from '../utils/tooltip';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -54,6 +55,9 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
     const tooltip = d3.select(tooltipRef.current);
+    // Keep the tooltip on-screen near any edge; call after .html() (see util).
+    const place = (event: { clientX: number; clientY: number }) =>
+      placeTooltip(tooltipRef.current, event);
 
     const dateExtent = d3.extent(filteredData, (d) => d.date) as [Date, Date];
     const allValues = filteredData
@@ -345,9 +349,8 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('opacity', 1)
           .html(
             `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
-          )
-          .style('left', event.clientX + 12 + 'px')
-          .style('top', event.clientY - 28 + 'px');
+          );
+        place(event);
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
 
@@ -397,9 +400,8 @@ const MainChart: React.FC<MainChartProps> = ({
             .style('opacity', 1)
             .html(
               `<strong>${r.label}</strong><br/>${r.d.date.toDateString()}<br/>${pointLabels[currentMetric]}: ${(r.d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
-            )
-            .style('left', event.clientX + 12 + 'px')
-            .style('top', event.clientY - 28 + 'px');
+            );
+          place(event);
         })
         .on('mouseout', () => tooltip.style('opacity', 0))
         .transition()
@@ -451,9 +453,8 @@ const MainChart: React.FC<MainChartProps> = ({
             .style('opacity', 1)
             .html(
               `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}<br/><em>Target date</em>`
-            )
-            .style('left', event.clientX + 12 + 'px')
-            .style('top', event.clientY - 28 + 'px');
+            );
+          place(event);
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
     }

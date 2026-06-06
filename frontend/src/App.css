@@ -132,6 +132,28 @@ body {
   color: var(--error-text);
 }
 
+/* Informational, not an error: the location is valid, its data just isn't
+   downloaded yet. Neutral surface + accent rule rather than the red error tone. */
+.archive-pending {
+  background-color: var(--surface, var(--bg));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+
+.archive-pending strong {
+  color: var(--text-h);
+}
+
+.archive-pending p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .data-panel {
   margin-top: 30px;
 }

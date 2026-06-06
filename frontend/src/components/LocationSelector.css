@@ -17,7 +17,7 @@
 }
 
 #city-search {
-  padding: 8px 12px;
+  padding: 8px 32px 8px 12px; /* room on the right for the clear button */
   font-size: 14px;
   color: var(--text-h);
   background: var(--bg);
@@ -30,6 +30,34 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+/* Clear ("×") button, overlaid at the right edge of the input. Only rendered
+   when there's text to clear. */
+.city-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  opacity: 0.55;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.city-clear:hover {
+  opacity: 1;
+  background: var(--accent-bg);
 }
 
 .city-suggestions {

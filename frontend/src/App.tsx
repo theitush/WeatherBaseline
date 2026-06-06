@@ -39,6 +39,7 @@ const AppContent: React.FC = () => {
     maxAvailableDate,
     loading,
     error,
+    archivePending,
   } = useApp();
 
   const handleLocationChange = (info: { name: string; lat: number; lon: number }) => {
@@ -133,6 +134,17 @@ const AppContent: React.FC = () => {
         {error && (
           <div className="error-message">
             <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {!loading && !error && archivePending && (
+          <div className="archive-pending">
+            <strong>Data coming soon for {location.name || 'this location'}.</strong>
+            <p>
+              This spot is on the map, but its historical record is still
+              downloading — every location will be available shortly. Try another
+              nearby city in the meantime, or check back soon.
+            </p>
           </div>
         )}
 

@@ -31,12 +31,27 @@ type Tier = 'archive' | 'recent' | 'forecast';
 // offer days that aren't in the data. Keyed "lat,lon".
 const cellMaxDate = new Map<string, string>();
 
+// Whether a loaded cell had any settled (archive/recent) ERA5-Land rows. A cell
+// can be searchable yet have no built archive yet (we're still backfilling the
+// grid) — in that case only the forecast tier exists, so the long-run history
+// and statistics can't be shown. The UI reads this to show a "coming soon"
+// message instead of a generic error. Keyed "lat,lon".
+const cellHasArchive = new Map<string, boolean>();
+
 const cellKey = (lat: number, lon: number) =>
   `${snap(lat).toFixed(1)},${snap(lon).toFixed(1)}`;
 
 /** Last available date for a loaded cell, or null if it hasn't loaded yet. */
 export function getCellMaxDate(lat: number, lon: number): string | null {
   return cellMaxDate.get(cellKey(lat, lon)) ?? null;
+}
+
+/**
+ * Whether the loaded cell has settled archive history (vs. forecast-only).
+ * null means the cell hasn't been loaded yet.
+ */
+export function getCellHasArchive(lat: number, lon: number): boolean | null {
+  return cellHasArchive.get(cellKey(lat, lon)) ?? null;
 }
 
 /** Snap a coordinate to the 0.1° ERA5-Land grid: round(coord*10)/10. */
@@ -153,6 +168,12 @@ export async function loadCellTimeline(
   apply(forecast, 'forecast'); // lowest precedence
   apply(archive, 'historical');
   apply(recent, 'historical'); // highest precedence
+
+  // Record whether this cell has any settled history. Archive is the long record
+  // the charts/stats need; recent alone (without archive) still counts as "has
+  // some real data," but in practice a built cell always has the archive. A cell
+  // with neither is one we haven't backfilled yet → the UI shows "coming soon".
+  cellHasArchive.set(cellKey(lat, lon), archive.length > 0 || recent.length > 0);
 
   // Record the last available date for this cell (max of the raw YYYY-MM-DD
   // keys — lexical max works since they're zero-padded ISO dates). The picker
