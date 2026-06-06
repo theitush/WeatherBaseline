@@ -52,6 +52,28 @@ The last command prints the live URL. The stable one is
 `https://weather-baseline.pages.dev`; the `<hash>.weather-baseline.pages.dev`
 line is that single deploy's immutable alias.
 
+### Social link previews (Pages Function)
+
+Deep links get a per-link preview card (city + date) when pasted into Slack,
+Twitter/X, etc. Crawlers don't run JS, so a **Pages Function**
+(`frontend/functions/_middleware.js`) rewrites the `og:`/`twitter:` `<meta>`
+tags server-side — but **only for social crawler User-Agents**; real visitors
+get the untouched SPA. The city name is an exact lat/lon lookup in `/cells.csv`;
+the bare root and unknown coords fall back to the generic card in `index.html`.
+
+The build copies `frontend/functions/` → `dist/functions/` (a Vite plugin in
+`vite.config.ts`, since `emptyOutDir` wipes `dist/`), so the function ships with
+`wrangler pages deploy dist` automatically — **no extra deploy step**.
+
+To test it locally, `pages dev` discovers `functions/` relative to CWD, not
+inside the assets dir, so symlink it first:
+```bash
+ln -sfn frontend/functions ./functions      # dev only; not committed
+npx wrangler pages dev dist --compatibility-date 2025-04-01
+curl -s -A Slackbot http://localhost:8788/23.80,90.40/2025-07-15/tmax | grep og:title
+rm ./functions
+```
+
 > Leave `VITE_API_BASE` **unset** for a local dev build — then the frontend uses
 > relative `/api/*`, which the Vite proxy forwards to the local Node backend.
 
