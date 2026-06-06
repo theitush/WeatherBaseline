@@ -1,6 +1,6 @@
 // API service. Weather data now comes from the v2 tiered cell files (see
 // tieredData.ts); only city search still hits a live API here.
-import { loadCellTimeline } from './tieredData';
+import { loadCellTimeline, apiUrl } from './tieredData';
 import type { WeatherDataPoint, GeocodeResult } from '../types';
 
 /**
@@ -76,7 +76,7 @@ export interface IpLocation {
  */
 export async function geolocateByIp(): Promise<IpLocation | null> {
   try {
-    const res = await fetch('/api/geo');
+    const res = await fetch(apiUrl('/api/geo'));
     if (!res.ok) return null;
     const data = await res.json();
     if (typeof data.lat !== 'number' || typeof data.lon !== 'number') return null;

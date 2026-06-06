@@ -10,6 +10,18 @@ import type { WeatherDataPoint } from '../types';
 // set VITE_DATA_BASE to the R2/CDN origin in prod.
 const DATA_BASE = import.meta.env.VITE_DATA_BASE ?? '';
 
+// Base origin for the Worker's /api/* control-plane routes (ensure-fresh, geo).
+// Empty in dev (the Vite proxy forwards /api → the Node backend); in prod set
+// VITE_API_BASE to the deployed Worker's origin (e.g. its workers.dev URL) so
+// these calls reach the Worker cross-origin. The Worker already sends
+// permissive CORS for /api/*. Shared with api.ts via apiUrl().
+export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+
+/** Build a control-plane URL: prefixes the path with API_BASE in prod. */
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 type Tier = 'archive' | 'recent' | 'forecast';
 
 // Last available date (YYYY-MM-DD) per snapped cell, set when its timeline
@@ -86,7 +98,7 @@ function parseCsv(text: string): RawRow[] {
 async function ensureFresh(lat: number, lon: number): Promise<void> {
   try {
     const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-    await fetch(`/api/ensure-fresh?${params}`);
+    await fetch(apiUrl(`/api/ensure-fresh?${params}`));
   } catch {
     // If the refresh gate fails we still try to read whatever files exist —
     // stale-but-present beats failing the whole load.

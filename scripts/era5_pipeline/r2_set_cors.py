@@ -31,6 +31,10 @@ from botocore.config import Config
 DEFAULT_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
+    # Production Pages origin (hyphenated — matches the 'weather-baseline'
+    # Pages project / its <name>.pages.dev URL). The no-hyphen variant is kept
+    # in case the project is ever renamed; extra origins are harmless.
+    "https://weather-baseline.pages.dev",
     "https://weatherbaseline.pages.dev",
 ]
 
