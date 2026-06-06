@@ -4,6 +4,8 @@ import type { WeatherDataPoint, YearlyAggregate } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
+import { useUnits } from '../hooks/useUnits';
+import { convert, unitLabel, axisLabel } from '../utils/units';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -37,6 +39,8 @@ const MainChart: React.FC<MainChartProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  const { system } = useUnits();
+
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
   const totalWidth = propWidth ?? 760;
@@ -46,6 +50,11 @@ const MainChart: React.FC<MainChartProps> = ({
 
   useEffect(() => {
     if (!svgRef.current || filteredData.length === 0) return;
+
+    // Convert a stored metric value to the active display system. The temp scale
+    // lives in display units (so its axis produces clean imperial ticks), so
+    // every value handed to tempScale must be converted first.
+    const cv = (v: number) => convert(v, currentMetric, system);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -62,7 +71,8 @@ const MainChart: React.FC<MainChartProps> = ({
     const dateExtent = d3.extent(filteredData, (d) => d.date) as [Date, Date];
     const allValues = filteredData
       .map((d) => d[currentMetric])
-      .filter((v): v is number => v !== undefined);
+      .filter((v): v is number => v !== undefined)
+      .map((v) => cv(v));
     const [minVal, maxVal] = d3.extent(allValues) as [number, number];
 
     // Precipitation and wind can't be negative, so don't let the padded lower
@@ -85,14 +95,19 @@ const MainChart: React.FC<MainChartProps> = ({
       .domain([tempLo, tempHi])
       .range(isVertical ? [0, width] : [height, 0]);
 
+    // tsv: temp-scale a *raw* (metric) value — converts to display units first.
+    // Use this for every plotted value; tempScale itself stays bare for the axis.
+    const tsv = (v: number) => tempScale(cv(v));
+
+    // 'temp' values are raw metric numbers → route through tsv (convert + scale).
     const tx = (t: Date | number, kind: 'time' | 'temp') =>
       isVertical
-        ? (kind === 'temp' ? tempScale(t as number) : timeScale(t as Date))
-        : (kind === 'time' ? timeScale(t as Date) : tempScale(t as number));
+        ? (kind === 'temp' ? tsv(t as number) : timeScale(t as Date))
+        : (kind === 'time' ? timeScale(t as Date) : tsv(t as number));
     const ty = (t: Date | number, kind: 'time' | 'temp') =>
       isVertical
-        ? (kind === 'time' ? timeScale(t as Date) : tempScale(t as number))
-        : (kind === 'temp' ? tempScale(t as number) : timeScale(t as Date));
+        ? (kind === 'time' ? timeScale(t as Date) : tsv(t as number))
+        : (kind === 'temp' ? tsv(t as number) : timeScale(t as Date));
 
     // Grid
     g.append('g')
@@ -148,12 +163,7 @@ const MainChart: React.FC<MainChartProps> = ({
     );
 
     // Axis label (the temp axis). "Daily" makes clear these are per-day values.
-    const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Daily Max Temp (°C)',
-      min_temperature: 'Daily Min Temp (°C)',
-      precipitation_sum: 'Daily Precipitation (mm)',
-      wind_speed_10m_max: 'Daily Max Wind Speed (m/s)',
-    };
+    const tempAxisLabel = axisLabel(currentMetric, system);
     if (isVertical) {
       g.append('text')
         .attr('x', width / 2)
@@ -161,7 +171,7 @@ const MainChart: React.FC<MainChartProps> = ({
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
         .style('fill', 'var(--chart-label)')
-        .text(tempLabels[currentMetric]);
+        .text(tempAxisLabel);
     } else {
       g.append('text')
         .attr('transform', 'rotate(-90)')
@@ -171,7 +181,7 @@ const MainChart: React.FC<MainChartProps> = ({
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
         .style('fill', 'var(--chart-label)')
-        .text(tempLabels[currentMetric]);
+        .text(tempAxisLabel);
     }
 
     // Pre-satellite era: light shading + dashed boundary at 1979 with a label.
@@ -250,15 +260,15 @@ const MainChart: React.FC<MainChartProps> = ({
           return d3
             .area<YearlyAggregate>()
             .y((d) => timeScale(d.date))
-            .x0((d) => tempScale(lo(d)))
-            .x1((d) => tempScale(hi(d)))
+            .x0((d) => tsv(lo(d)))
+            .x1((d) => tsv(hi(d)))
             .curve(d3.curveMonotoneY);
         }
         return d3
           .area<YearlyAggregate>()
           .x((d) => timeScale(d.date))
-          .y0((d) => tempScale(lo(d)))
-          .y1((d) => tempScale(hi(d)))
+          .y0((d) => tsv(lo(d)))
+          .y1((d) => tsv(hi(d)))
           .curve(d3.curveMonotoneX);
       };
 
@@ -297,12 +307,12 @@ const MainChart: React.FC<MainChartProps> = ({
           ? d3
               .line<YearlyAggregate>()
               .y((d) => timeScale(d.date))
-              .x((d) => tempScale(d.movingMedian as number))
+              .x((d) => tsv(d.movingMedian as number))
               .curve(d3.curveMonotoneY)
           : d3
               .line<YearlyAggregate>()
               .x((d) => timeScale(d.date))
-              .y((d) => tempScale(d.movingMedian as number))
+              .y((d) => tsv(d.movingMedian as number))
               .curve(d3.curveMonotoneX);
 
         g.append('path')
@@ -320,12 +330,7 @@ const MainChart: React.FC<MainChartProps> = ({
     }
 
     // Scatter points
-    const units: Record<MetricKey, string> = {
-      max_temperature: '°C',
-      min_temperature: '°C',
-      precipitation_sum: 'mm',
-      wind_speed_10m_max: 'm/s',
-    };
+    const unit = unitLabel(currentMetric, system);
     const pointLabels: Record<MetricKey, string> = {
       max_temperature: 'Max Temp',
       min_temperature: 'Min Temp',
@@ -378,7 +383,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
+            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${cv(d[currentMetric] as number).toFixed(1)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
           );
         place(event);
       })
@@ -418,8 +423,8 @@ const MainChart: React.FC<MainChartProps> = ({
         .append('path')
         .attr('class', 'record-point')
         .attr('d', (r) => {
-          const cx = isVertical ? tempScale(r.d[currentMetric] as number) : timeScale(r.d.date);
-          const cy = isVertical ? timeScale(r.d.date) : tempScale(r.d[currentMetric] as number);
+          const cx = isVertical ? tsv(r.d[currentMetric] as number) : timeScale(r.d.date);
+          const cy = isVertical ? timeScale(r.d.date) : tsv(r.d[currentMetric] as number);
           return starPath(cx, cy);
         })
         .attr('fill', (r) => r.color)
@@ -430,7 +435,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${r.label}</strong><br/>${r.d.date.toDateString()}<br/>${pointLabels[currentMetric]}: ${(r.d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
+              `<strong>${r.label}</strong><br/>${r.d.date.toDateString()}<br/>${pointLabels[currentMetric]}: ${cv(r.d[currentMetric] as number).toFixed(1)}${unit}`
             );
           place(event);
         })
@@ -459,12 +464,12 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('stroke-dasharray', '5,5');
       if (isVertical) {
         lineEl
-          .attr('x1', tempScale(currentTemp)).attr('x2', tempScale(currentTemp))
+          .attr('x1', tsv(currentTemp)).attr('x2', tsv(currentTemp))
           .attr('y1', 0).attr('y2', height);
       } else {
         lineEl
           .attr('x1', 0).attr('x2', width)
-          .attr('y1', tempScale(currentTemp)).attr('y2', tempScale(currentTemp));
+          .attr('y1', tsv(currentTemp)).attr('y2', tsv(currentTemp));
       }
 
       g.selectAll('.current-temp-point')
@@ -472,8 +477,8 @@ const MainChart: React.FC<MainChartProps> = ({
         .enter()
         .append('circle')
         .attr('class', 'current-temp-point')
-        .attr('cx', (d) => isVertical ? tempScale(d[currentMetric] as number) : timeScale(d.date))
-        .attr('cy', (d) => isVertical ? timeScale(d.date) : tempScale(d[currentMetric] as number))
+        .attr('cx', (d) => isVertical ? tsv(d[currentMetric] as number) : timeScale(d.date))
+        .attr('cy', (d) => isVertical ? timeScale(d.date) : tsv(d[currentMetric] as number))
         .attr('r', 5)
         .attr('fill', 'var(--text-h)')
         .attr('stroke', 'var(--surface)')
@@ -482,13 +487,13 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
+              `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${cv(d[currentMetric] as number).toFixed(1)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
             );
           place(event);
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
     }
-  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical]);
+  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system]);
 
   return (
     <div className="main-chart-wrapper">

@@ -1,0 +1,87 @@
+/* Settings gear + popover. The trigger sits in the same header slot the old
+   .theme-toggle occupied (absolute, right-aligned, vertically centered). */
+.settings-menu {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  /* Lift the whole menu (and its popover) above the controls row, which is a
+     later DOM sibling inside the sticky-bar and would otherwise paint over the
+     open popover on mobile. */
+  z-index: 200;
+}
+
+.settings-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.settings-trigger:hover {
+  color: var(--text-strong);
+  border-color: var(--text-faint);
+  background-color: var(--surface-muted);
+}
+
+.settings-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  isolation: isolate;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Opaque so page content never shows through and clicks can't pass to it. */
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+/* Two stacked single toggle buttons — same square look as the old theme toggle.
+   Each shows the current state and flips on click. */
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.settings-toggle:hover {
+  color: var(--text-strong);
+  border-color: var(--text-faint);
+  background-color: var(--surface-muted);
+}
+
+.settings-toggle-glyph {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .settings-trigger {
+    width: 32px;
+    height: 32px;
+  }
+}

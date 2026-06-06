@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { searchCities } from '../services/api';
 import { loadCells, snapToNearestCell, type SnappedCell } from '../services/cellIndex';
 import type { GeocodeResult } from '../types';
+import { useUnits } from '../hooks/useUnits';
+import { formatDistance } from '../utils/units';
 import './LocationSelector.css';
 
 interface LocationSelectorProps {
@@ -38,6 +40,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   longitude,
   onChange,
 }) => {
+  const { system } = useUnits();
   const [cityInput, setCityInput] = useState(cityName);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -206,7 +209,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                   <div className="city-suggestion-main">
                     <span className="city-name">{snapped.cell.name}</span>
                     <span className={`city-snap-dist ${distClass(snapped.distanceKm)}`}>
-                      {formatKm(snapped.distanceKm)}
+                      {formatDistance(snapped.distanceKm, system)}
                     </span>
                   </div>
                   <div className="city-details">for “{searched}”</div>
@@ -225,12 +228,6 @@ function distClass(km: number): string {
   if (km < 10) return 'dist-near';
   if (km <= 20) return 'dist-mid';
   return 'dist-far';
-}
-
-/** Distance read-out: whole km, or "<1 km" when the cell is essentially on top. */
-function formatKm(km: number): string {
-  if (km < 1) return '<1 km';
-  return `${Math.round(km)} km`;
 }
 
 export default LocationSelector;

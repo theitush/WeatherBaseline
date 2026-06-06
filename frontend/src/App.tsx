@@ -11,7 +11,8 @@ import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogramChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
-import ThemeToggle from './components/ThemeToggle';
+import SettingsMenu from './components/SettingsMenu';
+import { UnitsContext, useUnitsState } from './hooks/useUnits';
 import { usePermutationTest } from './hooks/usePermutationTest';
 import type { MetricKey } from './utils/config';
 import './App.css';
@@ -110,7 +111,7 @@ const AppContent: React.FC = () => {
         <div className="sticky-bar">
           <header className="app-header">
             <h1>WeatherBaseline.com</h1>
-            <ThemeToggle />
+            <SettingsMenu />
           </header>
 
           <div className="controls-panel">
@@ -550,10 +551,13 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const units = useUnitsState();
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <UnitsContext.Provider value={units}>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </UnitsContext.Provider>
   );
 };
 

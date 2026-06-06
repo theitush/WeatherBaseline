@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import type { MetricKey } from '../utils/config';
 import { buildPeriods } from './PeriodHistogramChart';
 import type { PermutationResult } from '../utils/permutationTest';
+import { useUnits } from '../hooks/useUnits';
+import { convertDelta, unitLabel } from '../utils/units';
 import './SignificancePanel.css';
 
 interface SignificancePanelProps {
@@ -11,13 +13,6 @@ interface SignificancePanelProps {
   loading: boolean;
   currentMetric: MetricKey;
 }
-
-const UNITS: Record<MetricKey, string> = {
-  max_temperature: '°C',
-  min_temperature: '°C',
-  precipitation_sum: 'mm',
-  wind_speed_10m_max: 'm/s',
-};
 
 const METRIC_NOUN: Record<MetricKey, string> = {
   max_temperature: 'warmer',
@@ -48,11 +43,12 @@ function fmtP(p: number): string {
 }
 
 const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, currentMetric }) => {
+  const { system } = useUnits();
   const periods = useMemo(() => buildPeriods(), []);
   const oldest = periods[0];
   const newest = periods[periods.length - 1];
 
-  const unit = UNITS[currentMetric];
+  const unit = unitLabel(currentMetric, system);
   // Label the compared statistic to match what the test actually used.
   const statLabel = 'Median';
 
@@ -67,7 +63,7 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, 
       ) : (
         (() => {
           const line = verdict(result.pValue);
-          const diff = result.observedDiff;
+          const diff = convertDelta(result.observedDiff, currentMetric, system);
           const dir = diff >= 0 ? METRIC_NOUN[currentMetric] : METRIC_NOUN_NEG[currentMetric];
           return (
             <div className="sig-body">

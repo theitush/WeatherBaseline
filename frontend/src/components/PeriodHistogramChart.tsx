@@ -4,6 +4,8 @@ import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
+import { useUnits } from '../hooks/useUnits';
+import { convert, unitLabel, axisLabel, binWidth } from '../utils/units';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
@@ -121,6 +123,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   width: propWidth,
   panelHeight: propPanelHeight,
 }) => {
+  const { system } = useUnits();
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Bracket geometry stashed by the main render so the separate pValue-keyed
@@ -152,7 +155,12 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Restrict to historical archive rows only (no forecast).
     const historical = filteredData.filter((d) => d.data_type === 'historical');
 
-    const valueOf = (d: WeatherDataPoint) => d[currentMetric];
+    // Read a row's metric value already converted to the display system, so the
+    // axis, bins, and medians are all computed in display units (clean ticks).
+    const valueOf = (d: WeatherDataPoint) => {
+      const v = d[currentMetric];
+      return v == null ? v : convert(v, currentMetric, system);
+    };
     const allValues = historical
       .map(valueOf)
       .filter((v): v is number => v !== null && v !== undefined);
@@ -190,7 +198,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // the exact same bin edges (and they line up across metrics/locations).
     // Snap only the *bin* edges to the grid; the axis domain stays continuous
     // (above) to match the main chart.
-    const BIN = 0.5;
+    const BIN = binWidth(currentMetric, system);
     const binLo = Math.max(domainLo, Math.floor(domainLo / BIN) * BIN);
     const binHi = Math.ceil(domainHi / BIN) * BIN;
     const thresholds = d3.range(binLo, binHi + BIN, BIN);
@@ -222,18 +230,8 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       d3.max(pp.bins, (b) => b.length) ?? 0
     ) ?? 0;
 
-    const units: Record<MetricKey, string> = {
-      max_temperature: '°C',
-      min_temperature: '°C',
-      precipitation_sum: 'mm',
-      wind_speed_10m_max: 'm/s',
-    };
-    const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Daily Max Temp (°C)',
-      min_temperature: 'Daily Min Temp (°C)',
-      precipitation_sum: 'Daily Precipitation (mm)',
-      wind_speed_10m_max: 'Daily Max Wind Speed (m/s)',
-    };
+    const unit = unitLabel(currentMetric, system);
+    const tempAxisLabel = axisLabel(currentMetric, system);
 
     const barW = (d: d3.Bin<number, number>) =>
       Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1);
@@ -299,7 +297,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
+            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${unit}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
           );
         placeTooltip(tooltipRef.current, event);
       };
@@ -371,7 +369,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${units[currentMetric]}`
+              `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${unit}`
             );
           placeTooltip(tooltipRef.current, event);
         };
@@ -430,7 +428,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('text-anchor', 'middle')
       .style('font-size', '12px')
       .style('fill', 'var(--chart-label)')
-      .text(tempLabels[currentMetric]);
+      .text(tempAxisLabel);
 
     // Shared "Count" label down the y-axis (the per-panel axes only show ticks).
     g.append('text')
@@ -443,7 +441,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('fill', 'var(--chart-label)')
       .text('Count');
 
-  }, [filteredData, currentMetric, width, panelHeight, plotHeight]);
+  }, [filteredData, currentMetric, width, panelHeight, plotHeight, system]);
 
   // Significance stars — placed (and updated) on their own, keyed on pValue, so
   // the permutation worker result landing only adds/fades in the stars text. The
@@ -471,7 +469,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .text(stars);
     // Also re-runs after the main render (filteredData/metric rebuild the SVG and
     // the bracket lines, then this re-adds the stars onto the fresh bracket).
-  }, [pValue, filteredData, currentMetric, width, panelHeight, plotHeight]);
+  }, [pValue, filteredData, currentMetric, width, panelHeight, plotHeight, system]);
 
   return (
     <div className="period-histogram-wrapper">

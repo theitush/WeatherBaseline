@@ -4,6 +4,8 @@ import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
+import { useUnits } from '../hooks/useUnits';
+import { convert, unitLabel } from '../utils/units';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -35,6 +37,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  const { system } = useUnits();
+
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
   const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 260);
@@ -61,7 +65,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const values = filteredData
       .filter((d) => d.data_type !== 'forecast')
       .map((d) => d[currentMetric])
-      .filter((v): v is number => v !== undefined);
+      .filter((v): v is number => v !== undefined)
+      .map((v) => convert(v, currentMetric, system));
 
     if (values.length === 0) return;
 
@@ -91,12 +96,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .domain([0, d3.max(bins, (d) => d.length) as number])
       .range([0, isVertical ? height : width]);
 
-    const units: Record<MetricKey, string> = {
-      max_temperature: '°C',
-      min_temperature: '°C',
-      precipitation_sum: 'mm',
-      wind_speed_10m_max: 'm/s',
-    };
+    const unit = unitLabel(currentMetric, system);
 
     // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
     // axis leaves thin white separators between bins, matching the period hists.
@@ -110,7 +110,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
+            `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${unit}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
           );
         placeTooltip(tooltipRef.current, event);
       })
@@ -177,7 +177,11 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     );
 
     if (currentDateData.length > 0) {
-      const currentTemp = currentDateData[0][currentMetric] as number;
+      const currentTemp = convert(
+        currentDateData[0][currentMetric] as number,
+        currentMetric,
+        system
+      );
 
       // Line is perpendicular to the temp axis.
       const tempLine = g.append('line')
@@ -310,7 +314,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // Legend is rendered as an HTML element above the charts for both
     // mobile and desktop (see App.tsx).
 
-  }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical]);
+  }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical, system]);
 
   return (
     <div className="histogram-chart-wrapper">

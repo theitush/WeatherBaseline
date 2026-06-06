@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
+import { useUnits } from '../hooks/useUnits';
+import { convert, unitLabelBare } from '../utils/units';
 import './TemperatureContext.css';
 
 interface TemperatureContextProps {
@@ -31,14 +33,6 @@ const formatDate = (d: Date): string => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-};
-
-// Unit suffix appended to record-scale values, per metric.
-const METRIC_UNITS: Record<MetricKey, string> = {
-  max_temperature: '°',
-  min_temperature: '°',
-  precipitation_sum: 'mm',
-  wind_speed_10m_max: 'm/s',
 };
 
 // Direction words for the single-tailed "this hot/hotter" line, per metric.
@@ -122,14 +116,20 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   filteredData,
   currentMetric,
 }) => {
+  const { system } = useUnits();
+
   // currentTemp can legitimately be 0 (a dry day reads 0mm); only bail on true absence.
   if (!context || currentTemp === null || currentTemp === undefined) {
     return null;
   }
 
-  const unit = METRIC_UNITS[currentMetric];
+  const unit = unitLabelBare(currentMetric, system);
+  // fmt takes a raw (metric) value, converts it for display, then formats.
   // Temperature degrees read "12.3°"; other metrics read "12.3 mm".
-  const fmt = (v: number) => (unit === '°' ? `${v.toFixed(1)}°` : `${v.toFixed(1)} ${unit}`);
+  const fmt = (v: number) => {
+    const c = convert(v, currentMetric, system);
+    return unit === '°' ? `${c.toFixed(1)}°` : `${c.toFixed(1)} ${unit}`;
+  };
 
   const valid = filteredData.filter((d) => {
     const v = d[currentMetric];
