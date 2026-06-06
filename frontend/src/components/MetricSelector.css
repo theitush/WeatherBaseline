@@ -19,6 +19,10 @@
   font-weight: 600;
   opacity: 0.45;
   filter: saturate(0.7);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metric-button:hover {
@@ -28,6 +32,20 @@
 .metric-button.active {
   opacity: 1;
   filter: none;
-  border-color: rgba(17, 17, 17, 0.85);
+  border-color: var(--text-h);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Full label by default; the compact label only appears on narrow screens. */
+.metric-label-short {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .metric-label-full {
+    display: none;
+  }
+  .metric-label-short {
+    display: inline;
+  }
 }

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 18 && node backend/server.js'",
     "dev": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 18 && node backend/server.js'",
-    "dev:frontend": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd frontend && npm run dev'"
+    "dev:frontend": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd frontend && npm run dev'",
+    "dev:all": "bash -c 'npm run dev & npm run dev:frontend & wait'"
   },
   "dependencies": {
     "cors": "^2.8.5",

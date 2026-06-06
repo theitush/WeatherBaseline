@@ -2,7 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
-import { getTemperatureHistory } from '../services/api';
+import { getTemperatureHistory, geolocateByIp } from '../services/api';
+import { getCellMaxDate } from '../services/tieredData';
+import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
+import { parsePath, buildPath } from '../services/urlState';
 import {
   calculateYearlyAggregates,
   filterDataByYearRange,
@@ -37,6 +40,10 @@ interface AppState {
   endYear: number;
   setYearRange: (start: number, end: number) => void;
 
+  // Last available date (YYYY-MM-DD) for the loaded cell — the date picker
+  // caps its horizon to this so it never offers a day the data lacks.
+  maxAvailableDate: string | null;
+
   // Current temperature context
   temperatureContext: TemperatureContext | null;
 
@@ -64,21 +71,30 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  // Default location: Tel Aviv, Israel
-  const [location, setLocation] = useState<Location>({
-    lat: 32.0853,
-    lon: 34.7818,
-    name: 'Tel Aviv, Israel',
-  });
+  // A shareable URL (/lat,lon/date/metric) is the source of truth on load:
+  // if the path parses, it seeds location/date/metric so a link reconstructs the
+  // exact view with no geocoding. Bare root leaves the defaults below (then the
+  // IP lookup in App may override the location).
+  const initial = typeof window !== 'undefined' ? parsePath(window.location.pathname) : null;
 
-  // Default to today's date
+  // Default location: Tel Aviv, Israel (unless the URL specified one). A URL
+  // carries coords only — the name is resolved from the cell list below.
+  const [location, setLocation] = useState<Location>(
+    initial
+      ? { lat: initial.lat, lon: initial.lon, name: '' }
+      : { lat: 32.0853, lon: 34.7818, name: 'Tel Aviv, Israel' }
+  );
+
+  // Default to today's date (unless the URL specified one).
   const [currentDate, setCurrentDate] = useState<string>(() => {
+    if (initial) return initial.date;
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
 
-  // Default to first active metric
+  // Default to first active metric (unless the URL specified one).
   const [currentMetric, setCurrentMetric] = useState<MetricKey>(() => {
+    if (initial) return initial.metric;
     const activeMetrics = CONFIG.getActiveMetrics();
     return activeMetrics[0] || 'max_temperature';
   });
@@ -93,6 +109,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Year range filter (default to all available years)
   const [startYear, setStartYear] = useState<number>(1940);
   const [endYear, setEndYear] = useState<number>(new Date().getFullYear());
+
+  // Last available date for the loaded cell (drives the picker's max).
+  const [maxAvailableDate, setMaxAvailableDate] = useState<string | null>(null);
 
   // Temperature context
   const [temperatureContext, setTemperatureContext] = useState<TemperatureContext | null>(null);
@@ -114,7 +133,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         location.lon,
         currentDate,
         1940,
-        7
+        CONFIG.chart.seasonalWindowDays
       );
 
       if (!data || data.length === 0) {
@@ -125,6 +144,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       // Update full data
       setFullData(data);
+
+      // Record the cell's last available date for the picker's horizon cap.
+      // Populated by loadCellTimeline (run inside getTemperatureHistory above).
+      setMaxAvailableDate(getCellMaxDate(location.lat, location.lon));
 
       // Get available years
       const years = getAvailableYears(data);
@@ -221,6 +244,66 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, currentDate]);
 
+  // Bare-root visit (no shareable URL): guess the visitor's location from their
+  // IP, snap it to a servable cell, and adopt it. Setting location then triggers
+  // the fetch + URL-sync effects, so the address bar becomes shareable too. Runs
+  // once, only when the URL didn't already pin a location.
+  useEffect(() => {
+    if (initial) return; // URL already decided the location
+    let cancelled = false;
+    (async () => {
+      const [ip, cells] = await Promise.all([geolocateByIp(), loadCells()]);
+      if (cancelled || !ip) return; // failure -> keep the default city
+      const snapped = snapToNearestCell(ip.lat, ip.lon, cells);
+      if (!snapped) return;
+      // Adopt the snapped cell's own name (the only label we show), not the IP
+      // service's, so it matches what a search or a shared link would display.
+      setLocation({
+        lat: snapped.cell.lat,
+        lon: snapped.cell.lon,
+        name: snapped.cell.name,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A coords-only URL has no name; resolve it from the cell list so the search
+  // box shows where the data is from. Runs once on a URL-seeded load — the local
+  // lookup is instant, so the label appears without any blocking geocode.
+  useEffect(() => {
+    if (!initial) return; // a default/IP/search load already has a name
+    let cancelled = false;
+    lookupCellName(initial.lat, initial.lon).then((name) => {
+      if (!cancelled && name) {
+        setLocation((prev) => ({ ...prev, name }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the address bar in sync with state so the current view is always
+  // shareable. replaceState (not push) so tweaking date/metric doesn't bury the
+  // back button under one history entry per change. Coords are the only location
+  // identity in the URL — the name is derived from them, never stored.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = buildPath({
+      lat: location.lat,
+      lon: location.lon,
+      date: currentDate,
+      metric: currentMetric,
+    });
+    if (path !== window.location.pathname) {
+      window.history.replaceState(null, '', path);
+    }
+  }, [location, currentDate, currentMetric]);
+
   const value: AppState = {
     location,
     setLocation,
@@ -236,6 +319,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     startYear,
     endYear,
     setYearRange,
+    maxAvailableDate,
     temperatureContext,
     loading,
     error,

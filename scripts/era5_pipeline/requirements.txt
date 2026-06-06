@@ -1,0 +1,8 @@
+cdsapi>=0.7.4
+xarray>=2024.1.0
+netCDF4>=1.6.5
+numpy>=1.26
+pandas>=2.1
+requests>=2.31
+tqdm>=4.66
+rasterio>=1.3

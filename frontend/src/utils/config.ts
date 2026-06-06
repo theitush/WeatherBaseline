@@ -66,6 +66,7 @@ export interface Config {
     windowSize: number;
     histogramThresholds: number;
     tempMargin: number;
+    seasonalWindowDays: number;
   };
 
   // Helper methods
@@ -85,8 +86,8 @@ const CONFIG: Config = {
   ACTIVE_METRICS: {
     max_temperature: true,      // ✅ Maximum temperature
     min_temperature: true,      // ✅ Minimum temperature
-    precipitation_sum: false,   // ❌ Precipitation (commented out)
-    wind_speed_10m_max: false   // ❌ Wind speed (commented out)
+    precipitation_sum: true,    // ✅ Precipitation
+    wind_speed_10m_max: true    // ✅ Wind speed
   },
 
   // Chart dimensions
@@ -108,14 +109,13 @@ const CONFIG: Config = {
       base: '#4A90E2',
       name: 'Blue'
     },
-    // Keeping these for easy re-enabling
     precipitation_sum: {
-      base: '#B19CD9',
-      name: 'Pastel Purple'
+      base: '#7E5BC6',
+      name: 'Purple'
     },
     wind_speed_10m_max: {
-      base: '#A8D8A8',
-      name: 'Pastel Green'
+      base: '#8A8F98',
+      name: 'Gray'
     }
   },
 
@@ -169,7 +169,8 @@ const CONFIG: Config = {
   chart: {
     windowSize: 5, // Moving average window
     histogramThresholds: 30,
-    tempMargin: 2 // Temperature scale margin
+    tempMargin: 2, // Temperature scale margin
+    seasonalWindowDays: 5 // ±days-of-year window around the target date
   },
 
   // ==========================================

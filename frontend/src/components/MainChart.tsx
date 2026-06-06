@@ -38,7 +38,7 @@ const MainChart: React.FC<MainChartProps> = ({
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const totalWidth = propWidth ?? 720;
+  const totalWidth = propWidth ?? 760;
   const totalHeight = propHeight ?? 400;
   const width = totalWidth - MARGIN.left - MARGIN.right;
   const height = totalHeight - MARGIN.top - MARGIN.bottom;
@@ -61,6 +61,15 @@ const MainChart: React.FC<MainChartProps> = ({
       .filter((v): v is number => v !== undefined);
     const [minVal, maxVal] = d3.extent(allValues) as [number, number];
 
+    // Precipitation and wind can't be negative, so don't let the padded lower
+    // bound dip below zero. This keeps the temp-axis domain identical to the
+    // period-histogram chart's (see PeriodHistogramChart), which matters on
+    // mobile where the two x-axes sit one above the other and must line up.
+    const nonNegative =
+      currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
+    const tempLo = nonNegative ? Math.max(0, minVal - 2) : minVal - 2;
+    const tempHi = maxVal + 2;
+
     // timeScale maps date → its axis pixel; tempScale maps temp → its axis pixel.
     // Orientation only changes which axis (x vs y) each one drives.
     const timeScale = d3
@@ -69,7 +78,7 @@ const MainChart: React.FC<MainChartProps> = ({
       .range(isVertical ? [height, 0] : [0, width]);
     const tempScale = d3
       .scaleLinear()
-      .domain([minVal - 2, maxVal + 2])
+      .domain([tempLo, tempHi])
       .range(isVertical ? [0, width] : [height, 0]);
 
     const tx = (t: Date | number, kind: 'time' | 'temp') =>
@@ -119,12 +128,12 @@ const MainChart: React.FC<MainChartProps> = ({
       ) as any
     );
 
-    // Axis label (the temp axis)
+    // Axis label (the temp axis). "Daily" makes clear these are per-day values.
     const tempLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Apparent Temp (°C)',
-      min_temperature: 'Min Apparent Temp (°C)',
-      precipitation_sum: 'Precipitation (mm)',
-      wind_speed_10m_max: 'Max Wind Speed (km/h)',
+      max_temperature: 'Daily Max Temp (°C)',
+      min_temperature: 'Daily Min Temp (°C)',
+      precipitation_sum: 'Daily Precipitation (mm)',
+      wind_speed_10m_max: 'Daily Max Wind Speed (m/s)',
     };
     if (isVertical) {
       g.append('text')
@@ -132,7 +141,7 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('y', height + 32)
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text(tempLabels[currentMetric]);
     } else {
       g.append('text')
@@ -142,8 +151,67 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('dy', '1em')
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text(tempLabels[currentMetric]);
+    }
+
+    // Pre-satellite era: light shading + dashed boundary at 1979 with a label.
+    const satelliteDate = new Date(1979, 0, 1);
+    if (satelliteDate > dateExtent[0]) {
+      const boundaryPos = timeScale(satelliteDate);
+      if (isVertical) {
+        // Time runs along y (top = latest). Pre-1979 is the bottom band.
+        g.append('rect')
+          .attr('class', 'satellite-era-shade')
+          .attr('x', 0)
+          .attr('y', boundaryPos)
+          .attr('width', width)
+          .attr('height', height - boundaryPos)
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.012);
+        g.append('line')
+          .attr('class', 'satellite-era-line')
+          .attr('x1', 0).attr('x2', width)
+          .attr('y1', boundaryPos).attr('y2', boundaryPos)
+          .attr('stroke', 'var(--chart-axis)')
+          .attr('stroke-width', 0.75)
+          .attr('stroke-dasharray', '3,4');
+        g.append('text')
+          .attr('class', 'satellite-era-label')
+          .attr('x', width - 5)
+          .attr('y', boundaryPos - 5)
+          .style('text-anchor', 'end')
+          .style('font-size', '11px')
+          .style('font-style', 'italic')
+          .style('fill', 'var(--text-tertiary)')
+          .text('Satellites!');
+      } else {
+        // Time runs along x (left = earliest). Pre-1979 is the left band.
+        g.append('rect')
+          .attr('class', 'satellite-era-shade')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', boundaryPos)
+          .attr('height', height)
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.012);
+        g.append('line')
+          .attr('class', 'satellite-era-line')
+          .attr('x1', boundaryPos).attr('x2', boundaryPos)
+          .attr('y1', 0).attr('y2', height)
+          .attr('stroke', 'var(--chart-axis)')
+          .attr('stroke-width', 0.75)
+          .attr('stroke-dasharray', '3,4');
+        g.append('text')
+          .attr('class', 'satellite-era-label')
+          .attr('x', boundaryPos)
+          .attr('y', -5)
+          .style('text-anchor', 'middle')
+          .style('font-size', '11px')
+          .style('font-style', 'italic')
+          .style('fill', 'var(--text-tertiary)')
+          .text('Satellites!');
+      }
     }
 
     // Percentile bands
@@ -237,11 +305,11 @@ const MainChart: React.FC<MainChartProps> = ({
       max_temperature: '°C',
       min_temperature: '°C',
       precipitation_sum: 'mm',
-      wind_speed_10m_max: 'km/h',
+      wind_speed_10m_max: 'm/s',
     };
     const pointLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Apparent Temp',
-      min_temperature: 'Min Apparent Temp',
+      max_temperature: 'Max Temp',
+      min_temperature: 'Min Temp',
       precipitation_sum: 'Precipitation',
       wind_speed_10m_max: 'Max Wind Speed',
     };
@@ -258,6 +326,30 @@ const MainChart: React.FC<MainChartProps> = ({
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
+
+    // Invisible larger hit-targets so the hover doesn't require pixel-perfect aim
+    // on the 2px dots. Appended before the record stars / current-date marker so
+    // those stay on top and keep their own (more specific) tooltips.
+    g.selectAll('.data-point-hit')
+      .data(filteredData.filter((d) => d[currentMetric] !== undefined))
+      .enter()
+      .append('circle')
+      .attr('class', 'data-point-hit')
+      .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
+      .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
+      .attr('r', 6)
+      .attr('fill', 'transparent')
+      .style('cursor', 'crosshair')
+      .on('mouseover', (event, d) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
+          )
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
+      })
+      .on('mouseout', () => tooltip.style('opacity', 0));
 
     // Record high (red) and record low (blue) markers — slightly larger than the target-date dot.
     const valid = filteredData.filter((d) => {
@@ -297,7 +389,7 @@ const MainChart: React.FC<MainChartProps> = ({
           return starPath(cx, cy);
         })
         .attr('fill', (r) => r.color)
-        .attr('stroke', 'white')
+        .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 1.5)
         .style('opacity', 0)
         .on('mouseover', (event, r) => {
@@ -315,18 +407,6 @@ const MainChart: React.FC<MainChartProps> = ({
         .style('opacity', 1);
     }
 
-    dotSelection
-      .on('mouseover', (event, d) => {
-        tooltip
-          .style('opacity', 1)
-          .html(
-            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${(d[currentMetric] as number).toFixed(1)}${units[currentMetric]}`
-          )
-          .style('left', event.clientX + 12 + 'px')
-          .style('top', event.clientY - 28 + 'px');
-      })
-      .on('mouseout', () => tooltip.style('opacity', 0));
-
     // Current date indicator
     const targetDate = new Date(currentDate + 'T12:00:00');
     const currentDateData = fullData.filter(
@@ -342,7 +422,7 @@ const MainChart: React.FC<MainChartProps> = ({
 
       // Line is perpendicular to the temp axis: horizontal line in horizontal mode, vertical line in vertical mode.
       const lineEl = g.append('line').attr('class', 'current-temp-line')
-        .attr('stroke', '#333')
+        .attr('stroke', 'var(--text-h)')
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '5,5');
       if (isVertical) {
@@ -363,8 +443,8 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('cx', (d) => isVertical ? tempScale(d[currentMetric] as number) : timeScale(d.date))
         .attr('cy', (d) => isVertical ? timeScale(d.date) : tempScale(d[currentMetric] as number))
         .attr('r', 5)
-        .attr('fill', '#333')
-        .attr('stroke', 'white')
+        .attr('fill', 'var(--text-h)')
+        .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 2)
         .on('mouseover', (event, d) => {
           tooltip

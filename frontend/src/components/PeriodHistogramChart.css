@@ -1,0 +1,51 @@
+.period-histogram-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.period-histogram-svg {
+  overflow: visible;
+}
+
+.period-histogram-svg .axis text {
+  font-size: 11px;
+  fill: var(--chart-label);
+}
+
+.period-histogram-svg .axis line,
+.period-histogram-svg .axis path {
+  stroke: var(--chart-axis);
+}
+
+.period-histogram-svg .panel-baseline {
+  stroke: var(--chart-axis-faint);
+  stroke-width: 1;
+}
+
+.period-histogram-svg .period-bar {
+  cursor: crosshair;
+}
+
+.period-histogram-svg .period-median {
+  cursor: pointer;
+}
+
+.period-histogram-svg .sig-bracket path {
+  stroke: var(--text-h);
+  stroke-width: 1.2;
+}
+
+.period-histogram-svg .sig-stars {
+  fill: var(--text-h);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* "ns" reads as words, not stars: smaller, lighter, no letter-spacing. */
+.period-histogram-svg .sig-stars.sig-ns {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  fill: var(--chart-label);
+}

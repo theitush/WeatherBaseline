@@ -13,7 +13,7 @@ export const getLegendData = (metric: MetricKey): LegendItem[] => [
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
   { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Rolling median' },
   { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical data' },
-  { type: 'target', color: '#333', label: 'Target date' },
+  { type: 'target', color: 'var(--text-h)', label: 'Target date' },
 ];
 
 // Draw a single legend swatch into a d3 selection (centered vertically on y=0).
@@ -28,7 +28,7 @@ export const drawLegendSwatch = (
   } else if (item.type === 'circle') {
     sel.append('circle').attr('cx', 6).attr('cy', 0).attr('r', 2).attr('fill', item.color);
   } else if (item.type === 'target') {
-    sel.append('circle').attr('cx', 6).attr('cy', 0).attr('r', 4).attr('fill', '#333').attr('stroke', 'white').attr('stroke-width', 1.5);
+    sel.append('circle').attr('cx', 6).attr('cy', 0).attr('r', 4).attr('fill', 'var(--text-h)').attr('stroke', 'var(--surface)').attr('stroke-width', 1.5);
   }
 };
 
@@ -46,7 +46,7 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
         <circle cx={6} cy={0} r={2} fill={item.color} />
       )}
       {item.type === 'target' && (
-        <circle cx={6} cy={0} r={4} fill="#333" stroke="white" strokeWidth={1.5} />
+        <circle cx={6} cy={0} r={4} fill="var(--text-h)" stroke="var(--surface)" strokeWidth={1.5} />
       )}
     </g>
   </svg>

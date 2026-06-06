@@ -1,0 +1,16 @@
+{
+  "name": "howhotwasit-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HowHotWasIt v2 control-plane Worker: ensure-fresh + geo, R2-backed.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "seed": "bash scripts/seed-local-r2.sh",
+    "upload": "bash scripts/upload-r2.sh",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.85.0"
+  }
+}

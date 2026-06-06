@@ -1,23 +1,195 @@
 .date-selector {
+  position: relative;
   display: flex;
   align-items: center;
 }
 
-#target-date {
+.date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   font-size: 14px;
-  border: 1px solid #ccc;
+  font-family: inherit;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  width: 160px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-#target-date:focus {
+.date-trigger-icon {
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.date-trigger:hover {
+  border-color: var(--accent-border);
+}
+
+.date-trigger:hover .date-trigger-icon,
+.date-trigger.open .date-trigger-icon {
+  color: var(--accent);
+}
+
+.date-trigger.open,
+.date-trigger:focus-visible {
   outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
-#target-date.invalid {
-  border-color: #d04848;
-  box-shadow: 0 0 0 2px rgba(208, 72, 72, 0.1);
+.date-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+
+/* react-day-picker theming via its CSS variables, mapped onto our tokens. */
+.date-popover .rdp-root {
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-bg);
+  --rdp-today-color: var(--accent);
+  --rdp-day-width: 38px;
+  --rdp-day-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-day_button-height: 38px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-h);
+  margin: 4px;
+}
+
+.date-popover .rdp-caption_label,
+.date-popover .rdp-weekday {
+  color: var(--text);
+}
+
+/* Quick month/year dropdowns in the caption. */
+.date-popover .rdp-dropdowns {
+  display: flex;
+  gap: 6px;
+}
+
+.date-popover .rdp-dropdown_root {
+  position: relative;
+}
+
+.date-popover .rdp-dropdown {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.date-popover .rdp-dropdown:hover {
+  border-color: var(--accent-border);
+}
+
+.date-popover .rdp-dropdown:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.date-popover .rdp-weekday {
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.date-popover .rdp-day_button {
+  border-radius: 6px;
+}
+
+.date-popover .rdp-selected .rdp-day_button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+
+.date-popover .rdp-today:not(.rdp-selected) .rdp-day_button {
+  font-weight: 700;
+}
+
+/* The point of this whole component: future / out-of-range days are visibly
+   greyed out, not merely unclickable. */
+.date-popover .rdp-disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.date-popover .rdp-disabled .rdp-day_button {
+  color: var(--text);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.date-popover .rdp-outside:not(.rdp-disabled) {
+  opacity: 0.5;
+}
+
+/* rdp renders nav and the dropdown caption in separate containers, so they
+   can't share a row through normal flow. Like rdp's own default, we overlay
+   the nav row (now carrying the Today button + arrows) onto the caption line,
+   pinned top-right. Padding on the caption reserves space so the dropdowns
+   never collide with it. The month dropdown uses short names (Jan, Feb, …) so
+   its width stays constant and can't push the year under the nav row. */
+.date-popover .rdp-months {
+  position: relative;
+}
+
+.date-popover .rdp-nav-row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Reserve room on the caption so the dropdowns clear the overlaid nav row. */
+.date-popover .rdp-month_caption {
+  padding-right: 110px;
+}
+
+.date-popover .rdp-nav-row .rdp-nav {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.date-today {
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.date-today:hover {
+  background: var(--accent);
+  color: #fff;
 }

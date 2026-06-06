@@ -3,7 +3,6 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
-import { getLegendData, drawLegendSwatch } from './Legend';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -33,10 +32,11 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   height: propHeight,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
-  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 300);
+  const TOTAL_WIDTH = propWidth ?? (isVertical ? 360 : 260);
   const TOTAL_HEIGHT = propHeight ?? (isVertical ? 180 : 400);
 
   const width = TOTAL_WIDTH - MARGIN.left - MARGIN.right;
@@ -51,6 +51,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const g = svg
       .append('g')
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+
+    const tooltip = d3.select(tooltipRef.current);
 
     const values = filteredData
       .map((d) => d[currentMetric])
@@ -84,20 +86,38 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .domain([0, d3.max(bins, (d) => d.length) as number])
       .range([0, isVertical ? height : width]);
 
-    // Bars (animate count dimension from 0 on enter)
+    const units: Record<MetricKey, string> = {
+      max_temperature: '°C',
+      min_temperature: '°C',
+      precipitation_sum: 'mm',
+      wind_speed_10m_max: 'm/s',
+    };
+
+    // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
+    // axis leaves thin white separators between bins, matching the period hists.
     const barSel = g.selectAll('.bar')
       .data(bins)
       .enter()
       .append('rect')
       .attr('class', 'bar')
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
+      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'))
+      .on('mouseover', (event, d) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${units[currentMetric]}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
+          )
+          .style('left', event.clientX + 12 + 'px')
+          .style('top', event.clientY - 28 + 'px');
+      })
+      .on('mouseout', () => tooltip.style('opacity', 0));
 
     if (isVertical) {
       // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
       barSel
-        .attr('x', (d) => tempScale(d.x0 as number))
+        .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
         .attr('y', height)
-        .attr('width', (d) => tempScale(d.x1 as number) - tempScale(d.x0 as number))
+        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
         .attr('height', 0)
         .transition()
         .duration(500)
@@ -106,9 +126,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     } else {
       barSel
         .attr('x', 0)
-        .attr('y', (d) => tempScale(d.x1 as number))
+        .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
         .attr('width', 0)
-        .attr('height', (d) => tempScale(d.x0 as number) - tempScale(d.x1 as number))
+        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1))
         .transition()
         .duration(500)
         .attr('width', (d) => countLen(d.length));
@@ -127,7 +147,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .attr('dy', '1em')
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text('Count');
     } else {
       g.append('g')
@@ -138,7 +158,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .attr('transform', `translate(${width / 2},${height + 35})`)
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#555')
+        .style('fill', 'var(--chart-label)')
         .text('Count');
     }
 
@@ -158,7 +178,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       // Line is perpendicular to the temp axis.
       const tempLine = g.append('line')
         .attr('class', 'current-temp-line')
-        .attr('stroke', '#333')
+        .attr('stroke', 'var(--text-h)')
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '4,3');
 
@@ -194,7 +214,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              L ${rightX + bw * 0.5} ${yMid - 20}
              Q ${rightX + bw * 0.8} ${yMid - 10} ${rightX + bw * 0.5} ${yMid - 4}`
           )
-          .attr('stroke', '#666')
+          .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
 
@@ -204,7 +224,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('dy', '0.35em')
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
-          .style('fill', '#555')
+          .style('fill', 'var(--chart-label)')
           .text(pctHigher + '%');
 
         g.append('path')
@@ -216,7 +236,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              Q ${rightX + bw * 0.8} ${yBottom - 10} ${rightX + bw * 0.5} ${yBottom}
              L ${rightX} ${yBottom}`
           )
-          .attr('stroke', '#666')
+          .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
 
@@ -226,7 +246,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('dy', '0.35em')
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
-          .style('fill', '#555')
+          .style('fill', 'var(--chart-label)')
           .text(pctLower + '%');
       } else {
         // Vertical mode: brackets above the bars, paired with the vertical current-temp line.
@@ -247,7 +267,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              L ${xMid - 20} ${topY - bw * 0.5}
              Q ${xMid - 10} ${topY - bw * 0.8} ${xMid - 4} ${topY - bw * 0.5}`
           )
-          .attr('stroke', '#666')
+          .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
 
@@ -256,7 +276,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('y', topY - bw - 4)
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
-          .style('fill', '#555')
+          .style('fill', 'var(--chart-label)')
           .text(pctLower + '%');
 
         // Right bracket (higher%)
@@ -269,7 +289,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              Q ${xRight - 10} ${topY - bw * 0.8} ${xRight} ${topY - bw * 0.5}
              L ${xRight} ${topY}`
           )
-          .attr('stroke', '#666')
+          .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
 
@@ -278,26 +298,13 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('y', topY - bw - 4)
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
-          .style('fill', '#555')
+          .style('fill', 'var(--chart-label)')
           .text(pctHigher + '%');
       }
     }
 
-    // Desktop-only in-SVG legend; mobile renders an HTML legend above the charts (see App.tsx).
-    if (!isVertical) {
-      const legend = g.append('g').attr('class', 'legend')
-        .attr('transform', `translate(${width - 110}, 0)`);
-      getLegendData(currentMetric).forEach((item, i) => {
-        const row = legend.append('g').attr('transform', `translate(0, ${i * 16 + 7})`);
-        drawLegendSwatch(row, item);
-        row.append('text').attr('x', 18).attr('y', 0).attr('dy', '0.35em').style('font-size', '10px').style('fill', '#333').text(item.label);
-      });
-      const lbox = (legend.node() as SVGGElement).getBBox();
-      legend.insert('rect', ':first-child')
-        .attr('x', lbox.x - 4).attr('y', lbox.y - 4)
-        .attr('width', lbox.width + 8).attr('height', lbox.height + 8)
-        .attr('fill', 'white').attr('stroke', '#ccc').attr('stroke-width', 1).attr('rx', 3).attr('opacity', 0.9);
-    }
+    // Legend is rendered as an HTML element above the charts for both
+    // mobile and desktop (see App.tsx).
 
   }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical]);
 
@@ -309,6 +316,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         height={TOTAL_HEIGHT}
         className="histogram-chart-svg"
       />
+      <div ref={tooltipRef} className="chart-tooltip" />
     </div>
   );
 };

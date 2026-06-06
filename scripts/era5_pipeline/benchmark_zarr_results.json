@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "year": 2020,
+  "n_cities": 3,
+  "zarr_url": "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr",
+  "var": "t2m",
+  "method": "hourly t2m -> resample(D) min/max",
+  "timings_s": {
+    "open": 5.515,
+    "select": 2.806,
+    "compute": 88.559,
+    "save": 0.023,
+    "total": 96.903
+  },
+  "error": null,
+  "peak_mem_mb": 447.9,
+  "per_city_s": {
+    "New York": 24.12,
+    "London": 38.39,
+    "Tokyo": 25.89
+  },
+  "n_days": 366,
+  "payload_mb_est": 0.0176,
+  "parquet_mb": 0.018,
+  "csv_mb": 0.0444,
+  "sample": {
+    "New York": {
+      "all_nan": false,
+      "tmin_lo_C": -10.9,
+      "tmax_hi_C": 34.85,
+      "mean_tmin_C": 9.32,
+      "mean_tmax_C": 17.45,
+      "tmin_le_tmax": true,
+      "nan_days": 0
+    },
+    "London": {
+      "all_nan": false,
+      "tmin_lo_C": -3.43,
+      "tmax_hi_C": 32.78,
+      "mean_tmin_C": 7.9,
+      "mean_tmax_C": 15.06,
+      "tmin_le_tmax": true,
+      "nan_days": 0
+    },
+    "Tokyo": {
+      "all_nan": false,
+      "tmin_lo_C": -3.47,
+      "tmax_hi_C": 33.7,
+      "mean_tmin_C": 12.42,
+      "mean_tmax_C": 19.09,
+      "tmin_le_tmax": true,
+      "nan_days": 0
+    }
+  },
+  "wall_s": 96.933
+}

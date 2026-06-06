@@ -1,9 +1,6 @@
 .location-selector {
   display: flex;
-  flex-direction: row;
-  gap: 15px;
-  align-items: flex-end;
-  flex-wrap: nowrap;
+  align-items: center;
   min-width: 0;
 }
 
@@ -22,36 +19,37 @@
 #city-search {
   padding: 8px 12px;
   font-size: 14px;
-  border: 1px solid #ccc;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
   width: 260px;
 }
 
 #city-search:focus {
   outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .city-suggestions {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   left: 0;
-  width: 200px;
-  background: white;
-  border: 1px solid #ccc;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  max-height: 250px;
+  width: 260px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 320px;
   overflow-y: auto;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow, 0 8px 24px rgba(8, 6, 13, 0.12));
   z-index: 1000;
 }
 
 .city-suggestion {
   padding: 10px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .city-suggestion:last-child {
@@ -60,47 +58,47 @@
 
 .city-suggestion:hover,
 .city-suggestion.selected {
-  background-color: #e3f2fd;
+  background-color: var(--accent-bg);
+}
+
+/* Headline row: the served cell's name on the left, its distance on the right. */
+.city-suggestion-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .city-name {
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--text-h);
 }
 
 .city-details {
   font-size: 12px;
-  color: #666;
+  color: var(--text);
+  opacity: 0.75;
+  margin-top: 2px;
 }
 
-.coordinates {
-  display: flex;
-  gap: 12px;
+/* Distance to the snapped cell, colour-coded by trustworthiness:
+   green <10 km, yellow 10–20 km, red >20 km. Mono so the figure reads cleanly. */
+.city-snap-dist {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
 }
 
-.coordinate-input {
-  display: flex;
-  align-items: center;
+.city-snap-dist.dist-near {
+  color: var(--ok, #2e9e5b);
 }
 
-.coordinate-input label {
-  display: inline-block;
-  margin-right: 8px;
-  font-weight: 500;
-  white-space: nowrap;
+.city-snap-dist.dist-mid {
+  color: var(--warn, #c98a00);
 }
 
-.coordinate-input input {
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 90px;
-}
-
-.coordinate-input input:focus {
-  outline: none;
-  border-color: #4A90E2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+.city-snap-dist.dist-far {
+  color: var(--error-text, #cc3b3b);
 }

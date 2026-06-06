@@ -1,0 +1,8 @@
+# Worker deps (regenerable via npm install)
+node_modules/
+
+# Wrangler local state: Miniflare's emulated R2/KV + dev cache. Local-only.
+.wrangler/
+
+# Wrangler may write secrets here on `wrangler secret`; never commit.
+.dev.vars

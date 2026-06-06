@@ -1,0 +1,181 @@
+"""Upload tier .csv.gz files to the Cloudflare R2 bucket over the S3 API.
+
+One uploader for BOTH paths:
+  - local test seed (a few hundred files from data/era5-land/, run as a CLI), and
+  - the VM producer (download_cells.py imports upload_file / R2Uploader to push
+    each archive_*.csv.gz to R2 as it's written).
+
+Auth — set these env vars (an R2 "Object Read & Write" S3 API token):
+  R2_ACCESS_KEY_ID       access key id
+  R2_SECRET_ACCESS_KEY   secret access key
+  R2_ACCOUNT_ID          Cloudflare account id (forms the S3 endpoint)
+  R2_BUCKET              bucket name (default: weather-baseline)
+
+The endpoint is https://<account-id>.r2.cloudflarestorage.com . Objects are
+written with Content-Type: text/csv and Content-Encoding: gzip so the public
+r2.dev URL serves a browser-gunzippable file — matching how the Worker/Express
+static route sets the same headers. Keys mirror the tier layout: {tier}/{name}.
+
+CLI usage (local test, from scripts/era5_pipeline/):
+  source .venv/bin/activate
+  python r2_upload.py --tiers recent forecast        # fast volatile-only seed
+  python r2_upload.py --tiers archive recent forecast
+  python r2_upload.py --dir ../../data/era5-land --workers 16
+
+Importable usage (producer):
+  from r2_upload import R2Uploader
+  up = R2Uploader()                 # reads env
+  up.upload_file(path, "archive/archive_32.1_34.8.csv.gz")
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import boto3
+from botocore.config import Config
+
+DEFAULT_BUCKET = "weather-baseline"
+TIERS = ("archive", "recent", "forecast")
+
+
+class R2Uploader:
+    """Thin wrapper over a boto3 S3 client pointed at R2.
+
+    Reusable across threads (boto3 clients are thread-safe for distinct calls).
+    Created once and shared so the VM producer can upload concurrently with its
+    tile fetches without re-handshaking TLS per file.
+    """
+
+    def __init__(self, bucket: str | None = None):
+        account_id = os.environ.get("R2_ACCOUNT_ID")
+        access_key = os.environ.get("R2_ACCESS_KEY_ID")
+        secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+        missing = [
+            n
+            for n, v in [
+                ("R2_ACCOUNT_ID", account_id),
+                ("R2_ACCESS_KEY_ID", access_key),
+                ("R2_SECRET_ACCESS_KEY", secret_key),
+            ]
+            if not v
+        ]
+        if missing:
+            raise SystemExit(
+                f"missing R2 credentials in env: {', '.join(missing)}\n"
+                "set them from an R2 Object Read & Write S3 API token."
+            )
+        self.bucket = bucket or os.environ.get("R2_BUCKET", DEFAULT_BUCKET)
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            # R2 wants the modern signature; auto region.
+            config=Config(signature_version="s3v4", region_name="auto"),
+        )
+
+    def upload_file(self, path: Path, key: str) -> None:
+        """Upload one .csv.gz file under `key`, with the serve-it-raw headers."""
+        self.client.upload_file(
+            str(path),
+            self.bucket,
+            key,
+            ExtraArgs={
+                "ContentType": "text/csv; charset=utf-8",
+                "ContentEncoding": "gzip",
+            },
+        )
+
+    def list_sizes(self, prefix: str) -> dict[str, int]:
+        """Map every object key under `prefix` to its byte size, in one listing.
+
+        Sizes come straight from the ListObjectsV2 response — no GET, no download.
+        Used by the producer's resume to learn, cheaply, which cell archives R2
+        already has and roughly how complete each is (a full-history archive is
+        far larger than one interrupted mid-fetch).
+        """
+        sizes: dict[str, int] = {}
+        paginator = self.client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                sizes[obj["Key"]] = obj["Size"]
+        return sizes
+
+    def read_years(self, key: str) -> set[int]:
+        """Download one archive object and return the set of years it covers.
+
+        Only used to disambiguate the small archives that size alone can't classify
+        (a tiny but COMPLETE cell vs. a genuinely partial one). Reads just the date
+        column out of the gzip, so the parse stays cheap.
+        """
+        import gzip
+        import io
+
+        import pandas as pd
+
+        body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        with gzip.open(io.BytesIO(body), "rt") as fh:
+            dates = pd.read_csv(fh, usecols=["date"])["date"]
+        return set(pd.to_datetime(dates).dt.year.unique().tolist())
+
+
+def _iter_tier_files(data_dir: Path, tiers):
+    """Yield (local_path, r2_key) for every .csv.gz under the given tiers."""
+    for tier in tiers:
+        tdir = data_dir / tier
+        if not tdir.is_dir():
+            print(f"skip {tier} (no dir at {tdir})", file=sys.stderr)
+            continue
+        for f in sorted(tdir.glob("*.csv.gz")):
+            yield f, f"{tier}/{f.name}"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Upload tier files to R2 (S3 API).")
+    ap.add_argument(
+        "--dir",
+        default=str(Path(__file__).resolve().parents[2] / "data" / "era5-land"),
+        help="root containing archive/ recent/ forecast/ (default: data/era5-land)",
+    )
+    ap.add_argument(
+        "--tiers", nargs="+", default=list(TIERS), choices=TIERS,
+        help="which tiers to upload (default: all)",
+    )
+    ap.add_argument("--bucket", default=None, help="override R2_BUCKET")
+    ap.add_argument("--workers", type=int, default=16, help="parallel uploads")
+    args = ap.parse_args()
+
+    data_dir = Path(args.dir).resolve()
+    up = R2Uploader(bucket=args.bucket)
+    jobs = list(_iter_tier_files(data_dir, args.tiers))
+    if not jobs:
+        print("nothing to upload.")
+        return 0
+
+    print(f"uploading {len(jobs)} files to R2 bucket '{up.bucket}' "
+          f"({args.workers} workers)...")
+    done = 0
+    errors = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        futs = {ex.submit(up.upload_file, p, k): k for p, k in jobs}
+        for fut in as_completed(futs):
+            key = futs[fut]
+            try:
+                fut.result()
+            except Exception as e:  # noqa: BLE001 - report and keep going
+                errors += 1
+                print(f"  ERROR {key}: {e}", file=sys.stderr)
+            done += 1
+            if done % 50 == 0 or done == len(jobs):
+                print(f"  {done}/{len(jobs)}")
+
+    print(f"done. {len(jobs) - errors} uploaded, {errors} failed.")
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
