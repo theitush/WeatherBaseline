@@ -16,14 +16,18 @@ import * as store from './cellStore.js';
 
 // past_days wider than the ~6-day ERA5-Land lag so forecast overlaps recent.
 const FORECAST_PAST_DAYS = 9;
-// =5 guarantees today+3 is present in every timezone (Open-Meteo anchors
-// forecast_days to UTC "today"); the trailing-null filter trims unpublished days.
-const FORECAST_DAYS = 5;
-// recent must span the WHOLE seam: from the day after the archive ends to
-// whatever the era5-land archive API is willing to serve — no fixed window and
-// NO cap. A 14-day trailing window left a permanent hole right after the
-// archive (archive_end+1 .. today-14 was never requested) and froze older cells
-// mid-window. start_date is anchored to the archive's last date + 1 day.
+// =6 guarantees today+4 is present in every timezone (Open-Meteo anchors
+// forecast_days to UTC "today", so it lands as UTC-today+5 = local-today+4 even
+// west of UTC); the trailing-null filter trims unpublished days. The picker caps
+// at local today+4 (DateSelector MAX_AHEAD_DAYS). Forecast is re-fetched whole
+// every refresh (values change), not just its tail.
+const FORECAST_DAYS = 6;
+// recent fills the archive→frontier seam, but fetches only the dates it's
+// MISSING, anchored to the earliest gap within [archive_end+1 .. today] (see
+// firstMissingRecentDate). This heals an internal hole AND extends the tail
+// without re-pulling settled data every run. The old fixed 14-day trailing
+// window left a permanent hole right after the archive and froze cells
+// mid-window.
 
 const FORECAST_MODEL = 'ecmwf_ifs'; // IFS HRES 9km, O1280 (not ifs025/aifs).
 const CELL_SELECTION = 'nearest';
@@ -77,8 +81,30 @@ function indexByDate(daily) {
 }
 
 /**
+ * Earliest date in [archiveEnd+1 .. today] the recent tier is missing, as
+ * YYYY-MM-DD, or null if recent already covers the whole span. Lets the refresh
+ * fetch only the gap (heals an internal hole AND extends the tail) instead of
+ * the whole seam. era5-land's publish frontier sits a few days behind today, so
+ * the trailing unpublished days read as "missing" too — harmless: the API
+ * returns nulls and the settled-filter drops them, so the request just ends a
+ * little short of today. All math in UTC for stable date strings.
+ */
+async function firstMissingRecentDate(bucket, lat, lon, archiveEnd) {
+  const have = new Set((await store.readRows(bucket, 'recent', lat, lon)).map((r) => r.date));
+  const day = new Date(`${archiveEnd}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 1); // archive_end + 1
+  const today = fmtDate(new Date());
+  while (fmtDate(day) <= today) {
+    const iso = fmtDate(day);
+    if (!have.has(iso)) return iso;
+    day.setUTCDate(day.getUTCDate() + 1);
+  }
+  return null;
+}
+
+/**
  * Refresh the forecast tier for a cell if its object is older than the TTL.
- * IFS HRES over the −9 to +3 day window in one call. Returns whether it ran.
+ * IFS HRES over the −9 to +4 day window in one call. Returns whether it ran.
  */
 async function refreshForecast(bucket, lat, lon, ttlMs) {
   if ((await store.ageMs(bucket, 'forecast', lat, lon)) < ttlMs) return false;
@@ -100,20 +126,30 @@ async function refreshForecast(bucket, lat, lon, ttlMs) {
 
 /**
  * Refresh the recent tier for a cell if its object is older than the TTL.
- * Two calls (temp via era5_land, precip/wind via historical-forecast), joined
- * by date, appended last-wins. Returns whether it ran.
+ *
+ * Recent is SETTLED era5-land history, so we fetch only the dates we're missing
+ * — never the whole seam. The complete set is archive_end+1 .. today; subtract
+ * what recent already has and request from the EARLIEST missing date through
+ * today. Anchoring to the earliest gap (not recent's last date) HEALS an
+ * internal hole as well as extending the tail; if nothing's missing we make no
+ * API call.
+ *
+ * Two calls over that span (temp via era5_land, precip/wind via historical-
+ * forecast), joined by date, appended last-wins. Returns whether it ran.
  */
 async function refreshRecent(bucket, lat, lon, ttlMs) {
   if ((await store.ageMs(bucket, 'recent', lat, lon)) < ttlMs) return false;
 
-  // Anchor start to the day after the archive ends so recent always covers the
-  // full seam. No archive ⇒ forecast-only cell, no seam to fill: skip (the
-  // forecast tier already carries its own past_days for display).
+  // No archive ⇒ forecast-only cell, no seam to fill: skip (the forecast tier
+  // already carries its own past_days for display).
   const archiveEnd = await store.lastDate(bucket, 'archive', lat, lon);
   if (!archiveEnd) return false;
-  const start = new Date(`${archiveEnd}T00:00:00Z`);
-  start.setUTCDate(start.getUTCDate() + 1);
-  const dateRange = { start_date: fmtDate(start), end_date: fmtDate(new Date()) };
+
+  // Earliest date recent is missing within [archive_end+1 .. today]. null ⇒
+  // recent is already complete up to today, so there's nothing to fetch.
+  const startIso = await firstMissingRecentDate(bucket, lat, lon, archiveEnd);
+  if (!startIso) return false;
+  const dateRange = { start_date: startIso, end_date: fmtDate(new Date()) };
 
   const [tempData, pwData] = await Promise.all([
     // temperature — ERA5-Land, exact archive grid match.

@@ -40,7 +40,6 @@ const AppContent: React.FC = () => {
     yearTimeline,
     yearlyAggregates,
     temperatureContext,
-    maxAvailableDate,
     loading,
     error,
     archivePending,
@@ -138,7 +137,6 @@ const AppContent: React.FC = () => {
               <DateSelector
                 currentDate={currentDate}
                 onChange={handleDateChange}
-                maxDate={maxAvailableDate}
               />
             </div>
             {!loading && !error && filteredData.length > 0 && (

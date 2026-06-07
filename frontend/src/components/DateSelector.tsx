@@ -6,16 +6,16 @@ import './DateSelector.css';
 interface DateSelectorProps {
   currentDate: string;
   onChange: (date: string) => void;
-  // Last date the loaded cell actually has data for (YYYY-MM-DD). The picker
-  // caps its horizon here so it never offers a day the data lacks — the
-  // forecast edge varies by cell timezone, so a fixed today+N would over-offer
-  // for cells west of UTC. Null until the first cell loads.
-  maxDate?: string | null;
 }
 
-// Fallback horizon before any cell has loaded: today + 3 days. Once a cell
-// loads, maxDate (the cell's real last date) supersedes this.
-const FALLBACK_MAX_DATE = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+// Horizon is a hard today+4, independent of what any cell currently has loaded.
+// Every selectable day is backed by the ensure-fresh gate: picking a recent or
+// forecast day triggers the backend to top up that cell's recent/forecast tier
+// through today+4 before the read, so the picker must never gate on the loaded
+// data (a not-yet-backfilled cell would otherwise wrongly cap at its archive
+// end and block today/forecast dates — the bug this replaces). Days are local;
+// +4 days from local "now" is the furthest the live forecast reaches.
+const MAX_AHEAD_DAYS = 4;
 // Bound the year dropdown at 1950.
 const MIN_DATE = new Date(1950, 0, 1);
 
@@ -47,19 +47,22 @@ const formatLabel = (iso: string): string => {
   });
 };
 
-const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange, maxDate }) => {
+const DateSelector: React.FC<DateSelectorProps> = ({ currentDate, onChange }) => {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<Date>(parseISO(currentDate));
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const selected = parseISO(currentDate);
 
-  // Cap to the cell's real last available date once loaded; fall back to
-  // today+3 only before the first cell has loaded.
-  const maxAllowed = useMemo(
-    () => (maxDate ? parseISO(maxDate) : FALLBACK_MAX_DATE),
-    [maxDate]
-  );
+  // Hard cap: local today + MAX_AHEAD_DAYS, at local midnight so the whole day
+  // is selectable (a time-of-day component would let `{ after }` clip it). Not
+  // derived from any loaded cell — see MAX_AHEAD_DAYS.
+  const maxAllowed = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + MAX_AHEAD_DAYS);
+    return d;
+  }, []);
 
   // Keep the visible month in sync when the date is reset externally (e.g. a
   // different city), and snap back to the selected month each time we open.
