@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel } from '../utils/units';
+import { convert, unitLabel, binWidth } from '../utils/units';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -70,19 +70,46 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     if (values.length === 0) return;
 
-    const [minVal, maxVal] = d3.extent(values) as [number, number];
+    // Axis domain must match MainChart's tempScale EXACTLY so the shared
+    // current-temp line lands at the same pixel in both charts. That means:
+    //   (a) compute extent over the same rows MainChart uses — ALL filteredData
+    //       incl. forecast (the bins/percentiles still exclude forecast above,
+    //       but the *axis* range mustn't), and
+    //   (b) apply the same ≥0 floor for precip/wind.
+    // Previously the histogram dropped forecast rows and skipped the floor, so
+    // the precip target line drifted relative to the main graph.
+    const axisValues = filteredData
+      .map((d) => d[currentMetric])
+      .filter((v): v is number => v !== undefined)
+      .map((v) => convert(v, currentMetric, system));
+    const [minVal, maxVal] = d3.extent(axisValues) as [number, number];
+    const nonNegative =
+      currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
+    const domLo = nonNegative ? Math.max(0, minVal - 2) : minVal - 2;
+    const domHi = maxVal + 2;
 
     // Temp scale: vertical-orientation puts temp on X (left→right);
     // horizontal-orientation keeps temp on Y (bottom→top, original).
     const tempScale = d3
       .scaleLinear()
-      .domain([minVal - 2, maxVal + 2])
+      .domain([domLo, domHi])
       .range(isVertical ? [0, width] : [height, 0]);
 
+    // Adaptive-width bins anchored to a unit grid, rather than a fixed bin
+    // *count*. A fixed count made narrow-range places (e.g. tropical tmin) get
+    // sub-0.1° bins → jagged, sparse-looking bars. binWidth() picks a "nice"
+    // width from the data span so Zanzibar gets enough bars and Moscow not too
+    // many. The span is the padded axis span (domainHi−domainLo) computed the
+    // SAME way as PeriodHistogramChart so both charts land on identical bin
+    // edges and the shared current-temp line never drifts between them.
+    const [domainLo, domainHi] = tempScale.domain() as [number, number];
+    const BIN = binWidth(currentMetric, system, domainHi - domainLo);
+    const binLo = Math.floor(domainLo / BIN) * BIN;
+    const binHi = Math.ceil(domainHi / BIN) * BIN;
     const bins = d3
       .bin()
-      .domain(tempScale.domain() as [number, number])
-      .thresholds(30)(values);
+      .domain([binLo, binHi])
+      .thresholds(d3.range(binLo, binHi + BIN, BIN))(values);
 
     // Count scale: horizontal mode → X (0→width); vertical mode → Y (0 at top → max at bottom, bars hang down)
     const countScale = d3

@@ -70,13 +70,37 @@ export function axisLabel(metric: MetricKey, system: UnitSystem): string {
 
 // ---- histogram bins -------------------------------------------------------
 
+// Aim for at most this many bins across the data's span. The temperature width
+// is chosen from a small "nice number" ladder: the finest width whose bin count
+// stays ≤ MAX_BINS, so a wide-range place (e.g. Moscow) doesn't explode to ~50
+// bars while a narrow-range one (e.g. tropical tmin) keeps the finest grid. The
+// ladder floor (0.5 °C / 1 °F) caps how fine narrow ranges can get. Targeting
+// the ~50 ceiling lands most places in the 30–50 band.
+const MAX_BINS = 50;
+
 /**
- * Fixed bin width (in display units) for the period histogram. 0.5 works for
- * °C/°F and m/s/mph alike, but inches need a much finer bin or every dry/light
- * day collapses into a single bar (0.5 in ≈ 12.7 mm).
+ * Bin width (in display units) for the histograms.
+ *
+ * Temperature is *adaptive*: given the data `span` (max−min in display units),
+ * pick the finest "nice" width whose bin count stays ≤ MAX_BINS —
+ *   metric:   0.5 / 1 / 2 / 5 °C
+ *   imperial: 1 / 2 / 5 / 10 °F
+ * Pass span = 0 (or omit) to get the finest width.
+ *
+ * Other metrics keep clean fixed widths (round in both systems):
+ *   precipitation 1 mm / 0.05 in  (1 mm ≈ 0.039 in)
+ *   wind         0.5 m/s / 1 mph  (0.5 m/s ≈ 1.12 mph)
  */
-export function binWidth(metric: MetricKey, system: UnitSystem): number {
-  if (system === 'imperial' && metric === 'precipitation_sum') return 0.02; // ~0.5 mm
+export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): number {
+  if (isTemp(metric)) {
+    const ladder = system === 'imperial' ? [1, 2, 5, 10] : [0.5, 1, 2, 5];
+    for (const w of ladder) {
+      if (span <= 0 || span / w <= MAX_BINS) return w;
+    }
+    return ladder[ladder.length - 1];
+  }
+  if (metric === 'precipitation_sum') return system === 'imperial' ? 0.05 : 1.0;
+  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 1.0 : 0.5;
   return 0.5;
 }
 

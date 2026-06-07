@@ -194,12 +194,18 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Shared temp axis (x) across all three panels.
     const tempScale = d3.scaleLinear().domain([domainLo, domainHi]).range([0, width]);
 
-    // Fixed 0.5-unit bins, anchored to a half-unit grid so every period shares
-    // the exact same bin edges (and they line up across metrics/locations).
-    // Snap only the *bin* edges to the grid; the axis domain stays continuous
-    // (above) to match the main chart.
-    const BIN = binWidth(currentMetric, system);
-    const binLo = Math.max(domainLo, Math.floor(domainLo / BIN) * BIN);
+    // Adaptive-width bins, anchored to a unit grid so every period shares the
+    // exact same bin edges (and they line up across metrics/locations). The
+    // span passed to binWidth() is the padded axis span computed identically to
+    // the top HistogramChart, so both charts choose the same width and land on
+    // the same edges. Snap only the *bin* edges to the grid; the axis domain
+    // stays continuous (above) to match the main chart.
+    const BIN = binWidth(currentMetric, system, domainHi - domainLo);
+    // Snap purely to the BIN grid (no Math.max with the padded domainLo, which
+    // is off-grid — that shifted every edge by a fraction, e.g. a tooltip
+    // reading 20.35–20.85 instead of 20.0–20.5). Matches HistogramChart so both
+    // charts land on identical edges.
+    const binLo = Math.floor(domainLo / BIN) * BIN;
     const binHi = Math.ceil(domainHi / BIN) * BIN;
     const thresholds = d3.range(binLo, binHi + BIN, BIN);
     const binGen = d3
