@@ -378,6 +378,12 @@ body {
   margin: 8px 0 4px 0;
 }
 
+.radial-chart-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
 .period-histogram-row {
   display: flex;
   flex-direction: column;

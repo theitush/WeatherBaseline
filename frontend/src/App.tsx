@@ -9,6 +9,7 @@ import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogramChart';
+import YearRadialChart from './components/YearRadialChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
 import SettingsMenu from './components/SettingsMenu';
@@ -36,6 +37,7 @@ const AppContent: React.FC = () => {
     setCurrentMetric,
     filteredData,
     fullData,
+    yearTimeline,
     yearlyAggregates,
     temperatureContext,
     maxAvailableDate,
@@ -174,6 +176,23 @@ const AppContent: React.FC = () => {
                 currentDate={currentDate}
                 cityName={location.name || ''}
               />
+            </section>
+
+            {/* Section 1.5 — the year at a glance (radial) */}
+            <section className="page-section">
+              <div className="chart-title">
+                The whole year, every year
+                {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
+              </div>
+              <div className="radial-chart-row">
+                <YearRadialChart
+                  fullData={yearTimeline}
+                  currentMetric={currentMetric}
+                  currentDate={currentDate}
+                  width={isMobile ? mobileWidth : 460}
+                  height={isMobile ? mobileWidth : 460}
+                />
+              </div>
             </section>
 
             {/* Section 2 — the full record */}

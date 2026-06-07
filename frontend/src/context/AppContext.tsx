@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
-import { getTemperatureHistory, geolocateByIp } from '../services/api';
+import { getTemperatureHistory, getCellYearTimeline, geolocateByIp } from '../services/api';
 import { getCellMaxDate, getCellHasArchive } from '../services/tieredData';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
@@ -30,6 +30,9 @@ interface AppState {
 
   // Data
   fullData: WeatherDataPoint[];
+  // The entire location record, NOT seasonally windowed (fullData is the ±N-day
+  // slice). Feeds the radial year-context chart's whole-year cloud.
+  yearTimeline: WeatherDataPoint[];
   filteredData: WeatherDataPoint[];
   fullYearlyAggregates: YearlyAggregate[];
   yearlyAggregates: YearlyAggregate[];
@@ -107,6 +110,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Data state
   const [fullData, setFullData] = useState<WeatherDataPoint[]>([]);
+  const [yearTimeline, setYearTimeline] = useState<WeatherDataPoint[]>([]);
   const [filteredData, setFilteredData] = useState<WeatherDataPoint[]>([]);
   const [fullYearlyAggregates, setFullYearlyAggregates] = useState<YearlyAggregate[]>([]);
   const [yearlyAggregates, setYearlyAggregates] = useState<YearlyAggregate[]>([]);
@@ -136,13 +140,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       console.log('Fetching data for:', location, currentDate);
 
-      const data = await getTemperatureHistory(
-        location.lat,
-        location.lon,
-        currentDate,
-        1940,
-        CONFIG.chart.seasonalWindowDays
-      );
+      // The seasonal slice (for the charts) and the full year timeline (for the
+      // radial chart) share the same cached archive, so this is one download.
+      const [data, timeline] = await Promise.all([
+        getTemperatureHistory(
+          location.lat,
+          location.lon,
+          currentDate,
+          1940,
+          CONFIG.chart.seasonalWindowDays
+        ),
+        getCellYearTimeline(location.lat, location.lon),
+      ]);
 
       // A servable cell whose archive we haven't backfilled yet: it may have a
       // few forecast rows but no settled history, so there's nothing meaningful
@@ -152,6 +161,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       if (getCellHasArchive(location.lat, location.lon) === false) {
         setArchivePending(true);
         setFullData([]);
+        setYearTimeline([]);
         setFilteredData([]);
         return;
       }
@@ -164,6 +174,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       // Update full data
       setFullData(data);
+      setYearTimeline(timeline);
 
       // Record the cell's last available date for the picker's horizon cap.
       // Populated by loadCellTimeline (run inside getTemperatureHistory above).
@@ -332,6 +343,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     currentMetric,
     setCurrentMetric,
     fullData,
+    yearTimeline,
     filteredData,
     fullYearlyAggregates,
     yearlyAggregates,

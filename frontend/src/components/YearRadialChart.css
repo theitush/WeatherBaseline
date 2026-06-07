@@ -1,0 +1,28 @@
+.radial-chart-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* The cloud canvas sits behind the SVG overlay; the SVG is transparent so the
+   canvas shows through. Both share the wrapper's coordinate box. */
+.radial-chart-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.radial-chart-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.radial-chart-svg .radial-grid-ring {
+  stroke-width: 0.75px;
+  opacity: 0.6;
+}
+
+.radial-chart-svg .radial-target-point {
+  cursor: pointer;
+}

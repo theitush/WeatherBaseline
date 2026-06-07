@@ -86,15 +86,38 @@ interface RawRow {
  * exist for this cell yet — e.g. archive not built, or forecast not refreshed).
  * The browser auto-gunzips via Content-Encoding: gzip.
  */
+// Cache parsed ARCHIVE rows per snapped cell. The archive is the bulk of a
+// cell's payload (~75 years) and is immutable within a session, so re-reading it
+// when the user just changes the date or metric is pure waste; this also lets
+// the radial chart pull the full unfiltered timeline without a second download.
+// Only the archive is cached — `recent`/`forecast` are topped up daily and must
+// stay fresh, so they always re-fetch.
+const archiveCache = new Map<string, Promise<RawRow[]>>();
+
 async function fetchTier(tier: Tier, lat: number, lon: number): Promise<RawRow[]> {
-  let res: Response;
-  try {
-    res = await fetch(fileUrl(tier, lat, lon), { headers: { Accept: 'text/csv' } });
-  } catch {
-    return []; // network error on an optional tier — degrade gracefully
+  const key = `${lat},${lon}`;
+  if (tier === 'archive') {
+    const cached = archiveCache.get(key);
+    if (cached) return cached;
   }
-  if (!res.ok) return [];
-  return parseCsv(await res.text());
+
+  const p = (async () => {
+    let res: Response;
+    try {
+      res = await fetch(fileUrl(tier, lat, lon), { headers: { Accept: 'text/csv' } });
+    } catch {
+      return []; // network error on an optional tier — degrade gracefully
+    }
+    if (!res.ok) return [];
+    return parseCsv(await res.text());
+  })();
+
+  if (tier === 'archive') {
+    archiveCache.set(key, p);
+    // Don't let a transient empty result stick — drop it so a later load retries.
+    p.then((rows) => { if (rows.length === 0) archiveCache.delete(key); });
+  }
+  return p;
 }
 
 function parseCsv(text: string): RawRow[] {

@@ -63,6 +63,19 @@ export async function getTemperatureHistory(
   return timeline.filter((d) => withinSeasonalWindow(d.date, targetDt, daysRange));
 }
 
+/**
+ * Full unfiltered daily timeline for a cell (every day, every year) — the
+ * whole-year cloud the radial chart plots. Unlike getTemperatureHistory this
+ * applies no seasonal window. The archive tier is cached (see tieredData), so
+ * when called alongside getTemperatureHistory for the same cell it's free.
+ */
+export async function getCellYearTimeline(
+  latitude: number,
+  longitude: number
+): Promise<WeatherDataPoint[]> {
+  return loadCellTimeline(latitude, longitude);
+}
+
 /** A coarse location guessed from the visitor's IP, for a bare-root visit. */
 export interface IpLocation {
   lat: number;
