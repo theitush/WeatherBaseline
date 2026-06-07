@@ -113,6 +113,16 @@ async function writeRows(tier, lat, lon, rows) {
 }
 
 /**
+ * Last (max) date present in a tier file, or null if empty/absent. Rows are
+ * sorted by date on write, so the last row is the max. Used by the recent
+ * refresh to anchor its start_date to the day after the archive ends.
+ */
+async function lastDate(tier, lat, lon) {
+  const rows = await readRows(tier, lat, lon);
+  return rows.length ? rows[rows.length - 1].date : null;
+}
+
+/**
  * Merge new rows into an existing tier file by date, last-wins, then write.
  * Used by the recent tier's append-only refresh: a re-run for an overlapping
  * date range is idempotent, and a skipped run self-heals on the next call.
@@ -160,4 +170,5 @@ module.exports = {
   readRows,
   writeRows,
   mergeRows,
+  lastDate,
 };

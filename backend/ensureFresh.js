@@ -53,10 +53,12 @@ const FORECAST_PAST_DAYS = 9;
 // scales with the day count and days past +3 aren't selectable anyway.
 const FORECAST_DAYS = 5;
 
-// The recent call backfills the window that newly crossed the publish frontier.
-// 14 days is comfortably wider than the lag + a few skipped runs; append-by-date
-// makes the overlap harmless.
-const RECENT_PAST_DAYS = 14;
+// recent must span the WHOLE seam: from the day after the archive ends to
+// whatever the era5-land archive API is willing to serve — no fixed window and
+// NO cap. A 14-day trailing window left a permanent hole right after the
+// archive (archive_end+1 .. today-14 was never requested) and froze older cells
+// mid-window. start_date is anchored to the archive's last date + 1 day;
+// append-by-date keeps overlaps harmless.
 
 // IFS HRES (9km, O1280 grid) — the high-resolution deterministic forecast model.
 // NOT ecmwf_ifs025 (0.25°) or ecmwf_aifs (AI, 0.25°). Matches ERA5-Land's ~0.1°.
@@ -157,10 +159,14 @@ async function refreshForecast(lat, lon) {
 async function refreshRecent(lat, lon) {
   if ((await store.ageMs('recent', lat, lon)) < RECENT_TTL_MS) return false;
 
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - RECENT_PAST_DAYS);
-  const dateRange = { start_date: fmtDate(start), end_date: fmtDate(end) };
+  // Anchor start to the day after the archive ends so recent always covers the
+  // full seam. No archive ⇒ forecast-only cell, no seam to fill: skip (the
+  // forecast tier already carries its own past_days for display).
+  const archiveEnd = await store.lastDate('archive', lat, lon);
+  if (!archiveEnd) return false;
+  const start = new Date(`${archiveEnd}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() + 1);
+  const dateRange = { start_date: fmtDate(start), end_date: fmtDate(new Date()) };
 
   const [tempData, pwData] = await Promise.all([
     // temperature — ERA5-Land, exact archive grid match.

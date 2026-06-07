@@ -73,6 +73,19 @@ async function writeRows(bucket, tier, lat, lon, rows) {
 }
 
 /**
+ * Last (max) date present in a tier object, or null if the object is empty/
+ * absent. Used by the recent refresh to anchor its start_date to the day after
+ * the archive ends, so recent always spans the full archive→frontier seam
+ * rather than a fixed trailing window. Reads the whole object (rows are sorted
+ * on write, so the last row is the max date) — fine at recent's once-per-24h
+ * cadence.
+ */
+async function lastDate(bucket, tier, lat, lon) {
+  const rows = await readRows(bucket, tier, lat, lon);
+  return rows.length ? rows[rows.length - 1].date : null;
+}
+
+/**
  * Merge new rows into an existing tier object by date, last-wins, then write.
  * Used by the recent tier's append-only refresh: an overlapping re-run is
  * idempotent and a skipped run self-heals on the next call.
@@ -133,4 +146,5 @@ export {
   readRows,
   writeRows,
   mergeRows,
+  lastDate,
 };
