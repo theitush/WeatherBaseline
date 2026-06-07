@@ -8,7 +8,7 @@
    shared .context-verdict rule below (equal specificity, later in file). */
 .temperature-context .context-verdict-lead {
   margin: 0 0 6px 0;
-  font-size: 34px;
+  font-size: 42px;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -16,7 +16,7 @@
 /* Match .section-title's mobile shrink so the punchy lead tracks "The Data". */
 @media (max-width: 767px) {
   .temperature-context .context-verdict-lead {
-    font-size: 24px;
+    font-size: 30px;
   }
 }
 
@@ -43,6 +43,12 @@
   font-size: 0.85rem;
   line-height: 1.45;
   color: var(--text-secondary);
+}
+
+/* Lead line above the punchy verdict — same size/color as .context-explain
+   but pulled snug against the verdict it introduces. */
+.context-lead {
+  margin: -4px 0 13px;
 }
 
 .record-scale {

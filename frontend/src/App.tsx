@@ -87,7 +87,10 @@ const AppContent: React.FC = () => {
       day % 10 === 1 && day !== 11 ? 'st' :
       day % 10 === 2 && day !== 12 ? 'nd' :
       day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-    return `${months[d.getMonth()]} ${day}${suffix} ± ${CONFIG.chart.seasonalWindowDays} days`;
+    const date = `${months[d.getMonth()]} ${day}${suffix}`;
+    const city = location.name ? location.name.split(',')[0].trim() : '';
+    const where = city ? ` in ${city}` : '';
+    return `± ${CONFIG.chart.seasonalWindowDays} days around ${date}${where}`;
   };
 
   // Get current date data for temperature context.
@@ -168,6 +171,8 @@ const AppContent: React.FC = () => {
                 currentTemp={getCurrentTemp()}
                 filteredData={filteredData}
                 currentMetric={currentMetric}
+                currentDate={currentDate}
+                cityName={location.name || ''}
               />
             </section>
 
@@ -225,8 +230,7 @@ const AppContent: React.FC = () => {
             <section className="page-section">
               <header className="section-header">
                 <p className="section-subtitle">
-                  Did the common {metricQuestionLabel[currentMetric]} at this time of
-                  year change?
+                  Did the median {metricQuestionLabel[currentMetric]} change?
                 </p>
               </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>

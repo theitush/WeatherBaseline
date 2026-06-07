@@ -213,6 +213,16 @@ body {
   margin-bottom: 30px;
 }
 
+/* Section 2's header is empty (chart-title carries the heading). Collapse it and
+   trim the section's top padding so the chart-title sits the same 36px below the
+   divider as card 1's text sits above it — the line splits the gap evenly. */
+.section-header:empty {
+  margin-bottom: 0;
+}
+.page-section:has(> .section-header:empty) {
+  padding-top: 28px;
+}
+
 .section-title {
   margin: 0;
   font-size: 34px;
@@ -224,9 +234,9 @@ body {
 
 .section-subtitle {
   margin: 8px 0 0;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--text-strong);
   line-height: 1.3;
 }
 

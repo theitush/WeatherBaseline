@@ -9,9 +9,19 @@ interface TemperatureContextProps {
   currentTemp: number | null;
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
+  currentDate: string;
+  cityName: string;
 }
 
 const BIN_COUNT = 10;
+
+// Metric phrase for the lead line — mirrors the metric buttons.
+const METRIC_LEAD_LABEL: Record<MetricKey, string> = {
+  max_temperature: 'max temperature',
+  min_temperature: 'min temperature',
+  precipitation_sum: 'precipitation',
+  wind_speed_10m_max: 'wind speed',
+};
 
 // Gradient stops: record-low blue -> white -> record-high red (matches the bar exactly)
 const GRADIENT_LOW_RGB = [47, 111, 184];    // #2f6fb8
@@ -51,8 +61,8 @@ const METRIC_DIRECTION: Record<
 // #1-on-record gets the exclusive "Record-breaker!" (handled separately).
 const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!'];
 const VERDICT_EXTREME = ['Extreme!', 'Seriously extreme.', 'Pretty wild.'];
-const VERDICT_NOTABLE = ['Notable.', 'Worth a mention.', 'A bit unusual.', 'Mildly spicy.', 'Stands out a little.'];
-const VERDICT_MILD = ['Average.', 'Very average.', 'Totally normal.', 'Nothing to see here.', 'Meh.'];
+const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.'];
+const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
 
 // Deterministic pick — same (bank, seed) always yields the same phrase, so a
 // verdict stays put across the several re-renders a metric/date switch triggers
@@ -115,6 +125,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   currentTemp,
   filteredData,
   currentMetric,
+  currentDate,
+  cityName,
 }) => {
   const { system } = useUnits();
 
@@ -241,8 +253,27 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     if (isTop3) fireConfetti();
   }, [isTop3, currentMetric, currentTemp]);
 
+  // Lead line above the punchy verdict: "June 7th in Tel Aviv is".
+  const leadDate = (() => {
+    const d = new Date(currentDate + 'T12:00:00');
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    const day = d.getDate();
+    const suffix =
+      day % 10 === 1 && day !== 11 ? 'st' :
+      day % 10 === 2 && day !== 12 ? 'nd' :
+      day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+    return `${months[d.getMonth()]} ${day}${suffix}, ${d.getFullYear()}`;
+  })();
+  const city = cityName ? cityName.split(',')[0].trim() : '';
+  const metricLabel = METRIC_LEAD_LABEL[currentMetric];
+  const leadLine = city
+    ? `${leadDate} ${metricLabel} in ${city} is`
+    : `${leadDate} ${metricLabel} is`;
+
   return (
     <div className="temperature-context">
+      <p className="context-explain context-lead">{leadLine}</p>
       <div className="context-verdict context-verdict-lead">{verdict}</div>
 
       {hasScale ? (
