@@ -12,6 +12,7 @@ import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogram
 import SignificancePanel from './components/SignificancePanel';
 import { Legend } from './components/Legend';
 import SettingsMenu from './components/SettingsMenu';
+import ShareButton from './components/ShareButton';
 import { UnitsContext, useUnitsState } from './hooks/useUnits';
 import { usePermutationTest } from './hooks/usePermutationTest';
 import type { MetricKey } from './utils/config';
@@ -112,6 +113,12 @@ const AppContent: React.FC = () => {
           <header className="app-header">
             <h1>WeatherBaseline.com</h1>
             <SettingsMenu />
+            <ShareButton
+              placeName={location.name || ''}
+              temp={getCurrentTemp()}
+              currentMetric={currentMetric}
+              date={currentDate}
+            />
           </header>
 
           <div className="controls-panel">

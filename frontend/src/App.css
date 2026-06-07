@@ -18,6 +18,23 @@ body {
   padding: 20px;
 }
 
+/* Opaque page-bg strip fixed across the very top of the viewport. It hides any
+   content that scrolls up into the 10px gap above the pinned sticky-bar, so the
+   bar always keeps a clean framed top edge. Fixed positioning works identically
+   in every browser (the earlier sticky ::before mask wasn't painting on Firefox
+   mobile). z-index sits just under .sticky-bar (1100). */
+.app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background-color: var(--app-bg);
+  z-index: 1050;
+  pointer-events: none;
+}
+
 .app-container {
   max-width: 1360px;
   margin: 0 auto;
@@ -27,15 +44,27 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Title + controls travel together as one pinned unit (no see-through gap) */
+/* Title + controls travel together as one pinned unit (no see-through gap).
+   At rest the bar is the top of the white card. Once pinned it keeps a 10px
+   page-bg margin above it (top:10px) so it reads as a contained card with a
+   rounded top edge, not a strip jammed to the window. The card itself is fully
+   opaque with rounded corners + a drop shadow; an opaque page-bg margin (drawn
+   on the .app wrapper, see below) covers anything that would scroll into that
+   top gap, consistently across browsers. */
 .sticky-bar {
   position: sticky;
-  top: 0;
+  top: 10px;
   /* Above chart tooltips/dropdowns (z-index 1000) so the pinned header — and the
      settings popover within it — always paint on top, never see-through. */
   z-index: 1100;
   background-color: var(--surface);
-  border-bottom: 1px solid var(--border-muted);
+  /* Pull out over the container padding so the card spans the full width,
+     then re-add it as inner padding so the content keeps its original inset. */
+  margin: -30px -30px 0;
+  padding: 12px 30px 0;
+  border-radius: 8px;
+  /* Soft drop shadow separates the pinned header from content scrolling under. */
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.22);
 }
 
 .app-header {
@@ -430,6 +459,16 @@ body {
   }
   .app-container {
     padding: 16px;
+  }
+  /* Match the negative margins / inner padding to the 16px mobile inset. */
+  .sticky-bar {
+    top: 6px;
+    margin: -16px -16px 0;
+    padding: 8px 16px 0;
+  }
+  .sticky-bar::before {
+    left: -16px;
+    right: -16px;
   }
   .app-header h1 {
     font-size: 22px;

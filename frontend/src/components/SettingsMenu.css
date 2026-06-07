@@ -1,9 +1,9 @@
-/* Settings gear + popover. The trigger sits in the same header slot the old
-   .theme-toggle occupied (absolute, right-aligned, vertically centered). */
+/* Settings gear + popover. Anchored to the LEFT of the header (the share button
+   now takes the right slot the gear used to occupy). */
 .settings-menu {
   position: absolute;
   top: 50%;
-  right: 0;
+  left: 0;
   transform: translateY(-50%);
   /* Lift the whole menu (and its popover) above the controls row, which is a
      later DOM sibling inside the sticky-bar and would otherwise paint over the
@@ -35,7 +35,7 @@
 .settings-popover {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
   z-index: 1000;
   isolation: isolate;
   padding: 8px;
@@ -81,7 +81,11 @@
 
 @media (max-width: 767px) {
   .settings-trigger {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+  }
+  .settings-trigger svg {
+    width: 16px;
+    height: 16px;
   }
 }

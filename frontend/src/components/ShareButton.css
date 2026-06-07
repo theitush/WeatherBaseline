@@ -1,0 +1,58 @@
+/* Share button. Mirrors the settings trigger's square look. Takes the RIGHT
+   header slot the settings gear used to occupy (settings moved to the left). */
+.share-button {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 200;
+}
+
+.share-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.share-trigger:hover {
+  color: var(--text-strong);
+  border-color: var(--text-faint);
+  background-color: var(--surface-muted);
+}
+
+/* "Copied!" flash under the button. Right-aligned to the trigger. */
+.share-copied {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-strong);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 767px) {
+  .share-trigger {
+    width: 28px;
+    height: 28px;
+  }
+  .share-trigger svg {
+    width: 16px;
+    height: 16px;
+  }
+}
