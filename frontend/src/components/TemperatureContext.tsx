@@ -243,7 +243,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
 
   return (
     <div className="temperature-context">
-      <h3 className="context-question">How extreme is this weather?</h3>
+      <div className="context-verdict context-verdict-lead">{verdict}</div>
 
       {hasScale ? (
         <div className="record-scale" aria-label="Temperature vs records">
@@ -285,7 +285,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       )}
 
       <div className="context-answer">
-        <div className="context-verdict">{verdict}</div>
         {extremeLine && <p className="context-explain">{extremeLine}</p>}
       </div>
     </div>
