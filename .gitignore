@@ -36,6 +36,4 @@ __pycache__/
 # R2 S3 API credentials (S3 access key/secret). NEVER commit.
 /scripts/era5_pipeline/r2.env
 
-# Dev-only symlink for testing Pages Functions locally (real source: frontend/functions/)
-/functions
 .wrangler/
