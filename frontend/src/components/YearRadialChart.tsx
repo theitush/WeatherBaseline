@@ -17,6 +17,13 @@ interface YearRadialChartProps {
   height?: number;
 }
 
+// "Jun 5th" — short month + ordinal day for the top-of-spoke date label.
+const ordinal = (n: number): string => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -70,8 +77,10 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 
     // --- radius scale: raw value, padded 10% below min / above max ----------
+    // Dial shows ONLY the settled long-run archive — no 'recent' (live-model
+    // topped-up) days and no 'forecast'.
     const pts = fullData.filter(
-      (d) => d[currentMetric] !== undefined && d.data_type !== 'forecast'
+      (d) => d[currentMetric] !== undefined && d.data_type === 'historical'
     );
     if (pts.length === 0) return;
 
@@ -272,29 +281,6 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       const tR = rScale(tVal);
       const [tx, ty] = polar(tFrac, tR);
 
-      // Two dashed spokes bracketing the ±N-day seasonal window (the same window
-      // the rest of the site aggregates over) — a wedge around the target day
-      // rather than a single line at it.
-      const windowDays = CONFIG.chart.seasonalWindowDays;
-      for (const sign of [-1, 1]) {
-        // Offset the fraction directly (±days/365) rather than via a Date, so an
-        // edge that crosses a year boundary (e.g. target Jan 2, −5d → late Dec)
-        // stays adjacent to the target instead of wrapping to the far side. The
-        // dial is periodic, so a fraction just outside [0,1) is fine.
-        const edgeFrac = tFrac + (sign * windowDays) / 365;
-        const [ex, ey] = polar(edgeFrac, rOuter);
-        g.append('line')
-          .attr('class', 'radial-target-spoke')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', ex)
-          .attr('y2', ey)
-          .attr('stroke', 'var(--text-h)')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '4,4')
-          .attr('opacity', 0.45);
-      }
-
       // dashed circumference at the target's radius, in the theme foreground
       // (white on dark, black on light) so it always reads against the cloud —
       // matches the target dot and spoke.
@@ -326,6 +312,18 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           place(event);
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
+
+      // Target date label sitting just above the dot, e.g. "Jun 7th, 2026".
+      const dateLabel = `${MONTHS[targetDt.getMonth()]} ${ordinal(targetDt.getDate())}, ${targetDt.getFullYear()}`;
+      g.append('text')
+        .attr('class', 'radial-window-date')
+        .attr('x', tx)
+        .attr('y', ty - 11)
+        .style('text-anchor', 'middle')
+        .style('font-size', '11px')
+        .style('font-weight', '600')
+        .style('fill', 'var(--text-h)')
+        .text(dateLabel);
     }
   }, [fullData, currentMetric, currentDate, totalWidth, totalHeight, system]);
 

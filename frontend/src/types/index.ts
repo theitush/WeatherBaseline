@@ -5,7 +5,10 @@ export type { MetricKey } from '../utils/config';
 export interface WeatherDataPoint {
   date: Date;
   year: number;
-  data_type: 'historical' | 'forecast';
+  // 'historical' = settled archive (ERA5-Land). 'recent' = real but live-model
+  // topped-up days near the present frontier (still real data, but not the
+  // settled long-run archive). 'forecast' = future model guess.
+  data_type: 'historical' | 'recent' | 'forecast';
   max_temperature?: number;
   min_temperature?: number;
   precipitation_sum?: number;

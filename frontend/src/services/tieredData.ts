@@ -190,7 +190,7 @@ export async function loadCellTimeline(
 
   apply(forecast, 'forecast'); // lowest precedence
   apply(archive, 'historical');
-  apply(recent, 'historical'); // highest precedence
+  apply(recent, 'recent'); // highest precedence — real, but not settled archive
 
   // Record whether this cell has the settled long-run history the charts/stats
   // need. Only the archive counts: the `recent` tier is topped up daily from the

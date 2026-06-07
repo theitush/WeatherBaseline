@@ -45,7 +45,9 @@ export function usePermutationTest(
   const records = useMemo<PermRecord[]>(() => {
     const out: PermRecord[] = [];
     for (const d of filteredData) {
-      if (d.data_type !== 'historical') continue;
+      // Exclude only forecast; 'recent' is real settled-enough data (unchanged
+      // from when recent rows were tagged 'historical').
+      if (d.data_type === 'forecast') continue;
       const v = d[currentMetric];
       if (v === null || v === undefined || !Number.isFinite(v)) continue;
       if (d.year >= oldest.start && d.year <= oldest.end) {

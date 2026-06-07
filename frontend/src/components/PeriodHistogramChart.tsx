@@ -152,8 +152,9 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // a touch for contrast against the filled bars (see medianColorFor).
     const medianLineColor = medianColorFor(currentMetric);
 
-    // Restrict to historical archive rows only (no forecast).
-    const historical = filteredData.filter((d) => d.data_type === 'historical');
+    // Real observed rows only (no forecast); 'recent' is real data (was tagged
+    // 'historical' before the recent tier got its own data_type).
+    const historical = filteredData.filter((d) => d.data_type !== 'forecast');
 
     // Read a row's metric value already converted to the display system, so the
     // axis, bins, and medians are all computed in display units (clean ticks).

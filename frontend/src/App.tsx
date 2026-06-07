@@ -181,7 +181,7 @@ const AppContent: React.FC = () => {
             {/* Section 1.5 — the year at a glance (radial) */}
             <section className="page-section">
               <div className="chart-title">
-                The whole year, every year
+                Historical {metricQuestionLabel[currentMetric]}
                 {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
               </div>
               <div className="radial-chart-row">
