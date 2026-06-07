@@ -1,6 +1,6 @@
 // HowHotWasIt v2 — Cloudflare Worker entrypoint (control plane).
 //
-// Three routes, ported from backend/server.js:
+// Three routes:
 //   GET /api/ensure-fresh?lat=&lon=  → top up recent/forecast in R2 from Open-Meteo
 //   GET /api/geo                     → starting location for a bare visit
 //   GET /api/health                  → liveness

@@ -6,15 +6,19 @@
 // forecast (model, ~12h)          ─┘   forecast only fills dates the others miss.
 import type { WeatherDataPoint } from '../types';
 
-// Base URL for the cell files. Empty in dev (proxied to the Node backend);
-// set VITE_DATA_BASE to the R2/CDN origin in prod.
+// Base URL for the cell files — the R2/CDN origin. Set in BOTH dev and prod via
+// VITE_DATA_BASE (committed in frontend/.env): local dev reads the tier files
+// straight from R2, the same objects the local Worker writes. The empty-string
+// fallback is only for a misconfigured env (no VITE_DATA_BASE) and routes to a
+// relative /data path, which nothing serves anymore.
 const DATA_BASE = import.meta.env.VITE_DATA_BASE ?? '';
 
 // Base origin for the Worker's /api/* control-plane routes (ensure-fresh, geo).
-// Empty in dev (the Vite proxy forwards /api → the Node backend); in prod set
-// VITE_API_BASE to the deployed Worker's origin (e.g. its workers.dev URL) so
-// these calls reach the Worker cross-origin. The Worker already sends
-// permissive CORS for /api/*. Shared with api.ts via apiUrl().
+// Empty in dev: the Vite proxy forwards /api → the local Worker
+// (`wrangler dev --remote` on :8787). In prod set VITE_API_BASE to the deployed
+// Worker's origin (e.g. its workers.dev URL) so these calls reach the Worker
+// cross-origin. The Worker already sends permissive CORS for /api/*. Shared with
+// api.ts via apiUrl().
 export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 /** Build a control-plane URL: prefixes the path with API_BASE in prod. */
@@ -49,13 +53,10 @@ export function snap(coord: number): number {
 
 function fileUrl(tier: Tier, lat: number, lon: number): string {
   const name = `${tier}_${snap(lat).toFixed(1)}_${snap(lon).toFixed(1)}.csv.gz`;
-  // Two serving shapes share the SAME object key `{tier}/{name}`:
-  //   - dev (DATA_BASE=''): the Node backend's Express static route is mounted
-  //     at /data, so prefix it → /data/archive/archive_..csv.gz.
-  //   - prod (DATA_BASE=R2 origin): files sit at the bucket root under their
-  //     tier, so the key IS the path → https://…r2.dev/archive/archive_..csv.gz.
-  // Keeping the R2 keys un-prefixed matches the Worker's cellStore + the upload
-  // scripts; only the dev proxy needs the /data mount point.
+  // The object key `{tier}/{name}` IS the path under the R2 origin (dev and
+  // prod alike), e.g. https://…r2.dev/archive/archive_..csv.gz — matching the
+  // Worker's cellStore keys and the upload scripts. The /data fallback only
+  // applies if DATA_BASE is empty (misconfigured env), and nothing serves it.
   const prefix = DATA_BASE ? '' : '/data';
   return `${DATA_BASE}${prefix}/${tier}/${name}`;
 }

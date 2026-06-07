@@ -2,10 +2,9 @@
   "name": "howhot-weather-app",
   "version": "1.0.0",
   "description": "Weather visualization app with temperature history",
-  "main": "backend/server.js",
+  "main": "worker/src/index.js",
   "scripts": {
-    "start": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 18 && node backend/server.js'",
-    "dev": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 18 && node backend/server.js'",
+    "dev": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd worker && npx wrangler dev --remote --port 8787'",
     "dev:frontend": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd frontend && npm run dev'",
     "dev:all": "bash -c 'npm run dev & npm run dev:frontend & wait'"
   },

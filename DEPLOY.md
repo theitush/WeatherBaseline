@@ -25,8 +25,9 @@ deploy by running the commands below.
   cd worker && npx wrangler whoami     # should show the account, R2 + Workers scopes
   npx wrangler login                   # if not logged in (opens a browser)
   ```
-- Frontend builds on **Node 22** (`nvm use 22`). The Node backend (`backend/`)
-  is dev-only and is **not** deployed — the Worker replaces it in prod.
+- Frontend builds on **Node 22** (`nvm use 22`). Local dev runs the **same
+  Worker code as prod** via `wrangler dev --remote` (`npm run dev`) — the legacy
+  Node server in `backend/` is no longer part of the dev or prod loop.
 
 ## Deploy the frontend (Pages)
 
@@ -75,7 +76,8 @@ curl -s -A Slackbot http://localhost:8788/23.80,90.40/2025-07-15/tmax | grep og:
 ```
 
 > Leave `VITE_API_BASE` **unset** for a local dev build — then the frontend uses
-> relative `/api/*`, which the Vite proxy forwards to the local Node backend.
+> relative `/api/*`, which the Vite proxy forwards to the local Worker
+> (`wrangler dev --remote` on port 8787).
 
 ## Deploy the Worker
 

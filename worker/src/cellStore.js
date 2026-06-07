@@ -1,20 +1,18 @@
-// cellStore (Worker/R2 port) — v2 tiered storage, backed by an R2 binding.
+// cellStore — v2 tiered storage, backed by an R2 binding (env.BUCKET).
 //
-// This is the R2 analogue of backend/cellStore.js. Same on-the-wire layout —
-// keys are `{tier}/{tier}_{lat}_{lon}.csv.gz` so they match what the frontend
-// fetches and what the producer / upload scripts write. The only differences
-// from the Node version:
+// Object keys are `{tier}/{tier}_{lat}_{lon}.csv.gz`, matching what the frontend
+// fetches and what the producer / upload scripts (scripts/era5_pipeline/) write.
+// Storage notes:
 //
-//   - reads/writes go through the R2 binding (env.BUCKET) instead of fs;
-//   - freshness is the object's `uploaded` timestamp (R2's equivalent of mtime
-//     / Last-Modified) instead of a stat() mtime;
+//   - reads/writes go through the R2 binding (env.BUCKET);
+//   - freshness is the object's `uploaded` timestamp (R2's equivalent of an mtime
+//     / Last-Modified), which ensure-fresh compares against its TTLs;
 //   - no atomic-rename dance: R2 put() is already atomic (a reader sees the
-//     whole old or whole new object, never a partial one), so the temp-file +
-//     rename trick the FS version needed is unnecessary here.
+//     whole old or whole new object, never a partial one).
 //
 // Objects are stored gzip-compressed with the right Content-Type/Encoding so the
-// public R2 URL serves them exactly like the local Express static route did:
-// the browser auto-gunzips via Content-Encoding: gzip.
+// public R2 URL serves a browser-gunzippable file: the browser auto-gunzips via
+// Content-Encoding: gzip.
 
 const TIERS = ['archive', 'recent', 'forecast'];
 
@@ -58,8 +56,8 @@ async function readRows(bucket, tier, lat, lon) {
 /**
  * Write rows to a tier object as gzip CSV. Rows are sorted by date and
  * serialized in SCHEMA column order. R2 put() is atomic, so no temp/rename.
- * Sets Content-Type/Encoding so the public URL serves a browser-gunzippable
- * file (mirrors the Express static setHeaders in backend/server.js).
+ * Sets Content-Type/Encoding so the public R2 URL serves a browser-gunzippable
+ * file (text/csv + Content-Encoding: gzip).
  */
 async function writeRows(bucket, tier, lat, lon, rows) {
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
@@ -113,7 +111,8 @@ async function gunzipToText(body) {
 }
 
 // --- CSV helpers (no quoting needed: all fields are dates/numbers) ----------
-// Verbatim from backend/cellStore.js so the two stores stay format-identical.
+// Format must stay identical to the producer / upload scripts in
+// scripts/era5_pipeline/ so archive + live tiers parse the same.
 
 function parseCsv(text) {
   const lines = text.trim().split('\n');

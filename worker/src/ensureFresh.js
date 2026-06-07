@@ -1,7 +1,8 @@
-// ensureFresh (Worker port) — the thin tail-only refresh from ARCHITECTURE.md.
+// ensureFresh — the thin tail-only refresh from ARCHITECTURE.md (the single
+// control-plane impl, run both in prod and in local dev via wrangler dev).
 //
-// Logic is the same as backend/ensureFresh.js (see that file's header for the
-// full grid/source rationale). Worker-runtime differences only:
+// Full grid/source rationale is inline below and in ARCHITECTURE.md
+// ("✅ GRID DECISION"). Worker-runtime specifics:
 //   - global fetch (no node-fetch import);
 //   - the R2 bucket + TTLs are passed in (env.BUCKET, env.*_TTL_MS) instead of
 //     module-level fs + process.env;

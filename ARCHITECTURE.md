@@ -1,8 +1,9 @@
 # HowHotWasIt — v2 architecture (data & serving)
 
-Status: **in progress** on branch `v2-tiered-serving`. Serving path built; grid
-decision **RESOLVED 2026-06-03** — see "✅ GRID DECISION" below. Supersedes
-the current Node `backend/cacheManager.js` + `/api/archive` model.
+Status: **shipped** (on `main`, deployed). Grid decision **RESOLVED
+2026-06-03** — see "✅ GRID DECISION" below. Replaced the original v1 Node
+fetch-everything (`/api/archive`) model; the control plane is now the
+Cloudflare Worker in `worker/src/`, which both prod and local dev run.
 
 ## ✅ GRID DECISION (resolved 2026-06-03)
 
@@ -64,7 +65,7 @@ metrics**):
 
 RESOLUTION (2026-06-03): chose **ERA5-Land 0.1°** (was Option G2, accepting the
 split-source recent as intentional rather than rewriting to a single grid). The
-split-grid recent in `backend/ensureFresh.js` is the shipping design. The residual
+split-grid recent in `worker/src/ensureFresh.js` is the shipping design. The residual
 cross-model bias (IFS 9km ≠ ERA5-Land 0.1° ≠ historical-forecast — three physical
 grids; `cell_selection=nearest` only makes each pick deterministic) is a **deferred
 task**, see "✅ GRID DECISION" above.
@@ -196,8 +197,8 @@ the 12h/24h windows, or cap distinct cells refreshed per day.
    So a day shown as "forecast" is replaced by its real ERA5-Land value once it
    ages past the 5-day frontier and the next 24h append picks it up.
 
-The old `/api/archive` + `cacheManager.js` (fetch-and-cache 1940→now per
-location) is **retired** — its job shrinks to the thin tail-only `ensure-fresh`.
+The original v1 `/api/archive` fetch-and-cache model (1940→now per location) is
+**retired** — its job shrank to the thin tail-only `ensure-fresh` Worker.
 
 ## Scaling note — A → B later
 

@@ -6,9 +6,11 @@
 # VITE_DATA_BASE), never through this Worker — so file reads don't consume the
 # Worker request budget.
 #
-# Local dev: `wrangler dev --local` emulates the R2 binding via Miniflare in a
-# local dir (.wrangler/state) — no Cloudflare account or bucket needed. Seed it
-# from the repo's local data with scripts/seed-local-r2.sh.
+# Local dev: `npm run dev` (→ `wrangler dev --remote --port 8787`) binds this
+# Worker to the REAL R2 bucket below, so local dev reads/writes the same data as
+# prod (dev = local code, remote data). The Vite proxy forwards the frontend's
+# /api/* to this port. `npm run dev:local` falls back to a Miniflare-emulated R2
+# in .wrangler/state (no account needed; seed it with scripts/seed-local-r2.sh).
 name = "howhotwasit"
 main = "src/index.js"
 compatibility_date = "2024-09-23"
@@ -24,7 +26,7 @@ binding = "BUCKET"
 bucket_name = "weather-baseline"
 
 [vars]
-# Freshness thresholds (ms). Overridable per-environment. Mirror the old
-# backend/ensureFresh.js defaults: forecast 12h, recent 24h.
+# Freshness thresholds (ms). Overridable per-environment: forecast 12h, recent
+# 24h. ensureFresh.js falls back to these same defaults if the vars are absent.
 FORECAST_TTL_MS = "43200000"
 RECENT_TTL_MS = "86400000"
