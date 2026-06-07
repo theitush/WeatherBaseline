@@ -173,9 +173,7 @@ const AppContent: React.FC = () => {
 
             {/* Section 2 — the full record */}
             <section className="page-section">
-              <header className="section-header">
-                <h2 className="section-title">The Data</h2>
-              </header>
+              <header className="section-header" />
               <div className="charts-section">
                 <div className="chart-title">{formatChartTitle(currentDate)}</div>
                 <Legend metric={currentMetric} />
@@ -226,7 +224,6 @@ const AppContent: React.FC = () => {
             {/* Section 3 — recent-memory trend */}
             <section className="page-section">
               <header className="section-header">
-                <h2 className="section-title">The Stats</h2>
                 <p className="section-subtitle">
                   Did the common {metricQuestionLabel[currentMetric]} at this time of
                   year change?
