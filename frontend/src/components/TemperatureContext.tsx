@@ -59,6 +59,27 @@ const METRIC_DIRECTION: Record<
   wind_speed_10m_max: { high: ['windy', 'windier', 'windiest'], low: ['calm', 'calmer', 'calmest'] },
 };
 
+// Comparative used in the mild "a bit ___ than most" line, per metric & side.
+const METRIC_COMPARATIVE: Record<MetricKey, { high: string; low: string }> = {
+  max_temperature: { high: 'warmer', low: 'colder' },
+  min_temperature: { high: 'warmer', low: 'colder' },
+  precipitation_sum: { high: 'wetter', low: 'drier' },
+  wind_speed_10m_max: { high: 'windier', low: 'calmer' },
+};
+
+// Softeners for the mild "a ___ ___ than most" line.
+const MILD_HEDGE = ['bit', 'tad', 'touch', 'smidge', 'hair'];
+
+// Dead-center (45–55%) bottom line — no direction is meaningful, so just
+// lampoon the averageness. The top verdict still draws from VERDICT_MILD.
+const DEAD_CENTER_LINE = [
+  'Uniquely unique',
+  'Averagely average',
+  'Remarkably unremarkable',
+  'Distinctly indistinct',
+  'Textbook nothing',
+];
+
 // Verdict banks answering "How extreme is this weather?" — random per render.
 // #1-on-record gets the exclusive "Record-breaker!" (handled separately).
 const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!'];
@@ -257,10 +278,21 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           : `About ${pct.toFixed(0)}% of days${since} were this ${adj} or ${comp}.`;
         verdict = pick(VERDICT_NOTABLE, seed);
       } else {
-        // Mild — two-tailed %, "extreme" mocked in quotes since it isn't.
-        const tailFrac = Math.min(1, singleTail * 2);
-        const pct = tailFrac * 100;
-        extremeLine = `About ${pct.toFixed(0)}% of days${since} were this "extreme".`;
+        // Mild — no rarity number here. A two-tailed % near the middle never
+        // matched the histogram's single-tailed bracket and read as confusing.
+        // Instead describe the position softly: dead-center days get a mocked
+        // "perfectly average" verdict; off-center-but-mild days get a hedged
+        // "a bit warmer than most", naming today's actual side.
+        const pctile = atOrBelowN / n; // 0..1, where today sits in the pack
+        const isDeadCenter = pctile >= 0.45 && pctile <= 0.55;
+        if (isDeadCenter) {
+          extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for days${since}.`;
+        } else {
+          const cmp = METRIC_COMPARATIVE[currentMetric];
+          const word = isHighSide ? cmp.high : cmp.low;
+          const hedge = pick(MILD_HEDGE, seed);
+          extremeLine = `A ${hedge} ${word} than most days${since}.`;
+        }
         verdict = pick(VERDICT_MILD, seed);
       }
     }
