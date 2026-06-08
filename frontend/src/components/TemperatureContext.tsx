@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabelBare } from '../utils/units';
+import { comparablePool } from '../utils/dataProcessor';
 import CONFIG from '../utils/config';
 import './TemperatureContext.css';
 
@@ -144,7 +145,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     return unit === '°' ? `${c.toFixed(1)}°` : `${c.toFixed(1)} ${unit}`;
   };
 
-  const valid = filteredData.filter((d) => {
+  // Canonical pool: drop future forecasts, keep today/earlier (incl. recent
+  // forecast rows). Shared with the histogram via comparablePool so the prose
+  // rarity and the histogram brackets run off the identical days.
+  const valid = comparablePool(filteredData).filter((d) => {
     const v = d[currentMetric];
     return typeof v === 'number' && Number.isFinite(v);
   });
@@ -190,16 +194,21 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let verdict = context.description;
   let rank = 0; // 1-based rank on the day's side; 0 when undeterminable.
   {
-    const values = valid.map((d) => d[currentMetric] as number);
+    // Compare in CONVERTED (display-unit) space, exactly as the histogram does,
+    // so the prose rarity and the histogram bracket agree to the decimal.
+    const cur = convert(currentTemp, currentMetric, system);
+    const values = valid.map((d) => convert(d[currentMetric] as number, currentMetric, system));
     const n = values.length;
     if (n > 0) {
-      const atOrAboveN = values.filter((v) => v >= currentTemp).length;
-      const atOrBelowN = values.filter((v) => v <= currentTemp).length;
-      const atOrAbove = atOrAboveN / n;
-      const atOrBelow = atOrBelowN / n;
-      // Single-tailed rarity on the day's own side, and which side that is.
-      const isHighSide = atOrAbove <= atOrBelow;
-      const singleTail = Math.min(atOrAbove, atOrBelow);
+      // INCLUSIVE tails ("this hot or hotter" / "this dry or drier"): count days
+      // AT-OR-beyond today on each side. Inclusive is what keeps a 0mm dry day
+      // from reading as a record drought — when 60% of days are also 0mm, the low
+      // tail is 60%, not 0%. Matches the histogram's inclusive brackets.
+      const atOrAboveN = values.filter((v) => v >= cur).length;
+      const atOrBelowN = values.filter((v) => v <= cur).length;
+      // Today's own side is the smaller tail; that tail is the rarity %.
+      const isHighSide = atOrAboveN <= atOrBelowN;
+      const singleTail = (isHighSide ? atOrAboveN : atOrBelowN) / n;
       // Shared-worst ("competition") rank: count days at-or-more-extreme on this
       // side, so ties share the LAST position of their group. This is what stops
       // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm

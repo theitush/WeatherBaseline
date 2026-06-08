@@ -14,6 +14,22 @@ function parseLocalDate(dateString: string): Date {
 }
 
 /**
+ * Canonical comparison pool for rarity/percentile claims. Drops only FUTURE
+ * forecasts (model guesses for days that haven't happened); forecast rows dated
+ * today or earlier are kept, since those are recent reanalysis-quality figures
+ * and more accurate than excluding them. Both the prose verdict
+ * (TemperatureContext) and the histogram brackets (HistogramChart) MUST run off
+ * this same pool, and compare strictly (> / <), so their percentages agree.
+ */
+export function comparablePool(data: WeatherDataPoint[]): WeatherDataPoint[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return data.filter(
+    (d) => !(d.data_type === 'forecast' && d.date.getTime() > today.getTime())
+  );
+}
+
+/**
  * Calculate yearly aggregates with percentiles and rolling medians
  */
 export function calculateYearlyAggregates(

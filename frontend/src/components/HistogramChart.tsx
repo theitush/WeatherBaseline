@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { comparablePool } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth } from '../utils/units';
@@ -59,11 +60,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const tooltip = d3.select(tooltipRef.current);
 
-    // Forecast rows are model guesses, not settled observations — exclude them
-    // from the distribution (and the percentile brackets below) so the histogram
-    // reflects real history only. Matches the MainChart record-marker exclusion.
-    const values = filteredData
-      .filter((d) => d.data_type !== 'forecast')
+    // Drop only FUTURE forecasts; forecast rows for today/earlier are recent
+    // reanalysis-quality and kept. Shared with the prose verdict via
+    // comparablePool so both percentages run off the identical pool.
+    const values = comparablePool(filteredData)
       .map((d) => d[currentMetric])
       .filter((v): v is number => v !== undefined)
       .map((v) => convert(v, currentMetric, system));
@@ -227,10 +227,14 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('y1', tempScale(currentTemp)).attr('y2', tempScale(currentTemp));
       }
 
-      const higherCount = values.filter((v) => v > currentTemp).length;
+      // INCLUSIVE on both sides ("this hot or hotter" / "this cold or colder"),
+      // so each bracket is the honest tail that includes today and its ties —
+      // matching the prose verdict's inclusive single tail. With ties the two
+      // figures sum to >100 (the overlap is the days equal to today); that's
+      // intended, since each side legitimately counts the boundary day.
       const total = values.length;
-      const pctHigher = ((higherCount / total) * 100).toFixed(1);
-      const pctLower = (100 - parseFloat(pctHigher)).toFixed(1);
+      const pctHigher = ((values.filter((v) => v >= currentTemp).length / total) * 100).toFixed(1);
+      const pctLower = ((values.filter((v) => v <= currentTemp).length / total) * 100).toFixed(1);
 
       if (!isVertical) {
         // Brackets to the right of bars, paired with the horizontal current-temp line.
