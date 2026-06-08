@@ -7,15 +7,35 @@ export type LegendItem =
   | { type: 'line'; color: string; label: string }
   | { type: 'circle'; color: string; label: string }
   | { type: 'forecast'; color: string; label: string }
-  | { type: 'target'; color: string; label: string };
+  | { type: 'target'; color: string; label: string }
+  | { type: 'wedge'; color: string; label: string };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ordinal = (n: number): string => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+// Legend for the radial dial: only the marks it actually draws. The wedge label
+// names the actual window, e.g. "Jun 6th ±5 days".
+export const getRadialLegendData = (metric: MetricKey, currentDate: string): LegendItem[] => {
+  const dt = new Date(currentDate + 'T00:00:00');
+  const windowLabel = `${MONTHS[dt.getMonth()]} ${ordinal(dt.getDate())} ±5 days`;
+  return [
+    { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
+    { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
+    { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
+  ];
+};
 
 export const getLegendData = (metric: MetricKey): LegendItem[] => [
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
   { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Rolling median' },
-  { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical data' },
+  { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
   { type: 'forecast', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Forecast' },
-  { type: 'target', color: 'var(--text-h)', label: 'Target date' },
 ];
 
 // Draw a single legend swatch into a d3 selection (centered vertically on y=0).
@@ -56,12 +76,29 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
       {item.type === 'target' && (
         <circle cx={6} cy={0} r={4} fill="var(--text-h)" stroke="var(--surface)" strokeWidth={1.5} />
       )}
+      {item.type === 'wedge' && (
+        <rect width={12} height={12} y={-6} fill={item.color} opacity={0.18} />
+      )}
     </g>
   </svg>
 );
 
 export const Legend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
   const items = getLegendData(metric);
+  return (
+    <div className="chart-legend">
+      {items.map((item) => (
+        <div key={item.label} className="chart-legend-item">
+          <Swatch item={item} />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const RadialLegend: React.FC<{ metric: MetricKey; currentDate: string }> = ({ metric, currentDate }) => {
+  const items = getRadialLegendData(metric, currentDate);
   return (
     <div className="chart-legend">
       {items.map((item) => (

@@ -26,6 +26,17 @@ interface MainChartProps {
 const MARGIN_H = { top: 20, right: 30, bottom: 40, left: 55 };
 const MARGIN_V = { top: 8, right: 20, bottom: 40, left: 55 };
 
+// "May 31st, 2026" — matches the radial dial's target-date label.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ordinal = (n: number): string => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+const fmtDate = (d: Date): string =>
+  `${MONTHS[d.getMonth()]} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
+
 const MainChart: React.FC<MainChartProps> = ({
   filteredData,
   yearlyAggregates,
@@ -331,12 +342,6 @@ const MainChart: React.FC<MainChartProps> = ({
 
     // Scatter points
     const unit = unitLabel(currentMetric, system);
-    const pointLabels: Record<MetricKey, string> = {
-      max_temperature: 'Max Temp',
-      min_temperature: 'Min Temp',
-      precipitation_sum: 'Precipitation',
-      wind_speed_10m_max: 'Max Wind Speed',
-    };
 
     // Forecast rows are model guesses, not settled observations. They're drawn
     // as hollow (outlined) dots, and excluded from the record high/low markers
@@ -383,7 +388,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${cv(d[currentMetric] as number).toFixed(1)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
+            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(1)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
           );
         place(event);
       })
@@ -435,7 +440,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${r.label}</strong><br/>${r.d.date.toDateString()}<br/>${pointLabels[currentMetric]}: ${cv(r.d[currentMetric] as number).toFixed(1)}${unit}`
+              `<strong>${r.label}</strong><br/>${fmtDate(r.d.date)}<br/>${cv(r.d[currentMetric] as number).toFixed(1)}${unit}`
             );
           place(event);
         })
@@ -487,11 +492,46 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${d.date.toDateString()}</strong><br/>${pointLabels[currentMetric]}: ${cv(d[currentMetric] as number).toFixed(1)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
+              `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(1)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
             );
           place(event);
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
+
+      // Target date written just above the marker (mirrors the radial dial), so
+      // the legend doesn't need a "Target date" entry. e.g. "Jun 7, 2026".
+      const td = currentDateData[0].date;
+      const dateLabel = fmtDate(td);
+      const px = isVertical ? tsv(currentTemp) : timeScale(td);
+      const py = isVertical ? timeScale(td) : tsv(currentTemp);
+      const labelEl = g.append('text')
+        .attr('class', 'current-temp-label')
+        .style('font-size', '11px')
+        .style('font-weight', '600')
+        .style('fill', 'var(--text-h)')
+        .text(dateLabel);
+      if (isVertical) {
+        // Mobile: the target date is the most recent row, so it sits at the very
+        // top of the time axis — a label above it would clip out of the tiny top
+        // margin. Place it level, beside the marker, nudged down a hair. Default
+        // to the right; in extreme weather the marker is near the right edge, so
+        // flip to the left to keep the text on-screen.
+        const estTextW = dateLabel.length * 6.2; // ~6px/char at 11px
+        const flipLeft = px + 9 + estTextW > width;
+        labelEl
+          .attr('x', flipLeft ? px - 9 : px + 9)
+          .attr('y', py + 4)
+          .style('text-anchor', flipLeft ? 'end' : 'start');
+      } else {
+        // Desktop: tilt 45° descending left→right *down to* the dot, so the text
+        // sits up-and-left of the marker and clears the histogram on the right.
+        // Anchored at the end (the marker) and rotated +45° about that point.
+        labelEl
+          .attr('x', px)
+          .attr('y', py - 8)
+          .style('text-anchor', 'end')
+          .attr('transform', `rotate(45, ${px}, ${py - 8})`);
+      }
     }
   }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system]);
 

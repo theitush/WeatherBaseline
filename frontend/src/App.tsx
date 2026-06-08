@@ -11,7 +11,7 @@ import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogramChart';
 import YearRadialChart from './components/YearRadialChart';
 import SignificancePanel from './components/SignificancePanel';
-import { Legend } from './components/Legend';
+import { Legend, RadialLegend } from './components/Legend';
 import SettingsMenu from './components/SettingsMenu';
 import ShareButton from './components/ShareButton';
 import { UnitsContext, useUnitsState } from './hooks/useUnits';
@@ -182,6 +182,7 @@ const AppContent: React.FC = () => {
                 Historical {metricQuestionLabel[currentMetric]}
                 {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
               </div>
+              <RadialLegend metric={currentMetric} currentDate={currentDate} />
               <div className="radial-chart-row">
                 <YearRadialChart
                   fullData={yearTimeline}

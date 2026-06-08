@@ -106,6 +106,27 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       return [r * Math.cos(a), r * Math.sin(a)];
     };
 
+    // ±5-day comparison window around the target day, as a fraction of a turn.
+    // Drives both the faint wedge and the brightened in-window dots on canvas.
+    const WINDOW_DAYS = 5;
+    const windowFrac = WINDOW_DAYS / 365;
+
+    // Faint wedge straddling the top of the dial, behind everything else, so the
+    // ±5-day window reads as a sector of the year. Arc angles are clockwise from
+    // 12 o'clock, so the window is symmetric about 0.
+    const windowArc = d3
+      .arc<unknown>()
+      .innerRadius(rInner)
+      .outerRadius(rOuter)
+      .startAngle(-windowFrac * 2 * Math.PI)
+      .endAngle(windowFrac * 2 * Math.PI);
+    g.append('path')
+      .attr('class', 'radial-window-wedge')
+      .attr('d', windowArc(null) as string)
+      .attr('fill', 'var(--text-h)')
+      .attr('opacity', 0.07);
+
+
     // --- the day cloud on CANVAS -------------------------------------------
     // ~27k dots (75 years × 365) are far too many SVG nodes to rebuild on every
     // metric switch without a multi-second stall. The cloud is purely visual
@@ -261,7 +282,7 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           .html(
             `<strong>${MONTH_FULL[m]}</strong><br/>` +
             `Median ${med.toFixed(1)}${unit}<br/>` +
-            `Min ${lo.toFixed(1)}${unit} · Max ${hi.toFixed(1)}${unit}`
+            `${lo.toFixed(1)}${unit} – ${hi.toFixed(1)}${unit}`
           );
         place(event);
       })
