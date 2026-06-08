@@ -174,18 +174,25 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     // target spoke (which runs straight up to the top), so they sit clear of it.
     const spoke = (2 * Math.PI) / 12;
     const labelAngle = -Math.PI / 2 - 2 * spoke; // two spokes left of vertical
+    // Second set of labels on the far side of the dial: the spoke opposite the
+    // first set, then one spoke back toward the top, so both sets read upright-ish
+    // and the scale is legible without crossing the whole wheel.
+    const labelAngle2 = labelAngle + Math.PI - spoke;
     g.selectAll('.radial-ring-label')
-      .data(ringTicks)
+      .data(ringTicks.flatMap((t) => [
+        { t, a: labelAngle },
+        { t, a: labelAngle2 },
+      ]))
       .enter()
       .append('text')
       .attr('class', 'radial-ring-label')
-      .attr('x', (t) => rScale(t) * Math.cos(labelAngle))
-      .attr('y', (t) => rScale(t) * Math.sin(labelAngle))
+      .attr('x', (d) => rScale(d.t) * Math.cos(d.a))
+      .attr('y', (d) => rScale(d.t) * Math.sin(d.a))
       .attr('dy', '0.32em')
       .style('text-anchor', 'middle')
       .style('font-size', '9px')
       .style('fill', 'var(--chart-label)')
-      .text((t) => `${t}${unit}`);
+      .text((d) => `${d.t}${unit}`);
 
     // --- month rays + labels ------------------------------------------------
     for (let m = 0; m < 12; m++) {
