@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabelBare } from '../utils/units';
+import CONFIG from '../utils/config';
 import './TemperatureContext.css';
 
 interface TemperatureContextProps {
@@ -204,10 +205,20 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm
       // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
       rank = isHighSide ? atOrAboveN : atOrBelowN;
-      // "this time of year" — the comparison pool is every day within a
-      // ±seasonalWindowDays calendar window of the target date, across all years
-      // back to 1950, so frame it by the season rather than the start year.
-      const since = ' this time of year';
+      // Name the actual comparison pool: every day within a ±seasonalWindowDays
+      // calendar window of the target date, across all years back to 1950. Spell
+      // out the window and date ("within ±5 days of June 6th") rather than the
+      // vaguer "this time of year".
+      const win = CONFIG.chart.seasonalWindowDays;
+      const td = new Date(currentDate + 'T12:00:00');
+      const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const tDay = td.getDate();
+      const tSuffix =
+        tDay % 10 === 1 && tDay !== 11 ? 'st' :
+        tDay % 10 === 2 && tDay !== 12 ? 'nd' :
+        tDay % 10 === 3 && tDay !== 13 ? 'rd' : 'th';
+      const since = ` within ±${win} days of ${shortMonths[td.getMonth()]} ${tDay}${tSuffix}`;
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
@@ -217,8 +228,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Top-3 on record — name the rank, celebrate.
         extremeLine =
           rank === 1
-            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day on record! (for this time of year)`
-            : `${ordinal(rank)} ${sup} day on record! (for this time of year)`;
+            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day${since} on record!`
+            : `${ordinal(rank)} ${sup} day${since} on record!`;
         // #1 gets the exclusive phrase; #2/#3 draw from the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
       } else if (singleTail <= 0.05) {

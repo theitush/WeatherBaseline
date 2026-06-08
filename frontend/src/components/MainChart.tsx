@@ -195,20 +195,12 @@ const MainChart: React.FC<MainChartProps> = ({
         .text(tempAxisLabel);
     }
 
-    // Pre-satellite era: light shading + dashed boundary at 1979 with a label.
+    // Pre-satellite era: dashed boundary at 1979 with a label.
     const satelliteDate = new Date(1979, 0, 1);
     if (satelliteDate > dateExtent[0]) {
       const boundaryPos = timeScale(satelliteDate);
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
-        g.append('rect')
-          .attr('class', 'satellite-era-shade')
-          .attr('x', 0)
-          .attr('y', boundaryPos)
-          .attr('width', width)
-          .attr('height', height - boundaryPos)
-          .attr('fill', 'var(--text-h)')
-          .attr('opacity', 0.012);
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', 0).attr('x2', width)
@@ -227,14 +219,6 @@ const MainChart: React.FC<MainChartProps> = ({
           .text('Satellites!');
       } else {
         // Time runs along x (left = earliest). Pre-1979 is the left band.
-        g.append('rect')
-          .attr('class', 'satellite-era-shade')
-          .attr('x', 0)
-          .attr('y', 0)
-          .attr('width', boundaryPos)
-          .attr('height', height)
-          .attr('fill', 'var(--text-h)')
-          .attr('opacity', 0.012);
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', boundaryPos).attr('x2', boundaryPos)
