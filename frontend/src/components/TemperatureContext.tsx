@@ -10,6 +10,9 @@ interface TemperatureContextProps {
   context: TempContext | null;
   currentTemp: number | null;
   filteredData: WeatherDataPoint[];
+  // Full daily record (every day, all years) for the cell — used to test whether
+  // today is a top-1/2/3 value across the ENTIRE record, not just its ±5-day window.
+  yearTimeline: WeatherDataPoint[];
   currentMetric: MetricKey;
   currentDate: string;
   cityName: string;
@@ -83,6 +86,10 @@ const DEAD_CENTER_LINE = [
 // Verdict banks answering "How extreme is this weather?" — random per render.
 // #1-on-record gets the exclusive "Record-breaker!" (handled separately).
 const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!'];
+// Reserved for a top-1/2/3 value across the WHOLE record (not just its ±5-day
+// window) — the rarest thing the page can show, so the lines go big.
+const VERDICT_ALLTIME_1 = ['For the ages.', 'Nothing tops this.', 'The all-time benchmark.', 'History, made.'];
+const VERDICT_ALLTIME_23 = ['Practically unheard of.', 'A page in the record books.', 'Almost legendary.', 'Rarefied air.'];
 const VERDICT_EXTREME = ['Extreme!', 'Seriously extreme.', 'Pretty wild.'];
 const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.'];
 const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
@@ -112,14 +119,16 @@ const ordinal = (n: number): string => {
 };
 
 // Lightweight confetti burst — no dependency. Fires once when called.
-const fireConfetti = () => {
+// `multiplier` scales the piece count: 1 for an in-window top-3, 5 for an
+// all-time top-1/2/3 — the rarest event the page shows.
+const fireConfetti = (multiplier = 1) => {
   if (typeof document === 'undefined') return;
   const colors = ['#c0392b', '#2f6fb8', '#e6b800', '#2e8b57', '#8e44ad'];
   const root = document.createElement('div');
   root.style.cssText =
     'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden';
   document.body.appendChild(root);
-  const N = 180;
+  const N = 180 * multiplier;
   for (let i = 0; i < N; i++) {
     const p = document.createElement('div');
     const size = 6 + Math.random() * 6;
@@ -147,6 +156,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   context,
   currentTemp,
   filteredData,
+  yearTimeline,
   currentMetric,
   currentDate,
   cityName,
@@ -214,6 +224,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let extremeLine: string | null = null;
   let verdict = context.description;
   let rank = 0; // 1-based rank on the day's side; 0 when undeterminable.
+  let allTimeRank = 0; // rank across the ENTIRE record (every day, all years); 0 = N/A.
   {
     // Compare in CONVERTED (display-unit) space, exactly as the histogram does,
     // so the prose rarity and the histogram bracket agree to the decimal.
@@ -235,6 +246,22 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm
       // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
       rank = isHighSide ? atOrAboveN : atOrBelowN;
+      // All-time rank: same competition-rank logic, but against EVERY day of the
+      // whole record (not just the ±5-day window). A top-1/2/3 here means the
+      // value is, e.g., the hottest day this cell has ever seen on ANY date — far
+      // rarer than topping its calendar neighbours, so it earns louder prose +
+      // 5× confetti. Reuse today's side (isHighSide) so "hottest/coldest" agrees.
+      {
+        const allVals = comparablePool(yearTimeline)
+          .map((d) => d[currentMetric])
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+          .map((v) => convert(v, currentMetric, system));
+        if (allVals.length > 0) {
+          allTimeRank = isHighSide
+            ? allVals.filter((v) => v >= cur).length
+            : allVals.filter((v) => v <= cur).length;
+        }
+      }
       // Name the actual comparison pool: every day within a ±seasonalWindowDays
       // calendar window of the target date, across all years back to 1950. Spell
       // out the window and date ("within ±5 days of June 6th") rather than the
@@ -257,8 +284,18 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
       const seed = `${currentMetric}:${currentTemp}:${rank}`;
 
-      if (rank <= 3) {
-        // Top-3 on record — name the rank, celebrate.
+      if (allTimeRank >= 1 && allTimeRank <= 3) {
+        // Top-1/2/3 across the WHOLE record — the rarest thing the page shows.
+        // Drop the ±window qualifier: this is the all-time extreme on ANY date,
+        // not just nearby ones.
+        extremeLine =
+          allTimeRank === 1
+            ? `The ${sup} ${noun} EVER recorded!`
+            : `${ordinal(allTimeRank)}-${sup} ${noun} ever recorded!`;
+        verdict =
+          allTimeRank === 1 ? pick(VERDICT_ALLTIME_1, seed) : pick(VERDICT_ALLTIME_23, seed);
+      } else if (rank <= 3) {
+        // Top-3 in its ±window — name the rank, celebrate.
         extremeLine =
           rank === 1
             ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} ${noun}${since} on record!`
@@ -301,12 +338,15 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     }
   }
 
-  // Confetti for any top-3 day on record. Re-fires when the rank-bearing day
-  // changes (new date/metric/location that lands in the top 3).
+  // Confetti for any top-3 day. An in-window top-3 gets the normal burst; an
+  // all-time top-1/2/3 (rarest on the page) gets a 5× burst. Re-fires when the
+  // rank-bearing day changes (new date/metric/location landing in the top 3).
   const isTop3 = rank >= 1 && rank <= 3;
+  const isAllTimeTop3 = allTimeRank >= 1 && allTimeRank <= 3;
   useEffect(() => {
-    if (isTop3) fireConfetti();
-  }, [isTop3, currentMetric, currentTemp]);
+    if (isAllTimeTop3) fireConfetti(5);
+    else if (isTop3) fireConfetti(1);
+  }, [isTop3, isAllTimeTop3, currentMetric, currentTemp]);
 
   // Lead line above the punchy verdict: "June 7th in Tel Aviv is".
   const leadDate = (() => {

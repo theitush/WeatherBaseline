@@ -170,6 +170,7 @@ const AppContent: React.FC = () => {
                 context={temperatureContext}
                 currentTemp={getCurrentTemp()}
                 filteredData={filteredData}
+                yearTimeline={yearTimeline}
                 currentMetric={currentMetric}
                 currentDate={currentDate}
                 cityName={location.name || ''}
