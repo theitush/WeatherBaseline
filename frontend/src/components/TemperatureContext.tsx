@@ -251,6 +251,9 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       const since = ` within ±${win} days of ${shortMonths[td.getMonth()]} ${tDay}${tSuffix}`;
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
+      // Min temp is always the overnight low, so describe the pool as nights.
+      const noun = currentMetric === 'min_temperature' ? 'night' : 'day';
+      const nounP = noun + 's';
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
       const seed = `${currentMetric}:${currentTemp}:${rank}`;
 
@@ -258,15 +261,15 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Top-3 on record — name the rank, celebrate.
         extremeLine =
           rank === 1
-            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day${since} on record!`
-            : `${ordinal(rank)} ${sup} day${since} on record!`;
+            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} ${noun}${since} on record!`
+            : `${ordinal(rank)} ${sup} ${noun}${since} on record!`;
         // #1 gets the exclusive phrase; #2/#3 draw from the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
       } else if (singleTail <= 0.05) {
         // Extreme — one decimal, floored so a record never prints "0.0%".
         const pct = singleTail * 100;
         const shown = pct < 0.1 ? '<0.1' : pct.toFixed(1);
-        extremeLine = `Only ${shown}% of days${since} were this ${adj}!`;
+        extremeLine = `Only ${shown}% of ${nounP}${since} were this ${adj}!`;
         verdict = pick(VERDICT_EXTREME, seed);
       } else if (singleTail <= 0.2) {
         // Notable — whole percent, cumulative ("or hotter"). Drop the comparative
@@ -274,8 +277,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const pct = singleTail * 100;
         const atFloor = currentTemp === 0 && !isHighSide;
         extremeLine = atFloor
-          ? `About ${pct.toFixed(0)}% of days${since} were this ${adj}.`
-          : `About ${pct.toFixed(0)}% of days${since} were this ${adj} or ${comp}.`;
+          ? `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj}.`
+          : `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj} or ${comp}.`;
         verdict = pick(VERDICT_NOTABLE, seed);
       } else {
         // Mild — no rarity number here. A two-tailed % near the middle never
@@ -286,12 +289,12 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const pctile = atOrBelowN / n; // 0..1, where today sits in the pack
         const isDeadCenter = pctile >= 0.45 && pctile <= 0.55;
         if (isDeadCenter) {
-          extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for days${since}.`;
+          extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for ${nounP}${since}.`;
         } else {
           const cmp = METRIC_COMPARATIVE[currentMetric];
           const word = isHighSide ? cmp.high : cmp.low;
           const hedge = pick(MILD_HEDGE, seed);
-          extremeLine = `A ${hedge} ${word} than most days${since}.`;
+          extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
         }
         verdict = pick(VERDICT_MILD, seed);
       }
