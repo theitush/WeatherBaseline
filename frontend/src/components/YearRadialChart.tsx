@@ -149,9 +149,10 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .attr('stroke', 'var(--chart-grid)')
       .attr('stroke-dasharray', '2,3');
 
-    // value labels on the rings, set on a quiet 10-o'clock diagonal so they
-    // don't sit on the target spoke (which now runs straight up to the top).
-    const labelAngle = -Math.PI / 2 - 0.45; // just left of vertical
+    // value labels on the rings. Two month-spokes (2/12 turn) to the LEFT of the
+    // target spoke (which runs straight up to the top), so they sit clear of it.
+    const spoke = (2 * Math.PI) / 12;
+    const labelAngle = -Math.PI / 2 - 2 * spoke; // two spokes left of vertical
     g.selectAll('.radial-ring-label')
       .data(ringTicks)
       .enter()
@@ -324,6 +325,20 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
         .style('font-weight', '600')
         .style('fill', 'var(--text-h)')
         .text(dateLabel);
+
+      // Target VALUE label on the spoke one step RIGHT of vertical, sitting just
+      // over the wheel point and nudged right (above-and-right of the spoke).
+      const tValAngle = -Math.PI / 2 + spoke;
+      g.append('text')
+        .attr('class', 'radial-target-value')
+        .attr('x', tR * Math.cos(tValAngle) + 4)
+        .attr('y', tR * Math.sin(tValAngle) - 8)
+        .attr('dy', '0.32em')
+        .style('text-anchor', 'start')
+        .style('font-size', '11px')
+        .style('font-weight', '600')
+        .style('fill', 'var(--text-h)')
+        .text(`${tVal.toFixed(1)}${unit}`);
     }
   }, [fullData, currentMetric, currentDate, totalWidth, totalHeight, system]);
 

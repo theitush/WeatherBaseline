@@ -217,8 +217,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Top-3 on record — name the rank, celebrate.
         extremeLine =
           rank === 1
-            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day on record!`
-            : `${ordinal(rank)} ${sup} day on record!`;
+            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} day on record! (for this time of year)`
+            : `${ordinal(rank)} ${sup} day on record! (for this time of year)`;
         // #1 gets the exclusive phrase; #2/#3 draw from the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
       } else if (singleTail <= 0.05) {
