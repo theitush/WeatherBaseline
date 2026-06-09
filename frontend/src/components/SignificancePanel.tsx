@@ -27,16 +27,6 @@ const METRIC_NOUN_NEG: Record<MetricKey, string> = {
   wind_speed_10m_max: 'calmer',
 };
 
-// Plain-language verdict from the p-value. The thresholds are deliberately
-// loose — this is a vibe check on top of the histogram, not a paper.
-function verdict(p: number): string {
-  if (p < 0.001) return 'Wah! Super Likely!';     // *** level
-  if (p < 0.01) return 'Very Likely!';  // ** level
-  if (p < 0.05) return 'Pretty likely.';
-  if (p < 0.15) return 'Maybe..?';
-  return 'Not really..';
-}
-
 function fmtP(p: number): string {
   if (p < 0.001) return '< 0.001';
   return p.toFixed(3);
@@ -62,7 +52,6 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, 
         <div className="sig-empty">Not enough data in these periods to test.</div>
       ) : (
         (() => {
-          const line = verdict(result.pValue);
           const diff = convertDelta(result.observedDiff, currentMetric, system);
           const dir = diff >= 0 ? METRIC_NOUN[currentMetric] : METRIC_NOUN_NEG[currentMetric];
           return (

@@ -7,19 +7,6 @@
   min-height: 3.5rem;
 }
 
-.sig-heading {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.sig-sub {
-  font-weight: 400;
-  font-size: 0.78rem;
-  color: var(--text-tertiary);
-  margin-left: 0.4rem;
-}
-
 /* Loading / empty states */
 .sig-loading,
 .sig-empty {
@@ -48,13 +35,6 @@
 /* Result body */
 .sig-body {
   margin-top: 0.55rem;
-}
-
-.sig-verdict {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--text-strong);
 }
 
 .sig-explain {
