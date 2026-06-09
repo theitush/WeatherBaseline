@@ -1,0 +1,48 @@
+.freshness-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+  background-color: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+  /* Sit just below the sticky-bar, above the data panel */
+  position: relative;
+  z-index: 1;
+}
+
+.freshness-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.freshness-banner__refresh {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: inherit;
+  font: inherit;
+}
+
+.freshness-banner__refresh:hover {
+  color: var(--text-strong);
+}
+
+.freshness-banner__close {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.freshness-banner__close:hover {
+  color: var(--text-secondary);
+}

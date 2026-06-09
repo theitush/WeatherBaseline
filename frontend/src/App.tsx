@@ -12,6 +12,7 @@ import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogram
 import YearRadialChart from './components/YearRadialChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend, RadialLegend } from './components/Legend';
+import FreshnessBanner from './components/FreshnessBanner';
 import SettingsMenu from './components/SettingsMenu';
 import ShareButton from './components/ShareButton';
 import { UnitsContext, useUnitsState } from './hooks/useUnits';
@@ -43,6 +44,9 @@ const AppContent: React.FC = () => {
     loading,
     error,
     archivePending,
+    forecastUnavailable,
+    dismissForecastWarning,
+    refreshData,
   } = useApp();
 
   const handleLocationChange = (info: { name: string; lat: number; lon: number }) => {
@@ -144,6 +148,13 @@ const AppContent: React.FC = () => {
             )}
           </div>
         </div>
+
+        {forecastUnavailable && (
+          <FreshnessBanner
+            onRefresh={refreshData}
+            onDismiss={dismissForecastWarning}
+          />
+        )}
 
         {error && (
           <div className="error-message">

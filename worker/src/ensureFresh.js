@@ -61,16 +61,26 @@ function dailyToRows(daily) {
   return rows;
 }
 
-async function callOpenMeteo(base, params) {
+async function callOpenMeteo(base, params, retries = 3) {
   // cell_selection pinned on every call so grid-cell choice is deterministic.
   const url = `${base}?${new URLSearchParams({ cell_selection: CELL_SELECTION, ...params })}`;
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'HowHotWasIt/2.0' },
-  });
-  if (!res.ok) {
-    throw new Error(`Open-Meteo ${base} returned ${res.status} ${res.statusText}`);
+  let lastErr;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1))); // 1s, 2s
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': 'HowHotWasIt/2.0' },
+      });
+    } catch (networkErr) {
+      lastErr = networkErr;
+      continue; // retry on network failure
+    }
+    if (res.ok) return res.json();
+    lastErr = new Error(`Open-Meteo ${base} returned ${res.status} ${res.statusText}`);
+    if (res.status < 500) throw lastErr; // 4xx — retrying won't help
   }
-  return res.json();
+  throw lastErr;
 }
 
 /** Index a daily block by date for joining the two recent calls. */

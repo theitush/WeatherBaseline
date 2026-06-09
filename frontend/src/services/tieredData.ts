@@ -121,19 +121,30 @@ function parseCsv(text: string): RawRow[] {
   });
 }
 
-/** Ask the backend to top up the volatile tiers before we read them. */
-async function ensureFresh(lat: number, lon: number): Promise<void> {
+/**
+ * Ask the backend to top up the volatile tiers before we read them.
+ * Returns true if the call succeeded, false if it failed (network error or
+ * non-2xx). A false result means recent/forecast data may be stale.
+ */
+async function ensureFresh(lat: number, lon: number): Promise<boolean> {
   try {
     const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-    await fetch(apiUrl(`/api/ensure-fresh?${params}`));
+    const res = await fetch(apiUrl(`/api/ensure-fresh?${params}`));
+    return res.ok;
   } catch {
-    // If the refresh gate fails we still try to read whatever files exist —
-    // stale-but-present beats failing the whole load.
+    // Network error — still read whatever files exist in R2.
+    return false;
   }
 }
 
 const numOrNull = (s: string | undefined): number | null =>
   s === undefined || s === '' ? null : Number(s);
+
+export interface CellTimeline {
+  data: WeatherDataPoint[];
+  /** False when the ensure-fresh call to the Worker failed — recent/forecast data may be stale. */
+  forecastFresh: boolean;
+}
 
 /**
  * Load the full merged daily timeline for a snapped cell.
@@ -147,11 +158,11 @@ const numOrNull = (s: string | undefined): number | null =>
 export async function loadCellTimeline(
   rawLat: number,
   rawLon: number
-): Promise<WeatherDataPoint[]> {
+): Promise<CellTimeline> {
   const lat = snap(rawLat);
   const lon = snap(rawLon);
 
-  await ensureFresh(lat, lon);
+  const forecastFresh = await ensureFresh(lat, lon);
 
   const [archive, recent, forecast] = await Promise.all([
     fetchTier('archive', lat, lon),
@@ -189,5 +200,8 @@ export async function loadCellTimeline(
   // recent/forecast points.
   cellHasArchive.set(cellKey(lat, lon), archive.length > 0);
 
-  return [...byDate.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
+  return {
+    data: [...byDate.values()].sort((a, b) => a.date.getTime() - b.date.getTime()),
+    forecastFresh,
+  };
 }

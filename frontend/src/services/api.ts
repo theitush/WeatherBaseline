@@ -59,7 +59,7 @@ export async function getTemperatureHistory(
   // No horizon guard here: the date picker already caps selection to the cell's
   // real last available date (which varies by timezone), so anything that
   // reaches this point is in-range. Dates with no data just filter to empty.
-  const timeline = await loadCellTimeline(latitude, longitude);
+  const { data: timeline } = await loadCellTimeline(latitude, longitude);
   return timeline.filter((d) => withinSeasonalWindow(d.date, targetDt, daysRange));
 }
 
@@ -73,7 +73,8 @@ export async function getCellYearTimeline(
   latitude: number,
   longitude: number
 ): Promise<WeatherDataPoint[]> {
-  return loadCellTimeline(latitude, longitude);
+  const { data } = await loadCellTimeline(latitude, longitude);
+  return data;
 }
 
 /** A coarse location guessed from the visitor's IP, for a bare-root visit. */

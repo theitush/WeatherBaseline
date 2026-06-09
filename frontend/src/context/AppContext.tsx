@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
-import { getTemperatureHistory, getCellYearTimeline, geolocateByIp } from '../services/api';
-import { getCellHasArchive } from '../services/tieredData';
+import { geolocateByIp, parseDate, addDays } from '../services/api';
+import { loadCellTimeline, getCellHasArchive } from '../services/tieredData';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
@@ -55,6 +55,11 @@ interface AppState {
   // error, since every clickable location WILL have data once the download
   // finishes.
   archivePending: boolean;
+
+  // True when the last ensure-fresh call to the Worker failed — recent/forecast
+  // data may be stale. The banner lets the user dismiss or retry.
+  forecastUnavailable: boolean;
+  dismissForecastWarning: () => void;
 
   // Actions
   fetchData: () => Promise<void>;
@@ -123,28 +128,37 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [archivePending, setArchivePending] = useState<boolean>(false);
+  const [forecastUnavailable, setForecastUnavailable] = useState<boolean>(false);
+  const [forecastWarningDismissed, setForecastWarningDismissed] = useState<boolean>(false);
 
   // Fetch weather data
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     setArchivePending(false);
+    setForecastWarningDismissed(false);
 
     try {
       console.log('Fetching data for:', location, currentDate);
 
-      // The seasonal slice (for the charts) and the full year timeline (for the
-      // radial chart) share the same cached archive, so this is one download.
-      const [data, timeline] = await Promise.all([
-        getTemperatureHistory(
-          location.lat,
-          location.lon,
-          currentDate,
-          1940,
-          CONFIG.chart.seasonalWindowDays
-        ),
-        getCellYearTimeline(location.lat, location.lon),
-      ]);
+      // One loadCellTimeline call: archive cached, ensure-fresh runs once,
+      // forecastFresh tells us whether the Worker was reachable.
+      const { data: timeline, forecastFresh } = await loadCellTimeline(
+        location.lat,
+        location.lon
+      );
+      setForecastUnavailable(!forecastFresh);
+
+      // Seasonal slice for charts: filter the full timeline to ±seasonalWindowDays.
+      const targetDt = parseDate(currentDate);
+      const daysRange = CONFIG.chart.seasonalWindowDays;
+      const data = timeline.filter((d) => {
+        const year = d.date.getFullYear();
+        const targetThisYear = new Date(year, targetDt.getMonth(), targetDt.getDate());
+        const start = addDays(targetThisYear, -daysRange);
+        const end = addDays(targetThisYear, daysRange);
+        return d.date >= start && d.date <= end;
+      });
 
       // A servable cell whose archive we haven't backfilled yet: it may have a
       // few forecast rows but no settled history, so there's nothing meaningful
@@ -167,7 +181,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       // Update full data
       setFullData(data);
-      setYearTimeline(timeline);
+      setYearTimeline(timeline); // full unfiltered timeline for radial chart
 
       // Get available years
       const years = getAvailableYears(data);
@@ -233,6 +247,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     },
     [fullData, fullYearlyAggregates, currentDate, currentMetric]
   );
+
+  const dismissForecastWarning = useCallback(() => {
+    setForecastWarningDismissed(true);
+  }, []);
 
   // Refresh data (re-fetch)
   const refreshData = useCallback(async () => {
@@ -344,6 +362,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     loading,
     error,
     archivePending,
+    forecastUnavailable: forecastUnavailable && !forecastWarningDismissed,
+    dismissForecastWarning,
     fetchData,
     refreshData,
   };
