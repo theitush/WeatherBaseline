@@ -4,6 +4,7 @@
   padding: 0.5rem 0 0;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   text-align: center;
+  min-height: 3.5rem;
 }
 
 .sig-heading {

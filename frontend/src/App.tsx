@@ -177,24 +177,6 @@ const AppContent: React.FC = () => {
               />
             </section>
 
-            {/* Section 1.5 — the year at a glance (radial) */}
-            <section className="page-section">
-              <div className="chart-title">
-                Historical {metricQuestionLabel[currentMetric]}
-                {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
-              </div>
-              <RadialLegend metric={currentMetric} currentDate={currentDate} />
-              <div className="radial-chart-row">
-                <YearRadialChart
-                  fullData={yearTimeline}
-                  currentMetric={currentMetric}
-                  currentDate={currentDate}
-                  width={isMobile ? mobileWidth : 460}
-                  height={isMobile ? mobileWidth : 460}
-                />
-              </div>
-            </section>
-
             {/* Section 2 — the full record */}
             <section className="page-section">
               <header className="section-header" />
@@ -247,11 +229,6 @@ const AppContent: React.FC = () => {
 
             {/* Section 3 — recent-memory trend */}
             <section className="page-section">
-              <header className="section-header">
-                <p className="section-subtitle">
-                  Did the median {metricQuestionLabel[currentMetric]} change?
-                </p>
-              </header>
               <div className="chart-title">{formatChartTitle(currentDate)}</div>
               <PeriodLegend metric={currentMetric} />
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
@@ -279,6 +256,25 @@ const AppContent: React.FC = () => {
                 loading={significance.loading}
                 currentMetric={currentMetric}
               />
+            </section>
+
+            {/* Section 3.5 — the year at a glance (radial) */}
+            <section className="page-section">
+              <div className="chart-title">
+                {metricQuestionLabel[currentMetric].replace(/^\w/, c => c.toUpperCase())}
+                {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
+                {` (1950–${new Date().getFullYear()})`}
+              </div>
+              <RadialLegend metric={currentMetric} currentDate={currentDate} />
+              <div className="radial-chart-row">
+                <YearRadialChart
+                  fullData={yearTimeline}
+                  currentMetric={currentMetric}
+                  currentDate={currentDate}
+                  width={isMobile ? mobileWidth : 460}
+                  height={isMobile ? mobileWidth : 460}
+                />
+              </div>
             </section>
 
             {/* Section 4 — FAQ */}

@@ -67,10 +67,12 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, 
           const dir = diff >= 0 ? METRIC_NOUN[currentMetric] : METRIC_NOUN_NEG[currentMetric];
           return (
             <div className="sig-body">
-              <div className="sig-verdict">{line}</div>
               <p className="sig-explain">
                 {statLabel} of {newest.label} is {Math.abs(diff).toFixed(1)} {unit} {dir} than {statLabel.toLowerCase()} of {oldest.label}
-                {' '}(p&nbsp;=&nbsp;{fmtP(result.pValue)}).
+                {result.pValue >= 0.05
+                  ? <>, but the result is not significant (p&nbsp;=&nbsp;{fmtP(result.pValue)}).</>
+                  : <>{' '}(p&nbsp;=&nbsp;{fmtP(result.pValue)}).</>
+                }
               </p>
             </div>
           );
