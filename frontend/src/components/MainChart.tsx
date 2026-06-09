@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, axisLabel } from '../utils/units';
+import { convert, unitLabel, axisLabel, axisPad } from '../utils/units';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -92,8 +92,9 @@ const MainChart: React.FC<MainChartProps> = ({
     // mobile where the two x-axes sit one above the other and must line up.
     const nonNegative =
       currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
-    const tempLo = nonNegative ? Math.max(0, minVal - 2) : minVal - 2;
-    const tempHi = maxVal + 2;
+    const pad = axisPad(currentMetric, system, maxVal - minVal);
+    const tempLo = nonNegative ? Math.max(0, minVal - pad) : minVal - pad;
+    const tempHi = maxVal + pad;
 
     // timeScale maps date → its axis pixel; tempScale maps temp → its axis pixel.
     // Orientation only changes which axis (x vs y) each one drives.

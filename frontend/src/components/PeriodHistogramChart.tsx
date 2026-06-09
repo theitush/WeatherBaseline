@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, axisLabel, binWidth } from '../utils/units';
+import { convert, unitLabel, axisLabel, binWidth, axisPad } from '../utils/units';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
@@ -187,10 +187,11 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // bins and axis ticks).
     const nonNegative = currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
 
-    // Axis domain matches the main chart's tempScale exactly ([min-2, max+2]
-    // with the same ≥0 floor) so the two x-axes line up on mobile.
-    const domainLo = nonNegative ? Math.max(0, axisMin - 2) : axisMin - 2;
-    const domainHi = axisMax + 2;
+    // Axis domain matches the main chart's tempScale exactly (same pad formula,
+    // same ≥0 floor) so the two x-axes line up on mobile.
+    const pad = axisPad(currentMetric, system, axisMax - axisMin);
+    const domainLo = nonNegative ? Math.max(0, axisMin - pad) : axisMin - pad;
+    const domainHi = axisMax + pad;
 
     // Shared temp axis (x) across all three panels.
     const tempScale = d3.scaleLinear().domain([domainLo, domainHi]).range([0, width]);

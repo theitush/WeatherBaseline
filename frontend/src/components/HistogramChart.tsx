@@ -6,7 +6,7 @@ import CONFIG from '../utils/config';
 import { comparablePool } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, binWidth } from '../utils/units';
+import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -85,8 +85,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const [minVal, maxVal] = d3.extent(axisValues) as [number, number];
     const nonNegative =
       currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
-    const domLo = nonNegative ? Math.max(0, minVal - 2) : minVal - 2;
-    const domHi = maxVal + 2;
+    const pad = axisPad(currentMetric, system, maxVal - minVal);
+    const domLo = nonNegative ? Math.max(0, minVal - pad) : minVal - pad;
+    const domHi = maxVal + pad;
 
     // Temp scale: vertical-orientation puts temp on X (left→right);
     // horizontal-orientation keeps temp on Y (bottom→top, original).

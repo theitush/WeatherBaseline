@@ -87,9 +87,13 @@ const MAX_BINS = 50;
  *   imperial: 1 / 2 / 5 / 10 °F
  * Pass span = 0 (or omit) to get the finest width.
  *
- * Other metrics keep clean fixed widths (round in both systems):
- *   precipitation 1 mm / 0.05 in  (1 mm ≈ 0.039 in)
- *   wind         0.5 m/s / 1 mph  (0.5 m/s ≈ 1.12 mph)
+ * Precipitation is also adaptive — the ladder ensures narrow ranges (a dry
+ * climate with 0–5 mm) get fine 0.25/0.5 mm bins while wet climates stay tidy:
+ *   metric:   0.25 / 0.5 / 1 / 2 / 5 / 10 mm
+ *   imperial: 0.05 / 0.1 / 0.25 / 0.5 / 1 in
+ *
+ * Wind keeps a fixed width:
+ *   0.5 m/s / 1 mph
  */
 export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): number {
   if (isTemp(metric)) {
@@ -99,9 +103,33 @@ export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): numbe
     }
     return ladder[ladder.length - 1];
   }
-  if (metric === 'precipitation_sum') return system === 'imperial' ? 0.05 : 1.0;
+  if (metric === 'precipitation_sum') {
+    const ladder = system === 'imperial'
+      ? [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1]
+      : [0.1, 0.2, 0.5, 1, 5, 10];
+    for (const w of ladder) {
+      if (span <= 0 || span / w <= MAX_BINS) return w;
+    }
+    return ladder[ladder.length - 1];
+  }
   if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 1.0 : 0.5;
   return 0.5;
+}
+
+/**
+ * Axis padding (in display units) to add above the max (and below the min for
+ * signed metrics). For temperature the traditional ±2° looks right; for
+ * precipitation/wind we use ~15 % of the data span so a narrow range (0–3 mm)
+ * doesn't end up with a fixed 2-unit cliff on each side.
+ *
+ * The minimum pad is one bin-width so there's always breathing room above the
+ * tallest bar, scaled to the unit system (0.25 mm / 0.05 in for precip).
+ */
+export function axisPad(metric: MetricKey, system: UnitSystem, dataSpan: number): number {
+  if (isTemp(metric)) return 2;
+  const minPad = binWidth(metric, system); // finest bin width = natural minimum step
+  const pct = Math.ceil(dataSpan * 0.15 / minPad) * minPad;
+  return Math.max(minPad, pct);
 }
 
 // ---- distance (location search) -------------------------------------------
