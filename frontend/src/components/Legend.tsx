@@ -19,10 +19,10 @@ const ordinal = (n: number): string => {
 };
 
 // Legend for the radial dial: only the marks it actually draws. The wedge label
-// names the actual window, e.g. "Jun 6th ±5 days".
+// names the actual window, e.g. "Jun 6th ±3 days".
 export const getRadialLegendData = (metric: MetricKey, currentDate: string): LegendItem[] => {
   const dt = new Date(currentDate + 'T00:00:00');
-  const windowLabel = `${MONTHS[dt.getMonth()]} ${ordinal(dt.getDate())} ±5 days`;
+  const windowLabel = `${MONTHS[dt.getMonth()]} ${ordinal(dt.getDate())} ±${CONFIG.chart.seasonalWindowDays} days`;
   return [
     { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },

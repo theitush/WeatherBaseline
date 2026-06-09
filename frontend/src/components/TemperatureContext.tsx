@@ -11,7 +11,7 @@ interface TemperatureContextProps {
   currentTemp: number | null;
   filteredData: WeatherDataPoint[];
   // Full daily record (every day, all years) for the cell — used to test whether
-  // today is a top-1/2/3 value across the ENTIRE record, not just its ±5-day window.
+  // today is a top-1/2/3 value across the ENTIRE record, not just its ±N-day window.
   yearTimeline: WeatherDataPoint[];
   currentMetric: MetricKey;
   currentDate: string;
@@ -86,7 +86,7 @@ const DEAD_CENTER_LINE = [
 // Verdict banks answering "How extreme is this weather?" — random per render.
 // #1-on-record gets the exclusive "Record-breaker!" (handled separately).
 const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!'];
-// Reserved for a top-1/2/3 value across the WHOLE record (not just its ±5-day
+// Reserved for a top-1/2/3 value across the WHOLE record (not just its ±N-day
 // window) — the rarest thing the page can show, so the lines go big.
 const VERDICT_ALLTIME_1 = ['For the ages.', 'Nothing tops this.', 'The all-time benchmark.', 'History, made.'];
 const VERDICT_ALLTIME_23 = ['Practically unheard of.', 'A page in the record books.', 'Almost legendary.', 'Rarefied air.'];
@@ -247,7 +247,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
       rank = isHighSide ? atOrAboveN : atOrBelowN;
       // All-time rank: same competition-rank logic, but against EVERY day of the
-      // whole record (not just the ±5-day window). A top-1/2/3 here means the
+      // whole record (not just the ±N-day window). A top-1/2/3 here means the
       // value is, e.g., the hottest day this cell has ever seen on ANY date — far
       // rarer than topping its calendar neighbours, so it earns louder prose +
       // 5× confetti. Reuse today's side (isHighSide) so "hottest/coldest" agrees.
@@ -264,7 +264,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       }
       // Name the actual comparison pool: every day within a ±seasonalWindowDays
       // calendar window of the target date, across all years back to 1950. Spell
-      // out the window and date ("within ±5 days of June 6th") rather than the
+      // out the window and date ("within ±N days of June 6th") rather than the
       // vaguer "this time of year".
       const win = CONFIG.chart.seasonalWindowDays;
       const td = new Date(currentDate + 'T12:00:00');

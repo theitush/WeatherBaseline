@@ -170,7 +170,7 @@ const CONFIG: Config = {
     windowSize: 5, // Moving average window
     histogramThresholds: 30,
     tempMargin: 2, // Temperature scale margin
-    seasonalWindowDays: 5 // ±days-of-year window around the target date
+    seasonalWindowDays: 3 // ±days-of-year window around the target date
   },
 
   // ==========================================

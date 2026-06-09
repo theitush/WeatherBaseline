@@ -409,7 +409,7 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
-                  <summary>Why ±5 days?</summary>
+                  <summary>Why ±{CONFIG.chart.seasonalWindowDays} days?</summary>
                   <div className="faq-body">
                     <p>
                       To say whether a given day was extreme, you need something to
@@ -423,18 +423,22 @@ const AppContent: React.FC = () => {
                     <p>
                       But a single calendar day across ~75 years is only ~75 data
                       points, and any one of them can be a fluke. So we widen the
-                      slot to a <strong>±5-day window</strong> around your date — June
-                      5th pulls in May 31st through June 10th, every year. That's an
-                      order of magnitude more days to characterise "what this part of
+                      slot to a{' '}
+                      <strong>±{CONFIG.chart.seasonalWindowDays}-day window</strong>{' '}
+                      around your date — June 5th pulls in{' '}
+                      {CONFIG.chart.seasonalWindowDays} days before through{' '}
+                      {CONFIG.chart.seasonalWindowDays} days after, every year.
+                      That gives a richer sample to characterise "what this part of
                       the season normally does," which makes the percentiles and the
                       ranking far more stable.
                     </p>
                     <p>
-                      Five days is the sweet spot: wide enough to beat down the noise,
-                      but narrow enough that the weather hasn't meaningfully drifted
-                      into a different season. The climate barely moves across eleven
-                      days, so you're still comparing apples to apples — which is
-                      exactly what lets the answer to "how extreme was <em>this</em>{' '}
+                      The window is wide enough to beat down the noise, but narrow
+                      enough that the weather hasn't meaningfully drifted into a
+                      different season. The climate barely moves across{' '}
+                      {CONFIG.chart.seasonalWindowDays * 2 + 1} days, so you're
+                      still comparing apples to apples — which is exactly what lets
+                      the answer to "how extreme was <em>this</em>{' '}
                       weather?" actually mean something.
                     </p>
                   </div>

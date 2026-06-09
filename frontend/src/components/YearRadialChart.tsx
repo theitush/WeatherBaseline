@@ -106,13 +106,13 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       return [r * Math.cos(a), r * Math.sin(a)];
     };
 
-    // ±5-day comparison window around the target day, as a fraction of a turn.
+    // ±seasonalWindowDays comparison window around the target day, as a fraction of a turn.
     // Drives both the faint wedge and the brightened in-window dots on canvas.
-    const WINDOW_DAYS = 5;
+    const WINDOW_DAYS = CONFIG.chart.seasonalWindowDays;
     const windowFrac = WINDOW_DAYS / 365;
 
     // Faint wedge straddling the top of the dial, behind everything else, so the
-    // ±5-day window reads as a sector of the year. Arc angles are clockwise from
+    // ±N-day window reads as a sector of the year. Arc angles are clockwise from
     // 12 o'clock, so the window is symmetric about 0.
     const windowArc = d3
       .arc<unknown>()
