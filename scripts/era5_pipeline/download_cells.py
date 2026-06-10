@@ -386,6 +386,51 @@ def batches(years: list[int], batch_years: int) -> list[tuple[int, int]]:
     return spans
 
 
+def resolve_land_indices(
+    finite_mask: np.ndarray,
+    lats: np.ndarray,
+    lons: np.ndarray,
+    targets: list[tuple[float, float]],
+) -> list[tuple[int, int] | None]:
+    """Map each (target_lat, target_lon) to a (row, col) index into a tile window
+    that has LAND data, snapping off ocean.
+
+    ERA5-Land is land-only: ocean gridpoints are NaN. A coastal city's nearest
+    0.1deg gridpoint can be just offshore (NaN), which the old plain-nearest snap
+    extracted as an all-blank archive (Finding F1). Here we snap to the nearest
+    gridpoint and, IF that cell is ocean, fall back to the geometrically closest
+    LAND cell in the window.
+
+    `finite_mask` is the land mask: True where the cell has finite data (over the
+    period being processed), shaped (n_lat, n_lon). `lats`/`lons` are the window's
+    1-D coordinate arrays (any monotonic ordering). Returns one entry per target:
+    a (row, col) index into the window, or None if the whole window is ocean
+    (no land to fall back to — the caller logs and skips it rather than writing a
+    blank or a far-away value).
+
+    Inland cells whose nearest gridpoint is already land resolve to exactly that
+    nearest index, so the snap is a no-op everywhere it was already correct.
+    """
+    land = np.argwhere(finite_mask)  # (k, 2) rows of [row, col] land cells
+    out: list[tuple[int, int] | None] = []
+    for tlat, tlon in targets:
+        li = int(np.abs(lats - tlat).argmin())
+        ci = int(np.abs(lons - tlon).argmin())
+        if finite_mask[li, ci]:
+            out.append((li, ci))  # nearest gridpoint is land — plain nearest
+            continue
+        if land.size == 0:
+            out.append(None)  # window is all ocean — nothing to snap to
+            continue
+        # nearest LAND cell by grid (index) distance — the window is ~6deg, so
+        # row/col steps are near-equal-area; squared index distance is the right
+        # tie-break and far cheaper than a haversine over every land cell.
+        d2 = (land[:, 0] - li) ** 2 + (land[:, 1] - ci) ** 2
+        bi, bj = land[int(d2.argmin())]
+        out.append((int(bi), int(bj)))
+    return out
+
+
 def process_span(
     ds,
     tile_id: str,
@@ -481,6 +526,34 @@ def process_span(
     wind_hourly = np.sqrt(raw["u10"] ** 2 + raw["v10"] ** 2)
     t2m_hourly = raw["t2m"]
 
+    # --- nearest-LAND snap (Finding F1) ---------------------------------------
+    # ERA5-Land is land-only (ocean cells are NaN). A coastal cell's nearest
+    # gridpoint can be just offshore — the old per-cell .sel(method="nearest")
+    # then extracted an all-blank archive. Build a land mask (any finite t2m over
+    # the span — a cell that's ever finite is land) and resolve each target cell
+    # to a real land gridpoint index, snapping off ocean. We then select by
+    # INTEGER index (.isel) below instead of coordinate-nearest .sel.
+    land_mask = np.isfinite(t2m_hourly).any(dim=time_name).values
+    win_lats = t2m_hourly[lat_name].values
+    win_lons = t2m_hourly[lon_name].values
+    targets = [(c["lat"], float(slon)) for c, slon in zip(tile_cells, sel_lons)]
+    cell_idx = resolve_land_indices(land_mask, win_lats, win_lons, targets)
+    n_snapped = sum(
+        1 for (c, slon), idx in zip(zip(tile_cells, sel_lons), cell_idx)
+        if idx is not None
+        and idx != (int(np.abs(win_lats - c["lat"]).argmin()),
+                    int(np.abs(win_lons - float(slon)).argmin()))
+    )
+    n_empty = sum(1 for idx in cell_idx if idx is None)
+    if n_snapped or n_empty:
+        log(f"  tile {tile_id} | years {span}: land snap — {n_snapped} cell(s) "
+            f"snapped off ocean to nearest land"
+            + (f", {n_empty} cell(s) had NO land in window (skipped)"
+               if n_empty else ""))
+    # index into the window for each cell (row, col), keyed by (lat, lon)
+    idx_by_cell = {(c["lat"], c["lon"]): idx
+                   for c, idx in zip(tile_cells, cell_idx)}
+
     def solar_offset_hours(lon_deg: float) -> int:
         """Whole-hour local solar offset for a longitude in [-180, 180]."""
         lon180 = ((lon_deg + 180.0) % 360.0) - 180.0
@@ -513,13 +586,20 @@ def process_span(
         dates = pd.to_datetime(t2m_max[time_name].values).date
 
         for c, slon in members:
-            sel = {lat_name: c["lat"], lon_name: float(slon)}
+            idx = idx_by_cell[(c["lat"], c["lon"])]
+            if idx is None:
+                # No land anywhere in this tile window — don't write a blank
+                # archive (that's the very F1 symptom). Skip; the cell stays
+                # absent and is logged above.
+                continue
+            row, col = idx
+            sel = {lat_name: row, lon_name: col}
             frame = pd.DataFrame({
                 "date": dates,
-                "tmax_C": np.round(t2m_max.sel(sel, method="nearest").values - 273.15, 3),
-                "tmin_C": np.round(t2m_min.sel(sel, method="nearest").values - 273.15, 3),
-                "precip_mm": np.round(tp_sum.sel(sel, method="nearest").values * 1000.0, 3),
-                "wind_max_ms": np.round(wind_max.sel(sel, method="nearest").values, 3),
+                "tmax_C": np.round(t2m_max.isel(sel).values - 273.15, 3),
+                "tmin_C": np.round(t2m_min.isel(sel).values - 273.15, 3),
+                "precip_mm": np.round(tp_sum.isel(sel).values * 1000.0, 3),
+                "wind_max_ms": np.round(wind_max.isel(sel).values, 3),
             }).sort_values("date")
             frames[(c["lat"], c["lon"])] = frame[
                 ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]

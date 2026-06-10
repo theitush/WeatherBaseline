@@ -1,0 +1,3292 @@
+{
+  "size_threshold": 100000,
+  "mask_day": "2020-06-15T12:00:00",
+  "n_blank": 342,
+  "n_mapped": 341,
+  "n_no_land": 1,
+  "no_land_cells": [
+    [
+      4.2,
+      73.5
+    ]
+  ],
+  "missing_from_cells_csv": [],
+  "snap_distance_hist": {
+    "1": 328,
+    "2": 11,
+    "3": 1,
+    "5": 1
+  },
+  "collisions_land_target_shared": {
+    "19.0,72.9": 2,
+    "14.8,-17.3": 5,
+    "10.0,76.3": 2,
+    "10.3,76.2": 2,
+    "1.4,103.9": 2,
+    "-12.0,-77.1": 2,
+    "-12.9,-38.4": 2,
+    "-22.9,-43.3": 3,
+    "37.5,126.7": 2,
+    "35.3,139.6": 2,
+    "32.8,35.0": 2,
+    "31.2,30.0": 2,
+    "26.2,50.5": 2,
+    "29.3,48.0": 2
+  },
+  "collisions_onto_existing_cell": [
+    "-37.8,145.0",
+    "-36.9,174.8",
+    "-34.8,-56.1",
+    "-34.7,-58.4",
+    "-34.0,18.5",
+    "-34.0,18.6",
+    "-34.0,18.7",
+    "-33.0,-71.5",
+    "-23.9,-46.4",
+    "-22.9,-43.4",
+    "-22.9,-43.3",
+    "-20.3,-40.3",
+    "-20.2,-40.3",
+    "-15.2,12.2",
+    "-12.9,-38.4",
+    "-12.1,-77.0",
+    "-12.0,-77.1",
+    "-11.2,13.9",
+    "-9.6,-35.8",
+    "-9.4,147.2",
+    "-8.8,13.3",
+    "-8.5,115.3",
+    "-8.0,-34.9",
+    "-7.3,112.8",
+    "-7.2,-34.9",
+    "-7.1,-34.9",
+    "-6.9,109.6",
+    "-6.8,39.2",
+    "-6.7,108.5",
+    "-6.4,108.3",
+    "-6.2,12.4",
+    "-6.2,106.9",
+    "-6.1,106.7",
+    "-5.8,-35.3",
+    "-5.2,119.5",
+    "-5.1,119.5",
+    "-4.0,39.7",
+    "-3.8,-38.5",
+    "-2.5,-44.2",
+    "-1.3,-48.5",
+    "0.1,-51.1",
+    "0.4,9.5",
+    "1.1,104.0",
+    "1.4,103.7",
+    "1.4,103.9",
+    "1.5,124.9",
+    "2.1,45.3",
+    "2.1,45.4",
+    "2.3,102.2",
+    "5.0,-1.7",
+    "5.3,-3.9",
+    "5.6,-0.3",
+    "5.6,-0.2",
+    "5.7,-0.1",
+    "6.2,1.2",
+    "6.3,-10.7",
+    "6.4,-10.8",
+    "6.5,3.3",
+    "8.3,77.2",
+    "8.4,-13.2",
+    "8.5,-13.2",
+    "9.1,-79.5",
+    "9.8,76.3",
+    "10.0,76.3",
+    "10.1,76.3",
+    "10.2,-64.6",
+    "10.3,76.2",
+    "10.3,123.8",
+    "10.4,123.9",
+    "10.4,124.0",
+    "10.5,76.1",
+    "10.7,-71.6",
+    "10.9,75.9",
+    "11.8,75.5",
+    "12.9,45.0",
+    "12.9,74.9",
+    "13.0,80.2",
+    "13.1,80.2",
+    "13.2,80.2",
+    "13.4,-16.7",
+    "14.0,121.6",
+    "14.2,121.1",
+    "14.2,121.4",
+    "14.4,120.9",
+    "14.5,-17.0",
+    "14.5,121.1",
+    "14.6,121.0",
+    "14.8,-17.3",
+    "14.8,43.0",
+    "14.8,120.9",
+    "14.9,120.8",
+    "15.0,120.6",
+    "15.0,120.7",
+    "16.1,120.5",
+    "18.5,-70.0",
+    "19.0,72.9",
+    "19.2,-96.2",
+    "19.2,72.8",
+    "19.4,72.8",
+    "19.9,85.8",
+    "21.1,72.7",
+    "21.2,-86.9",
+    "21.3,110.4",
+    "21.7,39.1",
+    "21.9,91.9",
+    "22.2,91.9",
+    "22.2,113.5",
+    "22.4,113.6",
+    "22.4,114.1",
+    "22.6,114.0",
+    "22.7,113.8",
+    "22.7,120.3",
+    "23.3,-106.4",
+    "23.5,116.8",
+    "24.7,118.1",
+    "24.7,118.6",
+    "24.9,67.0",
+    "24.9,67.1",
+    "24.9,67.2",
+    "25.2,55.3",
+    "25.2,118.9",
+    "25.3,55.4",
+    "25.4,55.5",
+    "26.2,50.5",
+    "26.4,50.2",
+    "26.5,50.0",
+    "27.6,120.6",
+    "28.2,121.0",
+    "29.3,48.0",
+    "29.6,35.0",
+    "30.8,121.3",
+    "31.1,29.8",
+    "31.2,30.0",
+    "31.2,30.1",
+    "31.2,32.3",
+    "31.4,34.4",
+    "31.5,121.2",
+    "31.7,34.6",
+    "31.8,34.7",
+    "32.0,34.7",
+    "32.1,34.8",
+    "32.3,34.9",
+    "32.6,35.0",
+    "32.8,35.0",
+    "33.0,35.1",
+    "33.1,35.2",
+    "33.3,35.3",
+    "33.4,35.4",
+    "33.6,-7.7",
+    "33.8,35.5",
+    "33.8,132.8",
+    "34.0,35.6",
+    "34.4,135.4",
+    "34.8,135.3",
+    "34.8,135.4",
+    "35.3,139.6",
+    "35.4,139.2",
+    "36.7,3.2",
+    "36.7,3.3",
+    "36.8,3.0",
+    "36.9,7.7",
+    "36.9,10.3",
+    "37.0,30.7",
+    "37.4,126.8",
+    "37.5,126.7",
+    "37.8,-122.4",
+    "37.9,-122.3",
+    "38.0,23.7",
+    "38.5,27.1",
+    "39.1,117.7",
+    "39.3,117.8",
+    "40.0,119.6",
+    "40.7,22.9",
+    "40.8,-74.1",
+    "40.9,14.2",
+    "40.9,14.3",
+    "40.9,29.3",
+    "41.0,-73.8",
+    "41.0,29.1",
+    "41.0,29.2",
+    "41.5,2.2",
+    "53.4,-6.2",
+    "55.7,12.5"
+  ],
+  "mapping": {
+    "21.6,69.6": {
+      "old_lat": 21.6,
+      "old_lon": 69.6,
+      "land_lat": 21.7,
+      "land_lon": 69.6,
+      "tile_id": "10_10",
+      "snap_cells": 1,
+      "old_name": "Porbandar, India"
+    },
+    "24.8,67.0": {
+      "old_lat": 24.8,
+      "old_lon": 67.0,
+      "land_lat": 24.9,
+      "land_lon": 67.0,
+      "tile_id": "10_10",
+      "snap_cells": 1,
+      "old_name": "Karachi, Sindh, Pakistan"
+    },
+    "24.8,67.1": {
+      "old_lat": 24.8,
+      "old_lon": 67.1,
+      "land_lat": 24.9,
+      "land_lon": 67.1,
+      "tile_id": "10_10",
+      "snap_cells": 1,
+      "old_name": "Pakistan Employees Cooperative Housing Society, Karachi, Pakistan"
+    },
+    "24.8,67.2": {
+      "old_lat": 24.8,
+      "old_lon": 67.2,
+      "land_lat": 24.9,
+      "land_lon": 67.2,
+      "tile_id": "10_10",
+      "snap_cells": 1,
+      "old_name": "Malir Cantonment, Sindh, Pakistan"
+    },
+    "19.8,72.7": {
+      "old_lat": 19.8,
+      "old_lon": 72.7,
+      "land_lat": 19.9,
+      "land_lon": 72.7,
+      "tile_id": "10_11",
+      "snap_cells": 1,
+      "old_name": "Boisar, Maharashtra, India"
+    },
+    "21.1,72.6": {
+      "old_lat": 21.1,
+      "old_lon": 72.6,
+      "land_lat": 21.1,
+      "land_lon": 72.7,
+      "tile_id": "10_11",
+      "snap_cells": 1,
+      "old_name": "Hajira INA, Gujarat, India"
+    },
+    "19.8,85.8": {
+      "old_lat": 19.8,
+      "old_lon": 85.8,
+      "land_lat": 19.9,
+      "land_lon": 85.8,
+      "tile_id": "10_13",
+      "snap_cells": 1,
+      "old_name": "Puri, India"
+    },
+    "21.6,87.5": {
+      "old_lat": 21.6,
+      "old_lon": 87.5,
+      "land_lat": 21.7,
+      "land_lon": 87.5,
+      "tile_id": "10_13",
+      "snap_cells": 1,
+      "old_name": "Digha, West Bengal, India"
+    },
+    "21.8,91.9": {
+      "old_lat": 21.8,
+      "old_lon": 91.9,
+      "land_lat": 21.9,
+      "land_lon": 91.9,
+      "tile_id": "10_14",
+      "snap_cells": 1,
+      "old_name": "21.8, 91.9"
+    },
+    "22.1,91.9": {
+      "old_lat": 22.1,
+      "old_lon": 91.9,
+      "land_lat": 22.2,
+      "land_lon": 91.9,
+      "tile_id": "10_14",
+      "snap_cells": 1,
+      "old_name": "S\u0101tkania, Chittagong, Bangladesh"
+    },
+    "22.5,91.7": {
+      "old_lat": 22.5,
+      "old_lon": 91.7,
+      "land_lat": 22.6,
+      "land_lon": 91.7,
+      "tile_id": "10_14",
+      "snap_cells": 1,
+      "old_name": "H\u0101thaz\u0101ri, Chittagong, Bangladesh"
+    },
+    "20.3,110.2": {
+      "old_lat": 20.3,
+      "old_lon": 110.2,
+      "land_lat": 20.4,
+      "land_lon": 110.2,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Xucheng, China"
+    },
+    "21.2,110.4": {
+      "old_lat": 21.2,
+      "old_lon": 110.4,
+      "land_lat": 21.3,
+      "land_lon": 110.4,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Zhanjiang, Guangdong, China"
+    },
+    "21.5,111.2": {
+      "old_lat": 21.5,
+      "old_lon": 111.2,
+      "land_lat": 21.6,
+      "land_lon": 111.2,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Bohe, China"
+    },
+    "22.2,113.6": {
+      "old_lat": 22.2,
+      "old_lon": 113.6,
+      "land_lat": 22.2,
+      "land_lon": 113.5,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Macau, Macao"
+    },
+    "22.3,113.6": {
+      "old_lat": 22.3,
+      "old_lon": 113.6,
+      "land_lat": 22.4,
+      "land_lon": 113.6,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Zhuhai, Guangdong, China"
+    },
+    "22.3,114.1": {
+      "old_lat": 22.3,
+      "old_lon": 114.1,
+      "land_lat": 22.4,
+      "land_lon": 114.1,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Nam Cheong, Hong Kong"
+    },
+    "22.3,114.3": {
+      "old_lat": 22.3,
+      "old_lon": 114.3,
+      "land_lat": 22.4,
+      "land_lon": 114.3,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Tiu Keng Leng, Hong Kong"
+    },
+    "22.5,114.0": {
+      "old_lat": 22.5,
+      "old_lon": 114.0,
+      "land_lat": 22.6,
+      "land_lon": 114.0,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Shawei, China"
+    },
+    "22.6,113.8": {
+      "old_lat": 22.6,
+      "old_lon": 113.8,
+      "land_lat": 22.7,
+      "land_lon": 113.8,
+      "tile_id": "10_17",
+      "snap_cells": 1,
+      "old_name": "Gushu, China"
+    },
+    "22.6,120.3": {
+      "old_lat": 22.6,
+      "old_lon": 120.3,
+      "land_lat": 22.7,
+      "land_lon": 120.3,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Kaohsiung, Takao, Taiwan"
+    },
+    "22.8,115.8": {
+      "old_lat": 22.8,
+      "old_lon": 115.8,
+      "land_lat": 22.9,
+      "land_lon": 115.8,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Jieshi, China"
+    },
+    "22.9,115.6": {
+      "old_lat": 22.9,
+      "old_lon": 115.6,
+      "land_lat": 23.0,
+      "land_lon": 115.6,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Donghai, Guangdong, China"
+    },
+    "23.4,116.8": {
+      "old_lat": 23.4,
+      "old_lon": 116.8,
+      "land_lat": 23.5,
+      "land_lon": 116.8,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Chenghua, Guangdong, China"
+    },
+    "24.6,118.1": {
+      "old_lat": 24.6,
+      "old_lon": 118.1,
+      "land_lat": 24.7,
+      "land_lon": 118.1,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Yingcun, Liuwudiancun, China"
+    },
+    "24.6,118.6": {
+      "old_lat": 24.6,
+      "old_lon": 118.6,
+      "land_lat": 24.7,
+      "land_lon": 118.6,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Jinjing, China"
+    },
+    "24.9,121.0": {
+      "old_lat": 24.9,
+      "old_lon": 121.0,
+      "land_lat": 24.9,
+      "land_lon": 121.1,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Zhubei, Taiwan"
+    },
+    "25.1,118.9": {
+      "old_lat": 25.1,
+      "old_lon": 118.9,
+      "land_lat": 25.2,
+      "land_lon": 118.9,
+      "tile_id": "10_18",
+      "snap_cells": 1,
+      "old_name": "Luocheng, Fujian, China"
+    },
+    "21.3,-157.9": {
+      "old_lat": 21.3,
+      "old_lon": -157.9,
+      "land_lat": 21.4,
+      "land_lon": -157.9,
+      "tile_id": "10_31",
+      "snap_cells": 1,
+      "old_name": "Honolulu, United States"
+    },
+    "22.9,-109.9": {
+      "old_lat": 22.9,
+      "old_lon": -109.9,
+      "land_lat": 23.0,
+      "land_lon": -109.9,
+      "tile_id": "10_39",
+      "snap_cells": 1,
+      "old_name": "Cabo San Lucas, Mexico"
+    },
+    "23.2,-106.4": {
+      "old_lat": 23.2,
+      "old_lon": -106.4,
+      "land_lat": 23.3,
+      "land_lon": -106.4,
+      "tile_id": "10_39",
+      "snap_cells": 1,
+      "old_name": "Mazatl\u00e1n, Mexico"
+    },
+    "21.2,-86.8": {
+      "old_lat": 21.2,
+      "old_lon": -86.8,
+      "land_lat": 21.2,
+      "land_lon": -86.9,
+      "tile_id": "10_42",
+      "snap_cells": 1,
+      "old_name": "Canc\u00fan, Quintana Roo, Mexico"
+    },
+    "21.6,39.1": {
+      "old_lat": 21.6,
+      "old_lon": 39.1,
+      "land_lat": 21.7,
+      "land_lon": 39.1,
+      "tile_id": "10_6",
+      "snap_cells": 1,
+      "old_name": "Jeddah, Mecca Region, Saudi Arabia"
+    },
+    "25.2,51.6": {
+      "old_lat": 25.2,
+      "old_lon": 51.6,
+      "land_lat": 25.3,
+      "land_lon": 51.6,
+      "tile_id": "10_8",
+      "snap_cells": 1,
+      "old_name": "Al Ma\u0163\u0101r al \u2018At\u012bq, Doha, Qatar"
+    },
+    "25.2,55.2": {
+      "old_lat": 25.2,
+      "old_lon": 55.2,
+      "land_lat": 25.2,
+      "land_lon": 55.3,
+      "tile_id": "10_8",
+      "snap_cells": 1,
+      "old_name": "Business Bay, Dubai, United Arab Emirates"
+    },
+    "25.3,55.3": {
+      "old_lat": 25.3,
+      "old_lon": 55.3,
+      "land_lat": 25.3,
+      "land_lon": 55.4,
+      "tile_id": "10_8",
+      "snap_cells": 1,
+      "old_name": "Dayrah, United Arab Emirates"
+    },
+    "25.4,55.4": {
+      "old_lat": 25.4,
+      "old_lon": 55.4,
+      "land_lat": 25.4,
+      "land_lon": 55.5,
+      "tile_id": "10_8",
+      "snap_cells": 1,
+      "old_name": "Sharjah, United Arab Emirates"
+    },
+    "15.5,73.8": {
+      "old_lat": 15.5,
+      "old_lon": 73.8,
+      "land_lat": 15.6,
+      "land_lon": 73.8,
+      "tile_id": "11_11",
+      "snap_cells": 1,
+      "old_name": "Panjim, India"
+    },
+    "17.0,73.3": {
+      "old_lat": 17.0,
+      "old_lon": 73.3,
+      "land_lat": 17.1,
+      "land_lon": 73.3,
+      "tile_id": "11_11",
+      "snap_cells": 1,
+      "old_name": "Ratnagiri, India"
+    },
+    "18.9,72.8": {
+      "old_lat": 18.9,
+      "old_lon": 72.8,
+      "land_lat": 19.0,
+      "land_lon": 72.9,
+      "tile_id": "11_11",
+      "snap_cells": 2,
+      "old_name": "Kegaon, India"
+    },
+    "19.0,72.8": {
+      "old_lat": 19.0,
+      "old_lon": 72.8,
+      "land_lat": 19.0,
+      "land_lon": 72.9,
+      "tile_id": "11_11",
+      "snap_cells": 1,
+      "old_name": "Dh\u0101r\u0101vi, Mumbai, Maharashtra, India"
+    },
+    "19.1,72.8": {
+      "old_lat": 19.1,
+      "old_lon": 72.8,
+      "land_lat": 19.2,
+      "land_lon": 72.8,
+      "tile_id": "11_11",
+      "snap_cells": 1,
+      "old_name": "Dh\u0101r\u0101vi, Mumbai, Maharashtra, India"
+    },
+    "19.3,72.8": {
+      "old_lat": 19.3,
+      "old_lon": 72.8,
+      "land_lat": 19.4,
+      "land_lon": 72.8,
+      "tile_id": "11_11",
+      "snap_cells": 1,
+      "old_name": "Bhayandar, Maharashtra, India"
+    },
+    "15.8,80.4": {
+      "old_lat": 15.8,
+      "old_lon": 80.4,
+      "land_lat": 15.9,
+      "land_lon": 80.4,
+      "tile_id": "11_12",
+      "snap_cells": 1,
+      "old_name": "Ch\u012br\u0101la, India"
+    },
+    "17.7,83.3": {
+      "old_lat": 17.7,
+      "old_lon": 83.3,
+      "land_lat": 17.8,
+      "land_lon": 83.3,
+      "tile_id": "11_13",
+      "snap_cells": 1,
+      "old_name": "Rasap\u016bdipalem, India"
+    },
+    "16.1,108.2": {
+      "old_lat": 16.1,
+      "old_lon": 108.2,
+      "land_lat": 16.1,
+      "land_lon": 108.1,
+      "tile_id": "11_16",
+      "snap_cells": 1,
+      "old_name": "Da Nang, Da Nang City, Vietnam"
+    },
+    "19.0,105.6": {
+      "old_lat": 19.0,
+      "old_lon": 105.6,
+      "land_lat": 19.1,
+      "land_lon": 105.6,
+      "tile_id": "11_16",
+      "snap_cells": 1,
+      "old_name": "Di\u1ec5n Th\u00e0nh, Vietnam"
+    },
+    "13.9,120.9": {
+      "old_lat": 13.9,
+      "old_lon": 120.9,
+      "land_lat": 14.0,
+      "land_lon": 120.9,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Taal, Philippines"
+    },
+    "14.2,121.2": {
+      "old_lat": 14.2,
+      "old_lon": 121.2,
+      "land_lat": 14.2,
+      "land_lon": 121.1,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Calamba, Calabarzon, Philippines"
+    },
+    "14.2,121.3": {
+      "old_lat": 14.2,
+      "old_lon": 121.3,
+      "land_lat": 14.2,
+      "land_lon": 121.4,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Los Ba\u00f1os, Philippines"
+    },
+    "14.3,121.4": {
+      "old_lat": 14.3,
+      "old_lon": 121.4,
+      "land_lat": 14.3,
+      "land_lon": 121.5,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Santa Cruz, Philippines"
+    },
+    "14.4,121.1": {
+      "old_lat": 14.4,
+      "old_lon": 121.1,
+      "land_lat": 14.5,
+      "land_lon": 121.1,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Muntinlupa, Philippines"
+    },
+    "14.5,120.9": {
+      "old_lat": 14.5,
+      "old_lon": 120.9,
+      "land_lat": 14.4,
+      "land_lon": 120.9,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Bacoor, Philippines"
+    },
+    "14.5,121.0": {
+      "old_lat": 14.5,
+      "old_lon": 121.0,
+      "land_lat": 14.6,
+      "land_lon": 121.0,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Paranaque City, Philippines"
+    },
+    "14.7,120.9": {
+      "old_lat": 14.7,
+      "old_lon": 120.9,
+      "land_lat": 14.8,
+      "land_lon": 120.9,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Valenzuela, Philippines"
+    },
+    "14.8,120.8": {
+      "old_lat": 14.8,
+      "old_lon": 120.8,
+      "land_lat": 14.9,
+      "land_lon": 120.8,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Malolos, Central Luzon, Philippines"
+    },
+    "14.9,120.6": {
+      "old_lat": 14.9,
+      "old_lon": 120.6,
+      "land_lat": 15.0,
+      "land_lon": 120.6,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Lubao, Philippines"
+    },
+    "14.9,120.7": {
+      "old_lat": 14.9,
+      "old_lon": 120.7,
+      "land_lat": 15.0,
+      "land_lon": 120.7,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Calumpit, Philippines"
+    },
+    "16.1,120.4": {
+      "old_lat": 16.1,
+      "old_lon": 120.4,
+      "land_lat": 16.1,
+      "land_lon": 120.5,
+      "tile_id": "11_18",
+      "snap_cells": 1,
+      "old_name": "Mangaldan, Philippines"
+    },
+    "13.4,123.7": {
+      "old_lat": 13.4,
+      "old_lon": 123.7,
+      "land_lat": 13.4,
+      "land_lon": 123.6,
+      "tile_id": "11_19",
+      "snap_cells": 1,
+      "old_name": "Tabaco, Philippines"
+    },
+    "13.9,121.6": {
+      "old_lat": 13.9,
+      "old_lon": 121.6,
+      "land_lat": 14.0,
+      "land_lon": 121.6,
+      "tile_id": "11_19",
+      "snap_cells": 1,
+      "old_name": "Lucena, Calabarzon, Philippines"
+    },
+    "19.2,-96.1": {
+      "old_lat": 19.2,
+      "old_lon": -96.1,
+      "land_lat": 19.2,
+      "land_lon": -96.2,
+      "tile_id": "11_41",
+      "snap_cells": 1,
+      "old_name": "Veracruz, Mexico"
+    },
+    "18.0,-76.8": {
+      "old_lat": 18.0,
+      "old_lon": -76.8,
+      "land_lat": 18.1,
+      "land_lon": -76.8,
+      "tile_id": "11_44",
+      "snap_cells": 1,
+      "old_name": "Kingston, Jamaica"
+    },
+    "18.4,-69.0": {
+      "old_lat": 18.4,
+      "old_lon": -69.0,
+      "land_lat": 18.5,
+      "land_lon": -69.0,
+      "tile_id": "11_45",
+      "snap_cells": 1,
+      "old_name": "La Romana, Dominican Republic"
+    },
+    "18.4,-70.0": {
+      "old_lat": 18.4,
+      "old_lon": -70.0,
+      "land_lat": 18.5,
+      "land_lon": -70.0,
+      "tile_id": "11_45",
+      "snap_cells": 1,
+      "old_name": "Bajos de Haina, Santo Domingo Oeste, Dominican Republic"
+    },
+    "13.5,-16.7": {
+      "old_lat": 13.5,
+      "old_lon": -16.7,
+      "land_lat": 13.4,
+      "land_lon": -16.7,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Serekunda, Banjul, Gambia"
+    },
+    "14.4,-17.0": {
+      "old_lat": 14.4,
+      "old_lon": -17.0,
+      "land_lat": 14.5,
+      "land_lon": -17.0,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Mbour, Senegal"
+    },
+    "14.7,-17.3": {
+      "old_lat": 14.7,
+      "old_lon": -17.3,
+      "land_lat": 14.8,
+      "land_lon": -17.3,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Rufisque, Senegal"
+    },
+    "14.7,-17.4": {
+      "old_lat": 14.7,
+      "old_lon": -17.4,
+      "land_lat": 14.8,
+      "land_lon": -17.3,
+      "tile_id": "11_53",
+      "snap_cells": 2,
+      "old_name": "Dakar, Senegal"
+    },
+    "14.7,-17.5": {
+      "old_lat": 14.7,
+      "old_lon": -17.5,
+      "land_lat": 14.8,
+      "land_lon": -17.3,
+      "tile_id": "11_53",
+      "snap_cells": 3,
+      "old_name": "Dakar, Senegal"
+    },
+    "14.8,-17.4": {
+      "old_lat": 14.8,
+      "old_lon": -17.4,
+      "land_lat": 14.8,
+      "land_lon": -17.3,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Pikine, Senegal"
+    },
+    "14.8,-17.5": {
+      "old_lat": 14.8,
+      "old_lon": -17.5,
+      "land_lat": 14.8,
+      "land_lon": -17.3,
+      "tile_id": "11_53",
+      "snap_cells": 2,
+      "old_name": "Mermoz Boabab, Gu\u00e9diawaye, Senegal"
+    },
+    "16.0,-16.5": {
+      "old_lat": 16.0,
+      "old_lon": -16.5,
+      "land_lat": 16.1,
+      "land_lon": -16.5,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Saint-Louis, Senegal"
+    },
+    "18.1,-16.0": {
+      "old_lat": 18.1,
+      "old_lon": -16.0,
+      "land_lat": 18.2,
+      "land_lon": -16.0,
+      "tile_id": "11_53",
+      "snap_cells": 1,
+      "old_name": "Nouakchott, Mauritania"
+    },
+    "14.8,42.9": {
+      "old_lat": 14.8,
+      "old_lon": 42.9,
+      "land_lat": 14.8,
+      "land_lon": 43.0,
+      "tile_id": "11_6",
+      "snap_cells": 1,
+      "old_name": "Al \u1e28udaydah, Al Hudaydah, Yemen"
+    },
+    "17.0,54.1": {
+      "old_lat": 17.0,
+      "old_lon": 54.1,
+      "land_lat": 17.1,
+      "land_lon": 54.1,
+      "tile_id": "11_8",
+      "snap_cells": 1,
+      "old_name": "\u015eal\u0101lah, Oman"
+    },
+    "10.0,76.2": {
+      "old_lat": 10.0,
+      "old_lon": 76.2,
+      "land_lat": 10.0,
+      "land_lon": 76.3,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Elamkunnapuzha, Kanayannur, India"
+    },
+    "10.1,76.2": {
+      "old_lat": 10.1,
+      "old_lon": 76.2,
+      "land_lat": 10.1,
+      "land_lon": 76.3,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Kottuvalli, India"
+    },
+    "10.2,76.2": {
+      "old_lat": 10.2,
+      "old_lon": 76.2,
+      "land_lat": 10.3,
+      "land_lon": 76.2,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Kodungall\u016br, Kerala, India"
+    },
+    "10.3,76.1": {
+      "old_lat": 10.3,
+      "old_lon": 76.1,
+      "land_lat": 10.3,
+      "land_lon": 76.2,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Kaipamangalam, India"
+    },
+    "10.4,76.1": {
+      "old_lat": 10.4,
+      "old_lon": 76.1,
+      "land_lat": 10.5,
+      "land_lon": 76.1,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Vadanappally, India"
+    },
+    "10.8,75.9": {
+      "old_lat": 10.8,
+      "old_lon": 75.9,
+      "land_lat": 10.9,
+      "land_lon": 75.9,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Ponn\u0101ni, India"
+    },
+    "11.7,75.5": {
+      "old_lat": 11.7,
+      "old_lon": 75.5,
+      "land_lat": 11.8,
+      "land_lon": 75.5,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Tellicherry, Kerala, India"
+    },
+    "12.3,75.1": {
+      "old_lat": 12.3,
+      "old_lon": 75.1,
+      "land_lat": 12.4,
+      "land_lon": 75.1,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Kanhangad, India"
+    },
+    "12.5,75.0": {
+      "old_lat": 12.5,
+      "old_lon": 75.0,
+      "land_lat": 12.6,
+      "land_lon": 75.0,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "K\u0101saragod, India"
+    },
+    "12.9,74.8": {
+      "old_lat": 12.9,
+      "old_lon": 74.8,
+      "land_lat": 12.9,
+      "land_lon": 74.9,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Mangaluru, Karnataka, India"
+    },
+    "13.0,74.8": {
+      "old_lat": 13.0,
+      "old_lon": 74.8,
+      "land_lat": 13.1,
+      "land_lon": 74.8,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Tok\u016bru, Mangaluru, India"
+    },
+    "9.5,76.3": {
+      "old_lat": 9.5,
+      "old_lon": 76.3,
+      "land_lat": 9.5,
+      "land_lon": 76.4,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Alappuzha, India"
+    },
+    "9.6,76.3": {
+      "old_lat": 9.6,
+      "old_lon": 76.3,
+      "land_lat": 9.6,
+      "land_lon": 76.4,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Komalapuram, India"
+    },
+    "9.7,76.3": {
+      "old_lat": 9.7,
+      "old_lon": 76.3,
+      "land_lat": 9.8,
+      "land_lon": 76.3,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Cherthala, Kerala, India"
+    },
+    "9.9,76.3": {
+      "old_lat": 9.9,
+      "old_lon": 76.3,
+      "land_lat": 10.0,
+      "land_lon": 76.3,
+      "tile_id": "12_11",
+      "snap_cells": 1,
+      "old_name": "Kochi, India"
+    },
+    "13.0,80.3": {
+      "old_lat": 13.0,
+      "old_lon": 80.3,
+      "land_lat": 13.0,
+      "land_lon": 80.2,
+      "tile_id": "12_12",
+      "snap_cells": 1,
+      "old_name": "Neelankarai, Chennai, India"
+    },
+    "13.1,80.3": {
+      "old_lat": 13.1,
+      "old_lon": 80.3,
+      "land_lat": 13.1,
+      "land_lon": 80.2,
+      "tile_id": "12_12",
+      "snap_cells": 1,
+      "old_name": "Chennai, India"
+    },
+    "13.2,80.3": {
+      "old_lat": 13.2,
+      "old_lon": 80.3,
+      "land_lat": 13.2,
+      "land_lon": 80.2,
+      "tile_id": "12_12",
+      "snap_cells": 1,
+      "old_name": "Tiruvottiy\u016br, India"
+    },
+    "7.7,81.7": {
+      "old_lat": 7.7,
+      "old_lon": 81.7,
+      "land_lat": 7.7,
+      "land_lon": 81.6,
+      "tile_id": "12_12",
+      "snap_cells": 1,
+      "old_name": "Batticaloa, Sri Lanka"
+    },
+    "8.2,77.2": {
+      "old_lat": 8.2,
+      "old_lon": 77.2,
+      "land_lat": 8.3,
+      "land_lon": 77.2,
+      "tile_id": "12_12",
+      "snap_cells": 1,
+      "old_name": "Painkulam, India"
+    },
+    "12.9,100.9": {
+      "old_lat": 12.9,
+      "old_lon": 100.9,
+      "land_lat": 12.9,
+      "land_lon": 101.0,
+      "tile_id": "12_15",
+      "snap_cells": 1,
+      "old_name": "Pattaya, Thailand"
+    },
+    "7.2,100.6": {
+      "old_lat": 7.2,
+      "old_lon": 100.6,
+      "land_lat": 7.1,
+      "land_lon": 100.6,
+      "tile_id": "12_15",
+      "snap_cells": 1,
+      "old_name": "Ban Mai, Thailand"
+    },
+    "12.3,109.2": {
+      "old_lat": 12.3,
+      "old_lon": 109.2,
+      "land_lat": 12.3,
+      "land_lon": 109.1,
+      "tile_id": "12_17",
+      "snap_cells": 1,
+      "old_name": "Nha Trang, Khanh Hoa, Vietnam"
+    },
+    "10.2,123.8": {
+      "old_lat": 10.2,
+      "old_lon": 123.8,
+      "land_lat": 10.3,
+      "land_lon": 123.8,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Naga, Central Visayas, Philippines"
+    },
+    "10.3,123.9": {
+      "old_lat": 10.3,
+      "old_lon": 123.9,
+      "land_lat": 10.4,
+      "land_lon": 123.9,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Cebu City, Philippines"
+    },
+    "10.3,124.0": {
+      "old_lat": 10.3,
+      "old_lon": 124.0,
+      "land_lat": 10.4,
+      "land_lon": 124.0,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Lapu-Lapu City, Philippines"
+    },
+    "8.5,124.6": {
+      "old_lat": 8.5,
+      "old_lon": 124.6,
+      "land_lat": 8.5,
+      "land_lon": 124.5,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Cagayan de Oro, Northern Mindanao, Philippines"
+    },
+    "9.0,125.5": {
+      "old_lat": 9.0,
+      "old_lon": 125.5,
+      "land_lat": 9.0,
+      "land_lon": 125.4,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Butuan, Philippines"
+    },
+    "9.8,125.5": {
+      "old_lat": 9.8,
+      "old_lon": 125.5,
+      "land_lat": 9.7,
+      "land_lon": 125.5,
+      "tile_id": "12_19",
+      "snap_cells": 1,
+      "old_name": "Surigao, Philippines"
+    },
+    "9.0,-79.5": {
+      "old_lat": 9.0,
+      "old_lon": -79.5,
+      "land_lat": 9.1,
+      "land_lon": -79.5,
+      "tile_id": "12_43",
+      "snap_cells": 1,
+      "old_name": "Panama City, Panama"
+    },
+    "10.4,-75.5": {
+      "old_lat": 10.4,
+      "old_lon": -75.5,
+      "land_lat": 10.5,
+      "land_lon": -75.5,
+      "tile_id": "12_44",
+      "snap_cells": 1,
+      "old_name": "Cartagena, Colombia"
+    },
+    "11.2,-74.2": {
+      "old_lat": 11.2,
+      "old_lon": -74.2,
+      "land_lat": 11.2,
+      "land_lon": -74.1,
+      "tile_id": "12_44",
+      "snap_cells": 1,
+      "old_name": "Santa Marta, Colombia"
+    },
+    "10.2,-71.3": {
+      "old_lat": 10.2,
+      "old_lon": -71.3,
+      "land_lat": 10.3,
+      "land_lon": -71.3,
+      "tile_id": "12_45",
+      "snap_cells": 1,
+      "old_name": "Ciudad Ojeda, Venezuela"
+    },
+    "10.5,-68.0": {
+      "old_lat": 10.5,
+      "old_lon": -68.0,
+      "land_lat": 10.4,
+      "land_lon": -68.0,
+      "tile_id": "12_45",
+      "snap_cells": 1,
+      "old_name": "Puerto Cabello, Venezuela"
+    },
+    "10.6,-71.6": {
+      "old_lat": 10.6,
+      "old_lon": -71.6,
+      "land_lat": 10.7,
+      "land_lon": -71.6,
+      "tile_id": "12_45",
+      "snap_cells": 1,
+      "old_name": "Maracaibo, Zulia, Venezuela"
+    },
+    "10.2,-64.7": {
+      "old_lat": 10.2,
+      "old_lon": -64.7,
+      "land_lat": 10.2,
+      "land_lon": -64.6,
+      "tile_id": "12_46",
+      "snap_cells": 1,
+      "old_name": "Barcelona, Anzo\u00e1tegui, Venezuela"
+    },
+    "10.5,-64.2": {
+      "old_lat": 10.5,
+      "old_lon": -64.2,
+      "land_lat": 10.6,
+      "land_lon": -64.2,
+      "tile_id": "12_46",
+      "snap_cells": 1,
+      "old_name": "Cuman\u00e1, Sucre, Venezuela"
+    },
+    "8.4,-13.3": {
+      "old_lat": 8.4,
+      "old_lon": -13.3,
+      "land_lat": 8.4,
+      "land_lon": -13.2,
+      "tile_id": "12_54",
+      "snap_cells": 1,
+      "old_name": "Goderich, Sierra Leone"
+    },
+    "8.5,-13.3": {
+      "old_lat": 8.5,
+      "old_lon": -13.3,
+      "land_lat": 8.5,
+      "land_lon": -13.2,
+      "tile_id": "12_54",
+      "snap_cells": 1,
+      "old_name": "Freetown, Western Area, Sierra Leone"
+    },
+    "11.6,43.1": {
+      "old_lat": 11.6,
+      "old_lon": 43.1,
+      "land_lat": 11.6,
+      "land_lon": 43.0,
+      "tile_id": "12_6",
+      "snap_cells": 1,
+      "old_name": "Djibouti"
+    },
+    "12.8,45.0": {
+      "old_lat": 12.8,
+      "old_lon": 45.0,
+      "land_lat": 12.9,
+      "land_lon": 45.0,
+      "tile_id": "12_7",
+      "snap_cells": 1,
+      "old_name": "Aden, Yemen"
+    },
+    "6.1,1.2": {
+      "old_lat": 6.1,
+      "old_lon": 1.2,
+      "land_lat": 6.2,
+      "land_lon": 1.2,
+      "tile_id": "13_0",
+      "snap_cells": 1,
+      "old_name": "Lom\u00e9, Maritime, Togo"
+    },
+    "6.4,2.5": {
+      "old_lat": 6.4,
+      "old_lon": 2.5,
+      "land_lat": 6.5,
+      "land_lon": 2.5,
+      "tile_id": "13_0",
+      "snap_cells": 1,
+      "old_name": "Ekp\u00e9, Cotonou, Benin"
+    },
+    "6.4,3.3": {
+      "old_lat": 6.4,
+      "old_lon": 3.3,
+      "land_lat": 6.5,
+      "land_lon": 3.3,
+      "tile_id": "13_0",
+      "snap_cells": 1,
+      "old_name": "Ajegunle, Nigeria"
+    },
+    "4.4,7.2": {
+      "old_lat": 4.4,
+      "old_lon": 7.2,
+      "land_lat": 4.5,
+      "land_lon": 7.2,
+      "tile_id": "13_1",
+      "snap_cells": 1,
+      "old_name": "Bonny, Nigeria"
+    },
+    "6.1,80.2": {
+      "old_lat": 6.1,
+      "old_lon": 80.2,
+      "land_lat": 6.2,
+      "land_lon": 80.2,
+      "tile_id": "13_12",
+      "snap_cells": 1,
+      "old_name": "Galle, Sri Lanka"
+    },
+    "1.7,98.8": {
+      "old_lat": 1.7,
+      "old_lon": 98.8,
+      "land_lat": 1.8,
+      "land_lon": 98.8,
+      "tile_id": "13_15",
+      "snap_cells": 1,
+      "old_name": "Sibolga, Indonesia"
+    },
+    "2.2,102.2": {
+      "old_lat": 2.2,
+      "old_lon": 102.2,
+      "land_lat": 2.3,
+      "land_lon": 102.2,
+      "tile_id": "13_15",
+      "snap_cells": 1,
+      "old_name": "Malacca, Melaka, Malaysia"
+    },
+    "1.2,104.0": {
+      "old_lat": 1.2,
+      "old_lon": 104.0,
+      "land_lat": 1.1,
+      "land_lon": 104.0,
+      "tile_id": "13_16",
+      "snap_cells": 1,
+      "old_name": "Batam, Riau, Indonesia"
+    },
+    "1.3,103.7": {
+      "old_lat": 1.3,
+      "old_lon": 103.7,
+      "land_lat": 1.4,
+      "land_lon": 103.7,
+      "tile_id": "13_16",
+      "snap_cells": 1,
+      "old_name": "Jurong Town, Singapore"
+    },
+    "1.3,103.9": {
+      "old_lat": 1.3,
+      "old_lon": 103.9,
+      "land_lat": 1.4,
+      "land_lon": 103.9,
+      "tile_id": "13_16",
+      "snap_cells": 1,
+      "old_name": "Ulu Bedok, Singapore"
+    },
+    "1.3,104.0": {
+      "old_lat": 1.3,
+      "old_lon": 104.0,
+      "land_lat": 1.4,
+      "land_lon": 103.9,
+      "tile_id": "13_16",
+      "snap_cells": 2,
+      "old_name": "Bedok New Town, Singapore"
+    },
+    "1.4,104.0": {
+      "old_lat": 1.4,
+      "old_lon": 104.0,
+      "land_lat": 1.5,
+      "land_lon": 104.0,
+      "tile_id": "13_16",
+      "snap_cells": 1,
+      "old_name": "Tampines New Town, Singapore"
+    },
+    "3.3,117.6": {
+      "old_lat": 3.3,
+      "old_lon": 117.6,
+      "land_lat": 3.4,
+      "land_lon": 117.6,
+      "tile_id": "13_18",
+      "snap_cells": 1,
+      "old_name": "Tarakan, Indonesia"
+    },
+    "0.8,127.4": {
+      "old_lat": 0.8,
+      "old_lon": 127.4,
+      "land_lat": 0.8,
+      "land_lon": 127.3,
+      "tile_id": "13_19",
+      "snap_cells": 1,
+      "old_name": "Ternate, Indonesia"
+    },
+    "1.5,124.8": {
+      "old_lat": 1.5,
+      "old_lon": 124.8,
+      "land_lat": 1.5,
+      "land_lon": 124.9,
+      "tile_id": "13_19",
+      "snap_cells": 1,
+      "old_name": "Manado, North Sulawesi, Indonesia"
+    },
+    "6.1,125.2": {
+      "old_lat": 6.1,
+      "old_lon": 125.2,
+      "land_lat": 6.2,
+      "land_lon": 125.2,
+      "tile_id": "13_19",
+      "snap_cells": 1,
+      "old_name": "General Santos, Philippines"
+    },
+    "1.0,-79.7": {
+      "old_lat": 1.0,
+      "old_lon": -79.7,
+      "land_lat": 0.9,
+      "land_lon": -79.7,
+      "tile_id": "13_43",
+      "snap_cells": 1,
+      "old_name": "Esmeraldas, Ecuador"
+    },
+    "6.2,-10.7": {
+      "old_lat": 6.2,
+      "old_lon": -10.7,
+      "land_lat": 6.3,
+      "land_lon": -10.7,
+      "tile_id": "13_54",
+      "snap_cells": 1,
+      "old_name": "Monrovia, Montserrado County, Liberia"
+    },
+    "6.3,-10.8": {
+      "old_lat": 6.3,
+      "old_lon": -10.8,
+      "land_lat": 6.4,
+      "land_lon": -10.8,
+      "tile_id": "13_54",
+      "snap_cells": 1,
+      "old_name": "Monrovia, Montserrado County, Liberia"
+    },
+    "4.9,-1.7": {
+      "old_lat": 4.9,
+      "old_lon": -1.7,
+      "land_lat": 5.0,
+      "land_lon": -1.7,
+      "tile_id": "13_55",
+      "snap_cells": 1,
+      "old_name": "Takoradi, Western, Ghana"
+    },
+    "4.9,-1.8": {
+      "old_lat": 4.9,
+      "old_lon": -1.8,
+      "land_lat": 5.0,
+      "land_lon": -1.8,
+      "tile_id": "13_55",
+      "snap_cells": 1,
+      "old_name": "Takoradi, Western, Ghana"
+    },
+    "5.2,-3.9": {
+      "old_lat": 5.2,
+      "old_lon": -3.9,
+      "land_lat": 5.3,
+      "land_lon": -3.9,
+      "tile_id": "13_55",
+      "snap_cells": 1,
+      "old_name": "Modeste, Ivory Coast"
+    },
+    "5.1,-1.2": {
+      "old_lat": 5.1,
+      "old_lon": -1.2,
+      "land_lat": 5.2,
+      "land_lon": -1.2,
+      "tile_id": "13_56",
+      "snap_cells": 1,
+      "old_name": "Cape Coast, Central, Ghana"
+    },
+    "5.1,-1.3": {
+      "old_lat": 5.1,
+      "old_lon": -1.3,
+      "land_lat": 5.2,
+      "land_lon": -1.3,
+      "tile_id": "13_56",
+      "snap_cells": 1,
+      "old_name": "Cape Coast, Central, Ghana"
+    },
+    "5.5,-0.2": {
+      "old_lat": 5.5,
+      "old_lon": -0.2,
+      "land_lat": 5.6,
+      "land_lon": -0.2,
+      "tile_id": "13_56",
+      "snap_cells": 1,
+      "old_name": "Accra, Greater Accra, Ghana"
+    },
+    "5.5,-0.3": {
+      "old_lat": 5.5,
+      "old_lon": -0.3,
+      "land_lat": 5.6,
+      "land_lon": -0.3,
+      "tile_id": "13_56",
+      "snap_cells": 1,
+      "old_name": "Mandela, Ghana"
+    },
+    "5.6,-0.1": {
+      "old_lat": 5.6,
+      "old_lon": -0.1,
+      "land_lat": 5.7,
+      "land_lon": -0.1,
+      "tile_id": "13_56",
+      "snap_cells": 1,
+      "old_name": "Teshi Old Town, Accra, Ghana"
+    },
+    "1.7,44.8": {
+      "old_lat": 1.7,
+      "old_lon": 44.8,
+      "land_lat": 1.8,
+      "land_lon": 44.8,
+      "tile_id": "13_7",
+      "snap_cells": 1,
+      "old_name": "Marka, Somalia"
+    },
+    "2.0,45.3": {
+      "old_lat": 2.0,
+      "old_lon": 45.3,
+      "land_lat": 2.1,
+      "land_lon": 45.3,
+      "tile_id": "13_7",
+      "snap_cells": 1,
+      "old_name": "Mogadishu, Banaadir, Somalia"
+    },
+    "2.0,45.4": {
+      "old_lat": 2.0,
+      "old_lon": 45.4,
+      "land_lat": 2.1,
+      "land_lon": 45.4,
+      "tile_id": "13_7",
+      "snap_cells": 1,
+      "old_name": "Mogadishu, Banaadir, Somalia"
+    },
+    "0.4,9.4": {
+      "old_lat": 0.4,
+      "old_lon": 9.4,
+      "land_lat": 0.4,
+      "land_lon": 9.5,
+      "tile_id": "14_1",
+      "snap_cells": 1,
+      "old_name": "Libreville, Estuaire, Gabon"
+    },
+    "-1.2,116.8": {
+      "old_lat": -1.2,
+      "old_lon": 116.8,
+      "land_lat": -1.1,
+      "land_lon": 116.8,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Penajam, Balikpapan, Indonesia"
+    },
+    "-1.3,116.8": {
+      "old_lat": -1.3,
+      "old_lon": 116.8,
+      "land_lat": -1.3,
+      "land_lon": 116.7,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Balikpapan, East Kalimantan, Indonesia"
+    },
+    "-3.0,120.2": {
+      "old_lat": -3.0,
+      "old_lon": 120.2,
+      "land_lat": -2.9,
+      "land_lon": 120.2,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Palopo, Indonesia"
+    },
+    "-3.4,119.3": {
+      "old_lat": -3.4,
+      "old_lon": 119.3,
+      "land_lat": -3.3,
+      "land_lon": 119.3,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Polewali, West Sulawesi, Indonesia"
+    },
+    "-4.0,119.6": {
+      "old_lat": -4.0,
+      "old_lon": 119.6,
+      "land_lat": -3.9,
+      "land_lon": 119.6,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Parepare, Indonesia"
+    },
+    "-5.1,119.4": {
+      "old_lat": -5.1,
+      "old_lon": 119.4,
+      "land_lat": -5.1,
+      "land_lon": 119.5,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Makassar, South Sulawesi, Indonesia"
+    },
+    "-5.2,119.4": {
+      "old_lat": -5.2,
+      "old_lon": 119.4,
+      "land_lat": -5.2,
+      "land_lon": 119.5,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Makassar, South Sulawesi, Indonesia"
+    },
+    "0.1,117.5": {
+      "old_lat": 0.1,
+      "old_lon": 117.5,
+      "land_lat": 0.1,
+      "land_lon": 117.4,
+      "tile_id": "14_18",
+      "snap_cells": 1,
+      "old_name": "Bontang, Indonesia"
+    },
+    "-0.9,134.1": {
+      "old_lat": -0.9,
+      "old_lon": 134.1,
+      "land_lat": -0.9,
+      "land_lon": 134.0,
+      "tile_id": "14_20",
+      "snap_cells": 1,
+      "old_name": "Manokwari, Indonesia"
+    },
+    "-1.2,136.1": {
+      "old_lat": -1.2,
+      "old_lon": 136.1,
+      "land_lat": -1.1,
+      "land_lon": 136.1,
+      "tile_id": "14_21",
+      "snap_cells": 1,
+      "old_name": "Biak, Indonesia"
+    },
+    "-1.9,136.2": {
+      "old_lat": -1.9,
+      "old_lon": 136.2,
+      "land_lat": -1.8,
+      "land_lon": 136.2,
+      "tile_id": "14_21",
+      "snap_cells": 1,
+      "old_name": "Serui, Indonesia"
+    },
+    "-1.4,-48.5": {
+      "old_lat": -1.4,
+      "old_lon": -48.5,
+      "land_lat": -1.3,
+      "land_lon": -48.5,
+      "tile_id": "14_48",
+      "snap_cells": 1,
+      "old_name": "Bel\u00e9m, Par\u00e1, Brazil"
+    },
+    "0.0,-51.1": {
+      "old_lat": 0.0,
+      "old_lon": -51.1,
+      "land_lat": 0.1,
+      "land_lon": -51.1,
+      "tile_id": "14_48",
+      "snap_cells": 1,
+      "old_name": "Macap\u00e1, Amap\u00e1, Brazil"
+    },
+    "-2.5,-44.3": {
+      "old_lat": -2.5,
+      "old_lon": -44.3,
+      "land_lat": -2.5,
+      "land_lon": -44.2,
+      "tile_id": "14_49",
+      "snap_cells": 1,
+      "old_name": "S\u00e3o Lu\u00eds, Maranh\u00e3o, Brazil"
+    },
+    "-3.7,-38.5": {
+      "old_lat": -3.7,
+      "old_lon": -38.5,
+      "land_lat": -3.8,
+      "land_lon": -38.5,
+      "tile_id": "14_50",
+      "snap_cells": 1,
+      "old_name": "Fortaleza, Cear\u00e1, Brazil"
+    },
+    "-3.7,-38.6": {
+      "old_lat": -3.7,
+      "old_lon": -38.6,
+      "land_lat": -3.7,
+      "land_lon": -38.7,
+      "tile_id": "14_50",
+      "snap_cells": 1,
+      "old_name": "Fortaleza, Cear\u00e1, Brazil"
+    },
+    "-5.8,-35.2": {
+      "old_lat": -5.8,
+      "old_lon": -35.2,
+      "land_lat": -5.8,
+      "land_lon": -35.3,
+      "tile_id": "14_50",
+      "snap_cells": 1,
+      "old_name": "Natal, Brazil"
+    },
+    "-4.1,39.7": {
+      "old_lat": -4.1,
+      "old_lon": 39.7,
+      "land_lat": -4.0,
+      "land_lon": 39.7,
+      "tile_id": "14_6",
+      "snap_cells": 1,
+      "old_name": "Mombasa, Mombasa County, Kenya"
+    },
+    "-5.1,39.1": {
+      "old_lat": -5.1,
+      "old_lon": 39.1,
+      "land_lat": -5.0,
+      "land_lon": 39.1,
+      "tile_id": "14_6",
+      "snap_cells": 1,
+      "old_name": "Tanga, Tanzania"
+    },
+    "-6.1,12.4": {
+      "old_lat": -6.1,
+      "old_lon": 12.4,
+      "land_lat": -6.2,
+      "land_lon": 12.4,
+      "tile_id": "15_1",
+      "snap_cells": 1,
+      "old_name": "Soyo, Zaire, Angola"
+    },
+    "-6.1,106.8": {
+      "old_lat": -6.1,
+      "old_lon": 106.8,
+      "land_lat": -6.1,
+      "land_lon": 106.7,
+      "tile_id": "15_16",
+      "snap_cells": 1,
+      "old_name": "Jakarta, Indonesia"
+    },
+    "-6.1,106.9": {
+      "old_lat": -6.1,
+      "old_lon": 106.9,
+      "land_lat": -6.2,
+      "land_lon": 106.9,
+      "tile_id": "15_16",
+      "snap_cells": 1,
+      "old_name": "Utan, Jakarta, Indonesia"
+    },
+    "-6.1,107.0": {
+      "old_lat": -6.1,
+      "old_lon": 107.0,
+      "land_lat": -6.1,
+      "land_lon": 107.1,
+      "tile_id": "15_16",
+      "snap_cells": 1,
+      "old_name": "Utan, Jakarta, Indonesia"
+    },
+    "-6.3,108.3": {
+      "old_lat": -6.3,
+      "old_lon": 108.3,
+      "land_lat": -6.4,
+      "land_lon": 108.3,
+      "tile_id": "15_16",
+      "snap_cells": 1,
+      "old_name": "Indramayu, West Java, Indonesia"
+    },
+    "-6.7,108.6": {
+      "old_lat": -6.7,
+      "old_lon": 108.6,
+      "land_lat": -6.7,
+      "land_lon": 108.5,
+      "tile_id": "15_16",
+      "snap_cells": 1,
+      "old_name": "Cirebon, West Java, Indonesia"
+    },
+    "-6.9,109.7": {
+      "old_lat": -6.9,
+      "old_lon": 109.7,
+      "land_lat": -6.9,
+      "land_lon": 109.6,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Pekalongan, Indonesia"
+    },
+    "-7.1,112.4": {
+      "old_lat": -7.1,
+      "old_lon": 112.4,
+      "land_lat": -7.0,
+      "land_lon": 112.4,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Lamongan, Indonesia"
+    },
+    "-7.1,112.6": {
+      "old_lat": -7.1,
+      "old_lon": 112.6,
+      "land_lat": -7.1,
+      "land_lon": 112.5,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Kebomas, East Java, Indonesia"
+    },
+    "-7.2,112.7": {
+      "old_lat": -7.2,
+      "old_lon": 112.7,
+      "land_lat": -7.1,
+      "land_lon": 112.7,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Surabaya, East Java, Indonesia"
+    },
+    "-7.4,112.8": {
+      "old_lat": -7.4,
+      "old_lon": 112.8,
+      "land_lat": -7.3,
+      "land_lon": 112.8,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Kalanganyartambak, Indonesia"
+    },
+    "-7.7,109.1": {
+      "old_lat": -7.7,
+      "old_lon": 109.1,
+      "land_lat": -7.6,
+      "land_lon": 109.1,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Rejanegara, Cilacap, Indonesia"
+    },
+    "-8.2,114.4": {
+      "old_lat": -8.2,
+      "old_lon": 114.4,
+      "land_lat": -8.1,
+      "land_lon": 114.4,
+      "tile_id": "15_17",
+      "snap_cells": 1,
+      "old_name": "Banyuwangi, Indonesia"
+    },
+    "-8.6,115.3": {
+      "old_lat": -8.6,
+      "old_lon": 115.3,
+      "land_lat": -8.5,
+      "land_lon": 115.3,
+      "tile_id": "15_18",
+      "snap_cells": 1,
+      "old_name": "Batubulan, Indonesia"
+    },
+    "-11.2,13.8": {
+      "old_lat": -11.2,
+      "old_lon": 13.8,
+      "land_lat": -11.2,
+      "land_lon": 13.9,
+      "tile_id": "15_2",
+      "snap_cells": 1,
+      "old_name": "Sumbe, Kwanza Sul, Angola"
+    },
+    "-8.8,13.2": {
+      "old_lat": -8.8,
+      "old_lon": 13.2,
+      "land_lat": -8.8,
+      "land_lon": 13.3,
+      "tile_id": "15_2",
+      "snap_cells": 1,
+      "old_name": "Luanda, Angola"
+    },
+    "-9.5,147.2": {
+      "old_lat": -9.5,
+      "old_lon": 147.2,
+      "land_lat": -9.4,
+      "land_lon": 147.2,
+      "tile_id": "15_23",
+      "snap_cells": 1,
+      "old_name": "Port Moresby, National Capital, Papua New Guinea"
+    },
+    "-8.1,-79.1": {
+      "old_lat": -8.1,
+      "old_lon": -79.1,
+      "land_lat": -8.0,
+      "land_lon": -79.1,
+      "tile_id": "15_43",
+      "snap_cells": 1,
+      "old_name": "Trujillo, La Libertad, Peru"
+    },
+    "-9.1,-78.6": {
+      "old_lat": -9.1,
+      "old_lon": -78.6,
+      "land_lat": -9.0,
+      "land_lon": -78.6,
+      "tile_id": "15_43",
+      "snap_cells": 1,
+      "old_name": "Chimbote, Peru"
+    },
+    "-11.1,-77.6": {
+      "old_lat": -11.1,
+      "old_lon": -77.6,
+      "land_lat": -11.0,
+      "land_lon": -77.6,
+      "tile_id": "15_44",
+      "snap_cells": 1,
+      "old_name": "Huacho, Peru"
+    },
+    "-12.1,-77.1": {
+      "old_lat": -12.1,
+      "old_lon": -77.1,
+      "land_lat": -12.0,
+      "land_lon": -77.1,
+      "tile_id": "15_44",
+      "snap_cells": 1,
+      "old_name": "Callao, Lima, Peru"
+    },
+    "-12.1,-77.2": {
+      "old_lat": -12.1,
+      "old_lon": -77.2,
+      "land_lat": -12.0,
+      "land_lon": -77.1,
+      "tile_id": "15_44",
+      "snap_cells": 2,
+      "old_name": "Callao, Peru"
+    },
+    "-12.2,-77.0": {
+      "old_lat": -12.2,
+      "old_lon": -77.0,
+      "land_lat": -12.1,
+      "land_lon": -77.0,
+      "tile_id": "15_44",
+      "snap_cells": 1,
+      "old_name": "Santiago de Surco, Peru"
+    },
+    "-7.1,-34.8": {
+      "old_lat": -7.1,
+      "old_lon": -34.8,
+      "land_lat": -7.1,
+      "land_lon": -34.9,
+      "tile_id": "15_50",
+      "snap_cells": 1,
+      "old_name": "Jo\u00e3o Pessoa, Para\u00edba, Brazil"
+    },
+    "-7.2,-34.8": {
+      "old_lat": -7.2,
+      "old_lon": -34.8,
+      "land_lat": -7.2,
+      "land_lon": -34.9,
+      "tile_id": "15_50",
+      "snap_cells": 1,
+      "old_name": "Jo\u00e3o Pessoa, Para\u00edba, Brazil"
+    },
+    "-8.1,-34.9": {
+      "old_lat": -8.1,
+      "old_lon": -34.9,
+      "land_lat": -8.0,
+      "land_lon": -34.9,
+      "tile_id": "15_50",
+      "snap_cells": 1,
+      "old_name": "Recife, Pernambuco, Brazil"
+    },
+    "-8.2,-34.9": {
+      "old_lat": -8.2,
+      "old_lon": -34.9,
+      "land_lat": -8.2,
+      "land_lon": -35.0,
+      "tile_id": "15_50",
+      "snap_cells": 1,
+      "old_name": "Jaboat\u00e3o, Brazil"
+    },
+    "-9.6,-35.7": {
+      "old_lat": -9.6,
+      "old_lon": -35.7,
+      "land_lat": -9.5,
+      "land_lon": -35.7,
+      "tile_id": "15_50",
+      "snap_cells": 1,
+      "old_name": "Macei\u00f3, Alagoas, Brazil"
+    },
+    "-9.7,-35.7": {
+      "old_lat": -9.7,
+      "old_lon": -35.7,
+      "land_lat": -9.6,
+      "land_lon": -35.8,
+      "tile_id": "15_50",
+      "snap_cells": 2,
+      "old_name": "Macei\u00f3, Alagoas, Brazil"
+    },
+    "-6.8,39.3": {
+      "old_lat": -6.8,
+      "old_lon": 39.3,
+      "land_lat": -6.8,
+      "land_lon": 39.2,
+      "tile_id": "15_6",
+      "snap_cells": 1,
+      "old_name": "Dar es Salaam, Dar es Salaam Region, Tanzania"
+    },
+    "-15.2,12.1": {
+      "old_lat": -15.2,
+      "old_lon": 12.1,
+      "land_lat": -15.2,
+      "land_lon": 12.2,
+      "tile_id": "16_1",
+      "snap_cells": 1,
+      "old_name": "Mossamedes, Namibe, Angola"
+    },
+    "-12.9,-38.5": {
+      "old_lat": -12.9,
+      "old_lon": -38.5,
+      "land_lat": -12.9,
+      "land_lon": -38.4,
+      "tile_id": "16_50",
+      "snap_cells": 1,
+      "old_name": "Salvador, Bahia, Brazil"
+    },
+    "-13.0,-38.4": {
+      "old_lat": -13.0,
+      "old_lon": -38.4,
+      "land_lat": -12.9,
+      "land_lon": -38.4,
+      "tile_id": "16_50",
+      "snap_cells": 1,
+      "old_name": "Salvador, Bahia, Brazil"
+    },
+    "-13.0,-38.5": {
+      "old_lat": -13.0,
+      "old_lon": -38.5,
+      "land_lat": -13.0,
+      "land_lon": -38.6,
+      "tile_id": "16_50",
+      "snap_cells": 1,
+      "old_name": "Salvador, Bahia, Brazil"
+    },
+    "-13.0,40.5": {
+      "old_lat": -13.0,
+      "old_lon": 40.5,
+      "land_lat": -13.1,
+      "land_lon": 40.5,
+      "tile_id": "16_6",
+      "snap_cells": 1,
+      "old_name": "Pemba, Mozambique"
+    },
+    "-15.7,46.3": {
+      "old_lat": -15.7,
+      "old_lon": 46.3,
+      "land_lat": -15.7,
+      "land_lon": 46.4,
+      "tile_id": "16_7",
+      "snap_cells": 1,
+      "old_name": "Mahajanga, Boeny, Madagascar"
+    },
+    "-20.2,-40.2": {
+      "old_lat": -20.2,
+      "old_lon": -40.2,
+      "land_lat": -20.2,
+      "land_lon": -40.3,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Serra, Esp\u00edrito Santo, Brazil"
+    },
+    "-20.4,-40.3": {
+      "old_lat": -20.4,
+      "old_lon": -40.3,
+      "land_lat": -20.3,
+      "land_lon": -40.3,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Vila Velha, Esp\u00edrito Santo, Brazil"
+    },
+    "-22.8,-43.1": {
+      "old_lat": -22.8,
+      "old_lon": -43.1,
+      "land_lat": -22.7,
+      "land_lon": -43.1,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "S\u00e3o Gon\u00e7alo, Niter\u00f3i, Rio de Janeiro, Brazil"
+    },
+    "-22.8,-43.2": {
+      "old_lat": -22.8,
+      "old_lon": -43.2,
+      "land_lat": -22.7,
+      "land_lon": -43.2,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Gamboa, Rio de Janeiro, Brazil"
+    },
+    "-22.9,-42.0": {
+      "old_lat": -22.9,
+      "old_lon": -42.0,
+      "land_lat": -22.8,
+      "land_lon": -42.0,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Cabo Frio, Brazil"
+    },
+    "-22.9,-43.2": {
+      "old_lat": -22.9,
+      "old_lon": -43.2,
+      "land_lat": -22.9,
+      "land_lon": -43.3,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Rio de Janeiro, Brazil"
+    },
+    "-23.0,-43.2": {
+      "old_lat": -23.0,
+      "old_lon": -43.2,
+      "land_lat": -22.9,
+      "land_lon": -43.3,
+      "tile_id": "17_49",
+      "snap_cells": 2,
+      "old_name": "Leblon, Rio de Janeiro, Brazil"
+    },
+    "-23.0,-43.3": {
+      "old_lat": -23.0,
+      "old_lon": -43.3,
+      "land_lat": -22.9,
+      "land_lon": -43.3,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Barra da Tijuca, Rio de Janeiro, Brazil"
+    },
+    "-23.0,-43.4": {
+      "old_lat": -23.0,
+      "old_lon": -43.4,
+      "land_lat": -22.9,
+      "land_lon": -43.4,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Barra da Tijuca, Rio de Janeiro, Brazil"
+    },
+    "-24.0,-46.3": {
+      "old_lat": -24.0,
+      "old_lon": -46.3,
+      "land_lat": -23.9,
+      "land_lon": -46.3,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Santos, Brazil"
+    },
+    "-24.0,-46.4": {
+      "old_lat": -24.0,
+      "old_lon": -46.4,
+      "land_lat": -23.9,
+      "land_lon": -46.4,
+      "tile_id": "17_49",
+      "snap_cells": 1,
+      "old_name": "Praia Grande, S\u00e3o Paulo, Brazil"
+    },
+    "-34.1,18.5": {
+      "old_lat": -34.1,
+      "old_lon": 18.5,
+      "land_lat": -34.0,
+      "land_lon": 18.5,
+      "tile_id": "19_2",
+      "snap_cells": 1,
+      "old_name": "Muizenberg, Western Cape, South Africa"
+    },
+    "-34.1,18.6": {
+      "old_lat": -34.1,
+      "old_lon": 18.6,
+      "land_lat": -34.0,
+      "land_lon": 18.6,
+      "tile_id": "19_2",
+      "snap_cells": 1,
+      "old_name": "Muizenberg, Western Cape, South Africa"
+    },
+    "-34.1,18.7": {
+      "old_lat": -34.1,
+      "old_lon": 18.7,
+      "land_lat": -34.0,
+      "land_lon": 18.7,
+      "tile_id": "19_2",
+      "snap_cells": 1,
+      "old_name": "Somerset West, Western Cape, South Africa"
+    },
+    "-37.9,145.0": {
+      "old_lat": -37.9,
+      "old_lon": 145.0,
+      "land_lat": -37.8,
+      "land_lon": 145.0,
+      "tile_id": "19_22",
+      "snap_cells": 1,
+      "old_name": "Bentleigh East, Australia"
+    },
+    "-36.9,174.9": {
+      "old_lat": -36.9,
+      "old_lon": 174.9,
+      "land_lat": -36.9,
+      "land_lon": 174.8,
+      "tile_id": "19_27",
+      "snap_cells": 1,
+      "old_name": "Howick, New Zealand"
+    },
+    "-33.0,-71.6": {
+      "old_lat": -33.0,
+      "old_lon": -71.6,
+      "land_lat": -33.0,
+      "land_lon": -71.5,
+      "tile_id": "19_45",
+      "snap_cells": 1,
+      "old_name": "Vi\u00f1a del Mar, Valparaiso, Chile"
+    },
+    "-34.5,-58.5": {
+      "old_lat": -34.5,
+      "old_lon": -58.5,
+      "land_lat": -34.4,
+      "land_lon": -58.5,
+      "tile_id": "19_47",
+      "snap_cells": 1,
+      "old_name": "Belgrano, Argentina"
+    },
+    "-34.7,-58.3": {
+      "old_lat": -34.7,
+      "old_lon": -58.3,
+      "land_lat": -34.7,
+      "land_lon": -58.4,
+      "tile_id": "19_47",
+      "snap_cells": 1,
+      "old_name": "Quilmes, Buenos Aires, Argentina"
+    },
+    "-34.9,-56.1": {
+      "old_lat": -34.9,
+      "old_lon": -56.1,
+      "land_lat": -34.8,
+      "land_lon": -56.1,
+      "tile_id": "19_47",
+      "snap_cells": 1,
+      "old_name": "Paso de Carrasco, Montevideo, Uruguay"
+    },
+    "-41.3,174.8": {
+      "old_lat": -41.3,
+      "old_lon": 174.8,
+      "land_lat": -41.2,
+      "land_lon": 174.8,
+      "tile_id": "20_27",
+      "snap_cells": 1,
+      "old_name": "Wellington, New Zealand"
+    },
+    "-41.5,-73.0": {
+      "old_lat": -41.5,
+      "old_lon": -73.0,
+      "land_lat": -41.4,
+      "land_lon": -73.0,
+      "tile_id": "20_44",
+      "snap_cells": 1,
+      "old_name": "Puerto Montt, Chile"
+    },
+    "52.4,4.6": {
+      "old_lat": 52.4,
+      "old_lon": 4.6,
+      "land_lat": 52.5,
+      "land_lon": 4.6,
+      "tile_id": "5_0",
+      "snap_cells": 1,
+      "old_name": "Haarlem, The Netherlands"
+    },
+    "55.7,12.6": {
+      "old_lat": 55.7,
+      "old_lon": 12.6,
+      "land_lat": 55.7,
+      "land_lon": 12.5,
+      "tile_id": "5_1",
+      "snap_cells": 1,
+      "old_name": "Copenhagen, Capital Region, Denmark"
+    },
+    "57.7,11.9": {
+      "old_lat": 57.7,
+      "old_lon": 11.9,
+      "land_lat": 57.8,
+      "land_lon": 11.9,
+      "tile_id": "5_1",
+      "snap_cells": 1,
+      "old_name": "Gothenburg, V\u00e4stra G\u00f6taland, Sweden"
+    },
+    "54.5,18.5": {
+      "old_lat": 54.5,
+      "old_lon": 18.5,
+      "land_lat": 54.6,
+      "land_lon": 18.5,
+      "tile_id": "5_2",
+      "snap_cells": 1,
+      "old_name": "Gdynia, Poland"
+    },
+    "55.6,13.0": {
+      "old_lat": 55.6,
+      "old_lon": 13.0,
+      "land_lat": 55.6,
+      "land_lon": 12.9,
+      "tile_id": "5_2",
+      "snap_cells": 1,
+      "old_name": "Malm\u00f6, Sweden"
+    },
+    "53.3,-6.2": {
+      "old_lat": 53.3,
+      "old_lon": -6.2,
+      "land_lat": 53.4,
+      "land_lon": -6.2,
+      "tile_id": "5_55",
+      "snap_cells": 1,
+      "old_name": "Dublin, Leinster, Ireland"
+    },
+    "56.0,-3.2": {
+      "old_lat": 56.0,
+      "old_lon": -3.2,
+      "land_lat": 56.1,
+      "land_lon": -3.2,
+      "tile_id": "5_55",
+      "snap_cells": 1,
+      "old_name": "Edinburgh, Scotland, United Kingdom"
+    },
+    "46.5,30.7": {
+      "old_lat": 46.5,
+      "old_lon": 30.7,
+      "land_lat": 46.6,
+      "land_lon": 30.7,
+      "tile_id": "6_4",
+      "snap_cells": 1,
+      "old_name": "Odesa, Ukraine"
+    },
+    "50.8,-0.1": {
+      "old_lat": 50.8,
+      "old_lon": -0.1,
+      "land_lat": 50.9,
+      "land_lon": -0.1,
+      "tile_id": "6_56",
+      "snap_cells": 1,
+      "old_name": "Brighton, United Kingdom"
+    },
+    "50.8,-1.1": {
+      "old_lat": 50.8,
+      "old_lon": -1.1,
+      "land_lat": 50.9,
+      "land_lon": -1.1,
+      "tile_id": "6_56",
+      "snap_cells": 1,
+      "old_name": "Portsmouth, United Kingdom"
+    },
+    "41.4,2.2": {
+      "old_lat": 41.4,
+      "old_lon": 2.2,
+      "land_lat": 41.5,
+      "land_lon": 2.2,
+      "tile_id": "7_0",
+      "snap_cells": 1,
+      "old_name": "Sant Mart\u00ed, Spain"
+    },
+    "43.7,7.3": {
+      "old_lat": 43.7,
+      "old_lon": 7.3,
+      "land_lat": 43.8,
+      "land_lon": 7.3,
+      "tile_id": "7_1",
+      "snap_cells": 1,
+      "old_name": "Nice, France"
+    },
+    "44.4,8.9": {
+      "old_lat": 44.4,
+      "old_lon": 8.9,
+      "land_lat": 44.5,
+      "land_lon": 8.9,
+      "tile_id": "7_1",
+      "snap_cells": 1,
+      "old_name": "Genoa, Liguria, Italy"
+    },
+    "44.4,9.0": {
+      "old_lat": 44.4,
+      "old_lon": 9.0,
+      "land_lat": 44.5,
+      "land_lon": 9.0,
+      "tile_id": "7_1",
+      "snap_cells": 1,
+      "old_name": "Genoa, Liguria, Italy"
+    },
+    "39.0,117.6": {
+      "old_lat": 39.0,
+      "old_lon": 117.6,
+      "land_lat": 39.1,
+      "land_lon": 117.6,
+      "tile_id": "7_18",
+      "snap_cells": 1,
+      "old_name": "Tanggu, Tianjin, China"
+    },
+    "39.0,117.7": {
+      "old_lat": 39.0,
+      "old_lon": 117.7,
+      "land_lat": 39.1,
+      "land_lon": 117.7,
+      "tile_id": "7_18",
+      "snap_cells": 1,
+      "old_name": "Tanggu, Tianjin, China"
+    },
+    "39.2,117.8": {
+      "old_lat": 39.2,
+      "old_lon": 117.8,
+      "land_lat": 39.3,
+      "land_lon": 117.8,
+      "tile_id": "7_18",
+      "snap_cells": 1,
+      "old_name": "Hangu, Tianjin, China"
+    },
+    "39.9,119.6": {
+      "old_lat": 39.9,
+      "old_lon": 119.6,
+      "land_lat": 40.0,
+      "land_lon": 119.6,
+      "tile_id": "7_18",
+      "snap_cells": 1,
+      "old_name": "Qinhuangdao, Hebei, China"
+    },
+    "39.1,121.7": {
+      "old_lat": 39.1,
+      "old_lon": 121.7,
+      "land_lat": 39.2,
+      "land_lon": 121.7,
+      "tile_id": "7_19",
+      "snap_cells": 1,
+      "old_name": "Jinzhou, Liaoning, China"
+    },
+    "40.8,14.2": {
+      "old_lat": 40.8,
+      "old_lon": 14.2,
+      "land_lat": 40.9,
+      "land_lon": 14.2,
+      "tile_id": "7_2",
+      "snap_cells": 1,
+      "old_name": "Fuorigrotta, Naples, Italy"
+    },
+    "40.8,14.3": {
+      "old_lat": 40.8,
+      "old_lon": 14.3,
+      "land_lat": 40.9,
+      "land_lon": 14.3,
+      "tile_id": "7_2",
+      "snap_cells": 1,
+      "old_name": "Naples, Italy"
+    },
+    "43.5,16.5": {
+      "old_lat": 43.5,
+      "old_lon": 16.5,
+      "land_lat": 43.6,
+      "land_lon": 16.5,
+      "tile_id": "7_2",
+      "snap_cells": 1,
+      "old_name": "Split, Croatia"
+    },
+    "40.4,128.9": {
+      "old_lat": 40.4,
+      "old_lon": 128.9,
+      "land_lat": 40.5,
+      "land_lon": 128.9,
+      "tile_id": "7_20",
+      "snap_cells": 1,
+      "old_name": "Iw\u014fn-\u016dp, North Korea"
+    },
+    "43.1,131.9": {
+      "old_lat": 43.1,
+      "old_lon": 131.9,
+      "land_lat": 43.1,
+      "land_lon": 132.0,
+      "tile_id": "7_20",
+      "snap_cells": 1,
+      "old_name": "Vladivostok, Russia"
+    },
+    "40.6,22.9": {
+      "old_lat": 40.6,
+      "old_lon": 22.9,
+      "land_lat": 40.7,
+      "land_lon": 22.9,
+      "tile_id": "7_3",
+      "snap_cells": 1,
+      "old_name": "Thessalon\u00edki, Central Macedonia, Greece"
+    },
+    "40.8,29.3": {
+      "old_lat": 40.8,
+      "old_lon": 29.3,
+      "land_lat": 40.9,
+      "land_lon": 29.3,
+      "tile_id": "7_4",
+      "snap_cells": 1,
+      "old_name": "\u0130\u00e7meler, Gebze, Turkey"
+    },
+    "40.9,29.1": {
+      "old_lat": 40.9,
+      "old_lon": 29.1,
+      "land_lat": 41.0,
+      "land_lon": 29.1,
+      "tile_id": "7_4",
+      "snap_cells": 1,
+      "old_name": "Maltepe, Istanbul, Turkey"
+    },
+    "40.9,29.2": {
+      "old_lat": 40.9,
+      "old_lon": 29.2,
+      "land_lat": 41.0,
+      "land_lon": 29.2,
+      "tile_id": "7_4",
+      "snap_cells": 1,
+      "old_name": "Maltepe, Istanbul, Turkey"
+    },
+    "44.2,28.6": {
+      "old_lat": 44.2,
+      "old_lon": 28.6,
+      "land_lat": 44.3,
+      "land_lon": 28.6,
+      "tile_id": "7_4",
+      "snap_cells": 1,
+      "old_name": "Constan\u0163a, Romania"
+    },
+    "40.7,-74.1": {
+      "old_lat": 40.7,
+      "old_lon": -74.1,
+      "land_lat": 40.8,
+      "land_lon": -74.1,
+      "tile_id": "7_44",
+      "snap_cells": 1,
+      "old_name": "Newark, New Jersey, United States"
+    },
+    "40.9,-73.8": {
+      "old_lat": 40.9,
+      "old_lon": -73.8,
+      "land_lat": 41.0,
+      "land_lon": -73.8,
+      "tile_id": "7_44",
+      "snap_cells": 1,
+      "old_name": "New Rochelle, United States"
+    },
+    "42.4,-71.0": {
+      "old_lat": 42.4,
+      "old_lon": -71.0,
+      "land_lat": 42.5,
+      "land_lon": -71.0,
+      "tile_id": "7_45",
+      "snap_cells": 1,
+      "old_name": "Malden, United States"
+    },
+    "41.0,37.9": {
+      "old_lat": 41.0,
+      "old_lon": 37.9,
+      "land_lat": 41.0,
+      "land_lon": 37.8,
+      "tile_id": "7_5",
+      "snap_cells": 1,
+      "old_name": "Ordu, Turkey"
+    },
+    "44.7,37.8": {
+      "old_lat": 44.7,
+      "old_lon": 37.8,
+      "land_lat": 44.8,
+      "land_lon": 37.8,
+      "tile_id": "7_5",
+      "snap_cells": 1,
+      "old_name": "Novorossiysk, Russia"
+    },
+    "43.4,-8.4": {
+      "old_lat": 43.4,
+      "old_lon": -8.4,
+      "land_lat": 43.4,
+      "land_lon": -8.3,
+      "tile_id": "7_54",
+      "snap_cells": 1,
+      "old_name": "A Coru\u00f1a, Spain"
+    },
+    "43.5,-3.8": {
+      "old_lat": 43.5,
+      "old_lon": -3.8,
+      "land_lat": 43.4,
+      "land_lon": -3.8,
+      "tile_id": "7_55",
+      "snap_cells": 1,
+      "old_name": "Santander, Spain"
+    },
+    "41.0,39.7": {
+      "old_lat": 41.0,
+      "old_lon": 39.7,
+      "land_lat": 41.0,
+      "land_lon": 39.6,
+      "tile_id": "7_6",
+      "snap_cells": 1,
+      "old_name": "Trabzon, Turkey"
+    },
+    "41.6,41.6": {
+      "old_lat": 41.6,
+      "old_lon": 41.6,
+      "land_lat": 41.6,
+      "land_lon": 41.7,
+      "tile_id": "7_6",
+      "snap_cells": 1,
+      "old_name": "Batumi, Georgia"
+    },
+    "36.8,3.1": {
+      "old_lat": 36.8,
+      "old_lon": 3.1,
+      "land_lat": 36.8,
+      "land_lon": 3.0,
+      "tile_id": "8_0",
+      "snap_cells": 1,
+      "old_name": "Algiers, Algeria"
+    },
+    "36.8,3.2": {
+      "old_lat": 36.8,
+      "old_lon": 3.2,
+      "land_lat": 36.7,
+      "land_lon": 3.2,
+      "tile_id": "8_0",
+      "snap_cells": 1,
+      "old_name": "Bordj el Kiffan, Algeria"
+    },
+    "36.8,3.3": {
+      "old_lat": 36.8,
+      "old_lon": 3.3,
+      "land_lat": 36.7,
+      "land_lon": 3.3,
+      "tile_id": "8_0",
+      "snap_cells": 1,
+      "old_name": "Rouiba, Algiers, Algeria"
+    },
+    "34.8,10.8": {
+      "old_lat": 34.8,
+      "old_lon": 10.8,
+      "land_lat": 34.9,
+      "land_lon": 10.8,
+      "tile_id": "8_1",
+      "snap_cells": 1,
+      "old_name": "Sfax, Sfax Governorate, Tunisia"
+    },
+    "36.8,10.3": {
+      "old_lat": 36.8,
+      "old_lon": 10.3,
+      "land_lat": 36.9,
+      "land_lon": 10.3,
+      "tile_id": "8_1",
+      "snap_cells": 1,
+      "old_name": "La Goulette, Tunisia"
+    },
+    "36.9,6.9": {
+      "old_lat": 36.9,
+      "old_lon": 6.9,
+      "land_lat": 36.9,
+      "land_lon": 6.8,
+      "tile_id": "8_1",
+      "snap_cells": 1,
+      "old_name": "Skikda, Algeria"
+    },
+    "36.9,7.8": {
+      "old_lat": 36.9,
+      "old_lon": 7.8,
+      "land_lat": 36.9,
+      "land_lon": 7.7,
+      "tile_id": "8_1",
+      "snap_cells": 1,
+      "old_name": "Annaba, Algeria"
+    },
+    "36.0,120.2": {
+      "old_lat": 36.0,
+      "old_lon": 120.2,
+      "land_lat": 36.0,
+      "land_lon": 120.1,
+      "tile_id": "8_18",
+      "snap_cells": 1,
+      "old_name": "Changjianglu Jiedao, China"
+    },
+    "37.6,121.4": {
+      "old_lat": 37.6,
+      "old_lon": 121.4,
+      "land_lat": 37.6,
+      "land_lon": 121.3,
+      "tile_id": "8_18",
+      "snap_cells": 1,
+      "old_name": "Zhifudao, China"
+    },
+    "37.3,126.7": {
+      "old_lat": 37.3,
+      "old_lon": 126.7,
+      "land_lat": 37.2,
+      "land_lon": 126.7,
+      "tile_id": "8_19",
+      "snap_cells": 1,
+      "old_name": "Ansan-si, Gyeonggi-do, South Korea"
+    },
+    "37.3,126.8": {
+      "old_lat": 37.3,
+      "old_lon": 126.8,
+      "land_lat": 37.4,
+      "land_lon": 126.8,
+      "tile_id": "8_19",
+      "snap_cells": 1,
+      "old_name": "Ansan-si, Gyeonggi-do, South Korea"
+    },
+    "37.4,126.6": {
+      "old_lat": 37.4,
+      "old_lon": 126.6,
+      "land_lat": 37.5,
+      "land_lon": 126.7,
+      "tile_id": "8_19",
+      "snap_cells": 2,
+      "old_name": "Incheon, South Korea"
+    },
+    "37.4,126.7": {
+      "old_lat": 37.4,
+      "old_lon": 126.7,
+      "land_lat": 37.5,
+      "land_lon": 126.7,
+      "tile_id": "8_19",
+      "snap_cells": 1,
+      "old_name": "Incheon, South Korea"
+    },
+    "37.5,126.6": {
+      "old_lat": 37.5,
+      "old_lon": 126.6,
+      "land_lat": 37.6,
+      "land_lon": 126.6,
+      "tile_id": "8_19",
+      "snap_cells": 1,
+      "old_name": "Incheon, South Korea"
+    },
+    "33.6,130.3": {
+      "old_lat": 33.6,
+      "old_lon": 130.3,
+      "land_lat": 33.6,
+      "land_lon": 130.2,
+      "tile_id": "8_20",
+      "snap_cells": 1,
+      "old_name": "Maebaru-ch\u016b\u014d, Fukuoka, Japan"
+    },
+    "33.8,132.7": {
+      "old_lat": 33.8,
+      "old_lon": 132.7,
+      "land_lat": 33.8,
+      "land_lon": 132.8,
+      "tile_id": "8_20",
+      "snap_cells": 1,
+      "old_name": "Matsuyama, Ehime, Japan"
+    },
+    "34.4,135.3": {
+      "old_lat": 34.4,
+      "old_lon": 135.3,
+      "land_lat": 34.4,
+      "land_lon": 135.4,
+      "tile_id": "8_21",
+      "snap_cells": 1,
+      "old_name": "Izumisano, Osaka, Japan"
+    },
+    "34.7,135.3": {
+      "old_lat": 34.7,
+      "old_lon": 135.3,
+      "land_lat": 34.8,
+      "land_lon": 135.3,
+      "tile_id": "8_21",
+      "snap_cells": 1,
+      "old_name": "Nishinomiya, Japan"
+    },
+    "34.7,135.4": {
+      "old_lat": 34.7,
+      "old_lon": 135.4,
+      "land_lat": 34.8,
+      "land_lon": 135.4,
+      "tile_id": "8_21",
+      "snap_cells": 1,
+      "old_name": "Nishinomiya, Osaka, Japan"
+    },
+    "35.2,139.7": {
+      "old_lat": 35.2,
+      "old_lon": 139.7,
+      "land_lat": 35.3,
+      "land_lon": 139.6,
+      "tile_id": "8_21",
+      "snap_cells": 2,
+      "old_name": "Kurihama, Yokosuka, Japan"
+    },
+    "35.3,139.2": {
+      "old_lat": 35.3,
+      "old_lon": 139.2,
+      "land_lat": 35.4,
+      "land_lon": 139.2,
+      "tile_id": "8_21",
+      "snap_cells": 1,
+      "old_name": "Odawara, Japan"
+    },
+    "35.3,139.7": {
+      "old_lat": 35.3,
+      "old_lon": 139.7,
+      "land_lat": 35.3,
+      "land_lon": 139.6,
+      "tile_id": "8_21",
+      "snap_cells": 1,
+      "old_name": "Yokosuka, Kanagawa, Japan"
+    },
+    "37.9,23.7": {
+      "old_lat": 37.9,
+      "old_lon": 23.7,
+      "land_lat": 38.0,
+      "land_lon": 23.7,
+      "tile_id": "8_3",
+      "snap_cells": 1,
+      "old_name": "Piraeus, Athens, Greece"
+    },
+    "34.0,-118.5": {
+      "old_lat": 34.0,
+      "old_lon": -118.5,
+      "land_lat": 34.1,
+      "land_lon": -118.5,
+      "tile_id": "8_37",
+      "snap_cells": 1,
+      "old_name": "Santa Monica, United States"
+    },
+    "37.7,-122.4": {
+      "old_lat": 37.7,
+      "old_lon": -122.4,
+      "land_lat": 37.8,
+      "land_lon": -122.4,
+      "tile_id": "8_37",
+      "snap_cells": 1,
+      "old_name": "Daly City, San Francisco, California, United States"
+    },
+    "37.8,-122.3": {
+      "old_lat": 37.8,
+      "old_lon": -122.3,
+      "land_lat": 37.9,
+      "land_lon": -122.3,
+      "tile_id": "8_37",
+      "snap_cells": 1,
+      "old_name": "Oakland, California, United States"
+    },
+    "37.8,-122.5": {
+      "old_lat": 37.8,
+      "old_lon": -122.5,
+      "land_lat": 37.9,
+      "land_lon": -122.5,
+      "tile_id": "8_37",
+      "snap_cells": 1,
+      "old_name": "San Francisco, California, United States"
+    },
+    "36.9,30.7": {
+      "old_lat": 36.9,
+      "old_lon": 30.7,
+      "land_lat": 37.0,
+      "land_lon": 30.7,
+      "tile_id": "8_4",
+      "snap_cells": 1,
+      "old_name": "Antalya, Turkey"
+    },
+    "38.4,27.1": {
+      "old_lat": 38.4,
+      "old_lon": 27.1,
+      "land_lat": 38.5,
+      "land_lon": 27.1,
+      "tile_id": "8_4",
+      "snap_cells": 1,
+      "old_name": "\u0130zmir, \u0130zmir Province, Turkey"
+    },
+    "32.6,34.9": {
+      "old_lat": 32.6,
+      "old_lon": 34.9,
+      "land_lat": 32.6,
+      "land_lon": 35.0,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Zikhron Ya\u2018aqov, Haifa, Israel"
+    },
+    "32.7,34.9": {
+      "old_lat": 32.7,
+      "old_lon": 34.9,
+      "land_lat": 32.8,
+      "land_lon": 35.0,
+      "tile_id": "8_5",
+      "snap_cells": 2,
+      "old_name": "Atlit, Israel"
+    },
+    "32.7,35.0": {
+      "old_lat": 32.7,
+      "old_lon": 35.0,
+      "land_lat": 32.8,
+      "land_lon": 35.0,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Tirat Karmel, Israel"
+    },
+    "32.9,35.1": {
+      "old_lat": 32.9,
+      "old_lon": 35.1,
+      "land_lat": 33.0,
+      "land_lon": 35.1,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Acre, Israel"
+    },
+    "33.1,35.1": {
+      "old_lat": 33.1,
+      "old_lon": 35.1,
+      "land_lat": 33.1,
+      "land_lon": 35.2,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "En N\u00e2qo\u00fbra, South Governorate, Lebanon"
+    },
+    "33.3,35.2": {
+      "old_lat": 33.3,
+      "old_lon": 35.2,
+      "land_lat": 33.3,
+      "land_lon": 35.3,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Tyre, South Governorate, Lebanon"
+    },
+    "33.4,35.3": {
+      "old_lat": 33.4,
+      "old_lon": 35.3,
+      "land_lat": 33.4,
+      "land_lon": 35.4,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Sarafand, Lebanon"
+    },
+    "33.6,35.4": {
+      "old_lat": 33.6,
+      "old_lon": 35.4,
+      "land_lat": 33.7,
+      "land_lon": 35.4,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Sidon, South Governorate, Lebanon"
+    },
+    "33.9,35.5": {
+      "old_lat": 33.9,
+      "old_lon": 35.5,
+      "land_lat": 33.8,
+      "land_lon": 35.5,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Beirut, Lebanon"
+    },
+    "33.9,35.6": {
+      "old_lat": 33.9,
+      "old_lon": 35.6,
+      "land_lat": 34.0,
+      "land_lon": 35.6,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Jdaidet el Matn, Beirut, Lebanon"
+    },
+    "34.4,35.8": {
+      "old_lat": 34.4,
+      "old_lon": 35.8,
+      "land_lat": 34.4,
+      "land_lon": 35.9,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Tripoli, Lebanon"
+    },
+    "36.8,34.6": {
+      "old_lat": 36.8,
+      "old_lon": 34.6,
+      "land_lat": 36.9,
+      "land_lon": 34.6,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Mersin, Turkey"
+    },
+    "36.8,34.7": {
+      "old_lat": 36.8,
+      "old_lon": 34.7,
+      "land_lat": 36.9,
+      "land_lon": 34.7,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Mersin, Turkey"
+    },
+    "36.8,35.8": {
+      "old_lat": 36.8,
+      "old_lon": 35.8,
+      "land_lat": 36.9,
+      "land_lon": 35.8,
+      "tile_id": "8_5",
+      "snap_cells": 1,
+      "old_name": "Zeytinbeli, Turkey"
+    },
+    "38.7,-9.4": {
+      "old_lat": 38.7,
+      "old_lon": -9.4,
+      "land_lat": 38.8,
+      "land_lon": -9.4,
+      "tile_id": "8_54",
+      "snap_cells": 1,
+      "old_name": "S\u00e3o Domingos de Rana, Portugal"
+    },
+    "33.6,-7.6": {
+      "old_lat": 33.6,
+      "old_lon": -7.6,
+      "land_lat": 33.6,
+      "land_lon": -7.7,
+      "tile_id": "8_55",
+      "snap_cells": 1,
+      "old_name": "Casablanca, Casablanca-Settat, Morocco"
+    },
+    "35.2,-2.9": {
+      "old_lat": 35.2,
+      "old_lon": -2.9,
+      "land_lat": 35.2,
+      "land_lon": -3.0,
+      "tile_id": "8_55",
+      "snap_cells": 1,
+      "old_name": "Nador, Morocco"
+    },
+    "35.8,-5.8": {
+      "old_lat": 35.8,
+      "old_lon": -5.8,
+      "land_lat": 35.8,
+      "land_lon": -5.7,
+      "tile_id": "8_55",
+      "snap_cells": 1,
+      "old_name": "Tangier, Tanger-Tetouan-Al Hoceima, Morocco"
+    },
+    "38.4,-0.4": {
+      "old_lat": 38.4,
+      "old_lon": -0.4,
+      "land_lat": 38.5,
+      "land_lon": -0.4,
+      "tile_id": "8_56",
+      "snap_cells": 1,
+      "old_name": "El Campello, Alicante, Spain"
+    },
+    "27.5,120.6": {
+      "old_lat": 27.5,
+      "old_lon": 120.6,
+      "land_lat": 27.6,
+      "land_lon": 120.6,
+      "tile_id": "9_18",
+      "snap_cells": 1,
+      "old_name": "Jinxiang, Zhejiang, China"
+    },
+    "28.1,121.0": {
+      "old_lat": 28.1,
+      "old_lon": 121.0,
+      "land_lat": 28.2,
+      "land_lon": 121.0,
+      "tile_id": "9_18",
+      "snap_cells": 1,
+      "old_name": "Tiancheng, China"
+    },
+    "30.7,121.3": {
+      "old_lat": 30.7,
+      "old_lon": 121.3,
+      "land_lat": 30.8,
+      "land_lon": 121.3,
+      "tile_id": "9_18",
+      "snap_cells": 1,
+      "old_name": "Jinshanwei, China"
+    },
+    "31.5,121.3": {
+      "old_lat": 31.5,
+      "old_lon": 121.3,
+      "land_lat": 31.5,
+      "land_lon": 121.2,
+      "tile_id": "9_18",
+      "snap_cells": 1,
+      "old_name": "Huating, China"
+    },
+    "31.6,121.4": {
+      "old_lat": 31.6,
+      "old_lon": 121.4,
+      "land_lat": 31.7,
+      "land_lon": 121.4,
+      "tile_id": "9_18",
+      "snap_cells": 1,
+      "old_name": "Chengqiao, China"
+    },
+    "28.3,121.6": {
+      "old_lat": 28.3,
+      "old_lon": 121.6,
+      "land_lat": 28.8,
+      "land_lon": 121.6,
+      "tile_id": "9_19",
+      "snap_cells": 5,
+      "old_name": "Shiqiaotou, China"
+    },
+    "29.9,122.3": {
+      "old_lat": 29.9,
+      "old_lon": 122.3,
+      "land_lat": 30.0,
+      "land_lon": 122.3,
+      "tile_id": "9_19",
+      "snap_cells": 1,
+      "old_name": "Shenjiamen, China"
+    },
+    "30.0,122.1": {
+      "old_lat": 30.0,
+      "old_lon": 122.1,
+      "land_lat": 30.1,
+      "land_lon": 122.1,
+      "tile_id": "9_19",
+      "snap_cells": 1,
+      "old_name": "Yancang, Zhoushan, China"
+    },
+    "31.1,29.7": {
+      "old_lat": 31.1,
+      "old_lon": 29.7,
+      "land_lat": 31.1,
+      "land_lon": 29.8,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "Alexandria, Egypt"
+    },
+    "31.2,29.9": {
+      "old_lat": 31.2,
+      "old_lon": 29.9,
+      "land_lat": 31.2,
+      "land_lon": 30.0,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "Alexandria, Egypt"
+    },
+    "31.3,30.0": {
+      "old_lat": 31.3,
+      "old_lon": 30.0,
+      "land_lat": 31.2,
+      "land_lon": 30.0,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "Ab\u016b Q\u012br, Alexandria, Egypt"
+    },
+    "31.3,30.1": {
+      "old_lat": 31.3,
+      "old_lon": 30.1,
+      "land_lat": 31.2,
+      "land_lon": 30.1,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "Ab\u016b Q\u012br, Alexandria, Egypt"
+    },
+    "31.3,30.3": {
+      "old_lat": 31.3,
+      "old_lon": 30.3,
+      "land_lat": 31.3,
+      "land_lon": 30.4,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "Idk\u016b, Egypt"
+    },
+    "31.5,31.8": {
+      "old_lat": 31.5,
+      "old_lon": 31.8,
+      "land_lat": 31.5,
+      "land_lon": 31.7,
+      "tile_id": "9_4",
+      "snap_cells": 1,
+      "old_name": "\u2018Izbat al Burj, Damietta, Egypt"
+    },
+    "29.5,35.0": {
+      "old_lat": 29.5,
+      "old_lon": 35.0,
+      "land_lat": 29.6,
+      "land_lon": 35.0,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Aqaba, Jordan"
+    },
+    "31.3,32.3": {
+      "old_lat": 31.3,
+      "old_lon": 32.3,
+      "land_lat": 31.2,
+      "land_lon": 32.3,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Port Said, Egypt"
+    },
+    "31.4,34.3": {
+      "old_lat": 31.4,
+      "old_lon": 34.3,
+      "land_lat": 31.4,
+      "land_lon": 34.4,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Kh\u0101n Y\u016bnis, Gaza Strip, Palestinian Territory"
+    },
+    "31.7,34.5": {
+      "old_lat": 31.7,
+      "old_lon": 34.5,
+      "land_lat": 31.7,
+      "land_lon": 34.6,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Ashkelon, Southern District, Israel"
+    },
+    "31.8,34.6": {
+      "old_lat": 31.8,
+      "old_lon": 34.6,
+      "land_lat": 31.8,
+      "land_lon": 34.7,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Ashdod, Southern District, Israel"
+    },
+    "31.9,34.7": {
+      "old_lat": 31.9,
+      "old_lon": 34.7,
+      "land_lat": 32.0,
+      "land_lon": 34.7,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Yavn\u00e9, Rishon LeTsiyyon, Israel"
+    },
+    "32.1,34.7": {
+      "old_lat": 32.1,
+      "old_lon": 34.7,
+      "land_lat": 32.1,
+      "land_lon": 34.8,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Tel Aviv, Israel"
+    },
+    "32.3,34.8": {
+      "old_lat": 32.3,
+      "old_lon": 34.8,
+      "land_lat": 32.3,
+      "land_lon": 34.9,
+      "tile_id": "9_5",
+      "snap_cells": 1,
+      "old_name": "Netanya, Israel"
+    },
+    "30.4,-9.6": {
+      "old_lat": 30.4,
+      "old_lon": -9.6,
+      "land_lat": 30.5,
+      "land_lon": -9.6,
+      "tile_id": "9_54",
+      "snap_cells": 1,
+      "old_name": "Agadir, Morocco"
+    },
+    "26.2,50.6": {
+      "old_lat": 26.2,
+      "old_lon": 50.6,
+      "land_lat": 26.2,
+      "land_lon": 50.5,
+      "tile_id": "9_7",
+      "snap_cells": 1,
+      "old_name": "Al Muharraq, Muharraq, Bahrain"
+    },
+    "26.3,50.2": {
+      "old_lat": 26.3,
+      "old_lon": 50.2,
+      "land_lat": 26.4,
+      "land_lon": 50.2,
+      "tile_id": "9_7",
+      "snap_cells": 1,
+      "old_name": "Thuqbah, Saudi Arabia"
+    },
+    "26.3,50.6": {
+      "old_lat": 26.3,
+      "old_lon": 50.6,
+      "land_lat": 26.2,
+      "land_lon": 50.5,
+      "tile_id": "9_7",
+      "snap_cells": 2,
+      "old_name": "Al Muharraq, Muharraq, Bahrain"
+    },
+    "26.5,50.1": {
+      "old_lat": 26.5,
+      "old_lon": 50.1,
+      "land_lat": 26.5,
+      "land_lon": 50.0,
+      "tile_id": "9_7",
+      "snap_cells": 1,
+      "old_name": "Dammam, Eastern Province, Saudi Arabia"
+    },
+    "29.3,48.1": {
+      "old_lat": 29.3,
+      "old_lon": 48.1,
+      "land_lat": 29.3,
+      "land_lon": 48.0,
+      "tile_id": "9_7",
+      "snap_cells": 1,
+      "old_name": "\u1e28awall\u012b, Hawalli, Kuwait"
+    },
+    "29.4,48.0": {
+      "old_lat": 29.4,
+      "old_lon": 48.0,
+      "land_lat": 29.3,
+      "land_lon": 48.0,
+      "tile_id": "9_7",
+      "snap_cells": 1,
+      "old_name": "\u1e28awall\u012b, Hawalli, Kuwait"
+    },
+    "27.2,56.3": {
+      "old_lat": 27.2,
+      "old_lon": 56.3,
+      "land_lat": 27.3,
+      "land_lon": 56.3,
+      "tile_id": "9_8",
+      "snap_cells": 1,
+      "old_name": "Bandar Abbas, Iran"
+    }
+  }
+}
