@@ -60,6 +60,7 @@ const ComparePage: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [series, setSeries] = useState<Series[]>(() => [makeSeries(0)]);
   const [layout, setLayout] = useState<LayoutMode>('overlay');
+  const [pointMode, setPointMode] = useState<'all' | 'percentile'>('all');
 
   const dataMap = useArchiveTimelines(series);
 
@@ -175,6 +176,23 @@ const ComparePage: React.FC = () => {
               </button>
             </div>
 
+            <div className="cmp-layout-toggle">
+              <button
+                type="button"
+                className={pointMode === 'all' ? 'active' : ''}
+                onClick={() => setPointMode('all')}
+              >
+                All data
+              </button>
+              <button
+                type="button"
+                className={pointMode === 'percentile' ? 'active' : ''}
+                onClick={() => setPointMode('percentile')}
+              >
+                Percentiles
+              </button>
+            </div>
+
             <button type="button" className="cmp-add-series" onClick={addSeries}>
               + Add chart
             </button>
@@ -207,6 +225,7 @@ const ComparePage: React.FC = () => {
                     series={grp.items}
                     axisMetric={grp.items[0].series.metric}
                     domain={domainByFamily.get(grp.family)}
+                    pointMode={pointMode}
                     width={overlayGroups.length > 1 ? 420 : 520}
                     height={overlayGroups.length > 1 ? 420 : 520}
                   />
@@ -216,6 +235,7 @@ const ComparePage: React.FC = () => {
                       rs.series.markers.map((m) => ({ series: rs.series, marker: m }))
                     )}
                     system={system}
+                    pointMode={pointMode}
                   />
                 </div>
               ))}
@@ -231,6 +251,7 @@ const ComparePage: React.FC = () => {
                     series={[rs]}
                     axisMetric={rs.series.metric}
                     domain={domainByFamily.get(unitFamily(rs.series.metric))}
+                    pointMode={pointMode}
                     width={400}
                     height={400}
                   />
@@ -238,6 +259,7 @@ const ComparePage: React.FC = () => {
                     entries={[rs]}
                     markers={rs.series.markers.map((m) => ({ series: rs.series, marker: m }))}
                     system={system}
+                    pointMode={pointMode}
                   />
                 </div>
               ))}
@@ -254,9 +276,10 @@ interface LegendProps {
   entries: ResolvedSeries[];
   markers: { series: Series; marker: { id: string; date: string; color: string } }[];
   system: ReturnType<typeof useUnits>['system'];
+  pointMode: 'all' | 'percentile';
 }
 
-const Legend: React.FC<LegendProps> = ({ entries, markers, system }) => {
+const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode }) => {
   // Resolve each marker's value so the legend can show what its dashed ring sits at.
   const markerValue = (
     date: string,
@@ -279,12 +302,47 @@ const Legend: React.FC<LegendProps> = ({ entries, markers, system }) => {
   return (
     <div className="cmp-legend">
       {entries.map(({ series: s }) => (
-        <div key={s.id} className="cmp-legend-item">
-          <span className="cmp-legend-line" style={{ background: s.color }} />
-          <span className="cmp-legend-text">
-            {s.name} · {METRIC_NAME[s.metric]} · {s.startYear}–{s.endYear}
-          </span>
-        </div>
+        <React.Fragment key={s.id}>
+          <div className="cmp-legend-item">
+            <span className="cmp-legend-line" style={{ background: s.color }} />
+            <span className="cmp-legend-text">
+              {s.name} · {METRIC_NAME[s.metric]} · {s.startYear}–{s.endYear}
+              {pointMode === 'percentile' ? ' · median' : ''}
+            </span>
+          </div>
+          {pointMode === 'percentile' && (
+            <>
+              <div className="cmp-legend-item cmp-legend-sub">
+                <span
+                  className="cmp-legend-swatch"
+                  style={{ background: s.color, opacity: 0.32 }}
+                />
+                <span className="cmp-legend-text">25–75 percentile</span>
+              </div>
+              <div className="cmp-legend-item cmp-legend-sub">
+                <span
+                  className="cmp-legend-swatch"
+                  style={{ background: s.color, opacity: 0.15 }}
+                />
+                <span className="cmp-legend-text">5–95 percentile</span>
+              </div>
+              <div className="cmp-legend-item cmp-legend-sub">
+                <span
+                  className="cmp-legend-swatch"
+                  style={{ background: s.color, opacity: 0.08 }}
+                />
+                <span className="cmp-legend-text">1–99 percentile</span>
+              </div>
+              <div className="cmp-legend-item cmp-legend-sub">
+                <span
+                  className="cmp-legend-dot"
+                  style={{ background: s.color, opacity: 0.1 }}
+                />
+                <span className="cmp-legend-text">outliers (&lt;1 / &gt;99)</span>
+              </div>
+            </>
+          )}
+        </React.Fragment>
       ))}
       {markers.map(({ series: s, marker }) => {
         const rs = entries.find((e) => e.series.id === s.id);

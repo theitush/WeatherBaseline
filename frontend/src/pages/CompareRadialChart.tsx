@@ -23,6 +23,12 @@ interface CompareRadialChartProps {
    * omitted the dial auto-scales to its own series.
    */
   domain?: [number, number];
+  /**
+   * 'all' draws every day as a faint dot. 'percentile' replaces the cloud with
+   * per-series 1–99, 5–95 and 25–75 bands (around the day-of-year), plus the
+   * dots that fall outside the 1–99 band drawn faintly as outliers.
+   */
+  pointMode?: 'all' | 'percentile';
   width?: number;
   height?: number;
 }
@@ -42,6 +48,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
   series,
   axisMetric,
   domain,
+  pointMode = 'all',
   width: propWidth,
   height: propHeight,
 }) => {
@@ -172,7 +179,77 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
         .text(MONTHS[m]);
     }
 
+    // ---- per-series percentile bands (percentile mode only) ----------------
+    // Build, per series, the day-of-year quantile envelopes. Returns the set of
+    // points that fall OUTSIDE the 1–99 band so the cloud can draw them as
+    // faint outliers. Bands are nested radial areas, palest 1–99 outermost.
+    type Band = { frac: number; lo: number; hi: number };
+    const radialArea = d3
+      .areaRadial<Band>()
+      .angle((d) => d.frac * 2 * Math.PI)
+      .innerRadius((d) => rScale(d.lo))
+      .outerRadius((d) => rScale(d.hi))
+      .curve(d3.curveCardinalClosed);
+
+    const outlierPts: Pt[] = [];
+    if (pointMode === 'percentile') {
+      for (const { series: s } of series) {
+        const pts = perSeriesPts.get(s.id) ?? [];
+        if (pts.length === 0) continue;
+        const byDoy = d3.group(pts, (p) => Math.floor(dayFraction(p.date) * 365));
+        const band199: Band[] = [];
+        const band595: Band[] = [];
+        const band2575: Band[] = [];
+        // thresholds[doy] = [p1, p99] for the outlier test below.
+        const thresh = new Map<number, [number, number]>();
+        for (const [doy, rows] of byDoy) {
+          const vals = rows.map((r) => r.val).sort(d3.ascending);
+          const p1 = d3.quantileSorted(vals, 0.01) as number;
+          const p5 = d3.quantileSorted(vals, 0.05) as number;
+          const p25 = d3.quantileSorted(vals, 0.25) as number;
+          const p75 = d3.quantileSorted(vals, 0.75) as number;
+          const p95 = d3.quantileSorted(vals, 0.95) as number;
+          const p99 = d3.quantileSorted(vals, 0.99) as number;
+          const frac = doy / 365;
+          band199.push({ frac, lo: p1, hi: p99 });
+          band595.push({ frac, lo: p5, hi: p95 });
+          band2575.push({ frac, lo: p25, hi: p75 });
+          thresh.set(doy, [p1, p99]);
+        }
+        if (band199.length <= 8) continue;
+        band199.sort((a, b) => a.frac - b.frac);
+        band595.sort((a, b) => a.frac - b.frac);
+        band2575.sort((a, b) => a.frac - b.frac);
+
+        g.append('path')
+          .datum(band199)
+          .attr('class', 'cmp-band cmp-band-199')
+          .attr('fill', s.color)
+          .attr('opacity', 0.08)
+          .attr('d', radialArea as never);
+        g.append('path')
+          .datum(band595)
+          .attr('class', 'cmp-band cmp-band-595')
+          .attr('fill', s.color)
+          .attr('opacity', 0.15)
+          .attr('d', radialArea as never);
+        g.append('path')
+          .datum(band2575)
+          .attr('class', 'cmp-band cmp-band-2575')
+          .attr('fill', s.color)
+          .attr('opacity', 0.32)
+          .attr('d', radialArea as never);
+
+        for (const p of pts) {
+          const doy = Math.floor(dayFraction(p.date) * 365);
+          const t = thresh.get(doy);
+          if (t && (p.val < t[0] || p.val > t[1])) outlierPts.push(p);
+        }
+      }
+    }
+
     // ---- per-series day cloud on CANVAS ------------------------------------
+    // In 'all' mode this is every day; in 'percentile' mode just the outliers.
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = totalWidth * dpr;
@@ -182,9 +259,12 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, totalWidth, totalHeight);
       ctx.translate(cx, cy);
+      const cloudPts = pointMode === 'percentile' ? outlierPts : allPts;
       // Lighter cloud when overlaying many series so they don't muddy together.
-      const cloudAlpha = series.length > 1 ? 0.06 : 0.1;
-      for (const p of allPts) {
+      // Outliers (beyond 1–99) get a fixed 10% alpha.
+      const cloudAlpha =
+        pointMode === 'percentile' ? 0.1 : series.length > 1 ? 0.06 : 0.1;
+      for (const p of cloudPts) {
         const [x, y] = polar(dayFraction(p.date), rScale(p.val));
         ctx.fillStyle = p.color;
         ctx.globalAlpha = cloudAlpha;
@@ -271,7 +351,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
     }
-  }, [series, axisMetric, domain, totalWidth, totalHeight, system]);
+  }, [series, axisMetric, domain, pointMode, totalWidth, totalHeight, system]);
 
   return (
     <div className="cmp-radial-wrapper" style={{ width: totalWidth, height: totalHeight }}>

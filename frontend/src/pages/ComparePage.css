@@ -343,6 +343,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cmp-legend-sub {
+  padding-left: 0.9rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+.cmp-legend-swatch {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 10px;
+  border-radius: 2px;
+}
+.cmp-legend-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin: 0 5px;
+  border-radius: 50%;
+}
 
 @media (max-width: 700px) {
   .cmp-series-card,
