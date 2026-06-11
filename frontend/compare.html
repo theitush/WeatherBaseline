@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WeatherBaseline — Compare</title>
+    <meta name="description" content="Overlay and compare yearly weather dials side by side." />
+    <script>
+      // Apply saved theme before first paint to avoid a flash of the wrong mode.
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark')
+          document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/compare.tsx"></script>
+  </body>
+</html>

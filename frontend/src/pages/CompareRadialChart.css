@@ -1,0 +1,35 @@
+.cmp-radial-wrapper {
+  position: relative;
+}
+
+.cmp-radial-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.cmp-radial-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.cmp-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 6px 9px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.cmp-marker-dot {
+  cursor: pointer;
+}

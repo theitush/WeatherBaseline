@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'node:path'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -7,6 +8,15 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    rollupOptions: {
+      // Two HTML entry points: the main app (index.html) and the standalone
+      // multi-radial comparison page (compare.html). Each has its own React
+      // root; they share nothing but the data services and design tokens.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        compare: resolve(__dirname, 'compare.html'),
+      },
+    },
   },
   server: {
     proxy: {
