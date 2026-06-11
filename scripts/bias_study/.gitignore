@@ -2,3 +2,7 @@
 # git — pull_hres_all.py mirrors it here only as a local cache / resume aid.
 # (The small pilot data/ — archive/ + overlap.csv — IS tracked, intentionally.)
 data/hres-forecast/
+
+# Raw CDS ERA5-Land geopotential GRIB (~13 MB) — regenerable; the derived
+# cell_elevation.csv (small) IS tracked instead.
+data/geo.grib
