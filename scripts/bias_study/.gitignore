@@ -1,0 +1,4 @@
+# The full 10k-cell HRES forecast pull lives in R2 (hres-forecast/ prefix), not
+# git — pull_hres_all.py mirrors it here only as a local cache / resume aid.
+# (The small pilot data/ — archive/ + overlap.csv — IS tracked, intentionally.)
+data/hres-forecast/
