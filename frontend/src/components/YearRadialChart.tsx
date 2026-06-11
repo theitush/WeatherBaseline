@@ -92,15 +92,15 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .domain([vMin - pad, vMax + pad])
       .range([rInner, rOuter]);
 
-    // The whole dial is rotated so the TARGET day sits at 12 o'clock — its
-    // day-of-year fraction is subtracted from every angle. Months therefore
-    // don't sit at fixed clock positions; they rotate with the selected date.
+    // The dial is anchored so Jan 1 sits at 12 o'clock and the year runs
+    // clockwise — months sit at fixed clock positions regardless of the
+    // selected date. The target day's marker simply moves around the ring.
     const targetDt = new Date(currentDate + 'T00:00:00');
     const targetFrac = dayFraction(targetDt);
 
-    // angle: target day at top (12 o'clock), clockwise through the year.
+    // angle: Jan 1 at top (12 o'clock), clockwise through the year.
     const angle = (frac: number) =>
-      (frac - targetFrac) * 2 * Math.PI - Math.PI / 2;
+      frac * 2 * Math.PI - Math.PI / 2;
     const polar = (frac: number, r: number): [number, number] => {
       const a = angle(frac);
       return [r * Math.cos(a), r * Math.sin(a)];
@@ -111,15 +111,16 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     const WINDOW_DAYS = CONFIG.chart.seasonalWindowDays;
     const windowFrac = WINDOW_DAYS / 365;
 
-    // Faint wedge straddling the top of the dial, behind everything else, so the
-    // ±N-day window reads as a sector of the year. Arc angles are clockwise from
-    // 12 o'clock, so the window is symmetric about 0.
+    // Faint wedge straddling the TARGET day's position on the dial, behind
+    // everything else, so the ±N-day window reads as a sector of the year.
+    // Arc angles are clockwise from 12 o'clock, so the window is centred on the
+    // target day's day-of-year fraction.
     const windowArc = d3
       .arc<unknown>()
       .innerRadius(rInner)
       .outerRadius(rOuter)
-      .startAngle(-windowFrac * 2 * Math.PI)
-      .endAngle(windowFrac * 2 * Math.PI);
+      .startAngle((targetFrac - windowFrac) * 2 * Math.PI)
+      .endAngle((targetFrac + windowFrac) * 2 * Math.PI);
     g.append('path')
       .attr('class', 'radial-window-wedge')
       .attr('d', windowArc(null) as string)
@@ -170,8 +171,8 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .attr('stroke', 'var(--chart-grid)')
       .attr('stroke-dasharray', '2,3');
 
-    // value labels on the rings. Two month-spokes (2/12 turn) to the LEFT of the
-    // target spoke (which runs straight up to the top), so they sit clear of it.
+    // value labels on the rings. Two month-spokes (2/12 turn) left of vertical,
+    // so they sit clear of the Jan/Dec boundary at the top of the dial.
     const spoke = (2 * Math.PI) / 12;
     const labelAngle = -Math.PI / 2 - 2 * spoke; // two spokes left of vertical
     // Second set of labels on the far side of the dial: the spoke opposite the
@@ -237,9 +238,9 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     if (medianPath.length > 8) {
       const radialLine = d3
         .lineRadial<{ frac: number; val: number }>()
-        // lineRadial measures angle from 12 o'clock clockwise — subtract the
-        // target fraction so the ring rotates with the rest of the dial.
-        .angle((d) => (d.frac - targetFrac) * 2 * Math.PI)
+        // lineRadial measures angle from 12 o'clock clockwise — Jan 1 anchored
+        // at top, matching the rest of the dial.
+        .angle((d) => d.frac * 2 * Math.PI)
         .radius((d) => rScale(d.val))
         .curve(d3.curveCardinalClosed);
       g.append('path')
@@ -261,10 +262,10 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .arc<number>()
       .innerRadius(rInner)
       .outerRadius(rOuter)
-      // Arc angles are clockwise from 12 o'clock; map the month's day-of-year
-      // span through the same target-relative rotation as everything else.
-      .startAngle((m) => (m / 12 - targetFrac) * 2 * Math.PI)
-      .endAngle((m) => ((m + 1) / 12 - targetFrac) * 2 * Math.PI);
+      // Arc angles are clockwise from 12 o'clock; Jan 1 anchored at top, so the
+      // month's day-of-year span maps directly.
+      .startAngle((m) => (m / 12) * 2 * Math.PI)
+      .endAngle((m) => ((m + 1) / 12) * 2 * Math.PI);
 
     g.selectAll('.radial-month-wedge')
       .data(d3.range(12))
@@ -354,15 +355,14 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
         .style('fill', 'var(--text-h)')
         .text(dateLabel);
 
-      // Target VALUE label on the spoke one step RIGHT of vertical, sitting just
-      // over the wheel point and nudged right (above-and-right of the spoke).
-      const tValAngle = -Math.PI / 2 + spoke;
+      // Target VALUE label just below the marker (date label sits above it), so
+      // both labels travel with the dot as it moves around the dial.
       g.append('text')
         .attr('class', 'radial-target-value')
-        .attr('x', tR * Math.cos(tValAngle) + 4)
-        .attr('y', tR * Math.sin(tValAngle) - 8)
+        .attr('x', tx)
+        .attr('y', ty + 16)
         .attr('dy', '0.32em')
-        .style('text-anchor', 'start')
+        .style('text-anchor', 'middle')
         .style('font-size', '11px')
         .style('font-weight', '600')
         .style('fill', 'var(--text-h)')
