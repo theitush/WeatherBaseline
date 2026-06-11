@@ -242,8 +242,9 @@ def main() -> int:
     ap.add_argument("--overwrite", action="store_true",
                     help="re-pull cells that already exist in R2 (e.g. to fix a "
                          "wrong window) instead of skipping them")
-    ap.add_argument("--ledger-every", type=int, default=25,
-                    help="flush the R2 ledger every N cells (default 25)")
+    ap.add_argument("--ledger-every", type=int, default=1,
+                    help="flush the R2 ledger every N cells (default 1: after "
+                         "every cell, so a kill never loses a cell's bias meta)")
     args = ap.parse_args()
 
     apikey = os.environ.get("OPENMETEO_API_KEY") or None
@@ -271,6 +272,7 @@ def main() -> int:
     print(f"window {s} .. {e}  ({days} days)   tier: {tier}")
     print(f"{len(cells)} cells x ~{calls_per_cell} calls = "
           f"~{len(cells) * calls_per_cell:,} API calls  @ {rate:.0f}/min")
+    print("listing what's already in R2 / loading ledger…", flush=True)
 
     up = R2Uploader()
     # Two-layer resume so a FRESH box with an empty local dir is correct:
@@ -296,9 +298,14 @@ def main() -> int:
 
     limiter = RateLimiter(rate)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    n_todo = sum(1 for _, sla, slo in cells
+                 if f"{sla:.1f}_{slo:.1f}" not in skip)
     n_ok = n_skip = n_fail = 0
     t_start = time.time()
     stopped = False
+    print(f"{n_todo} cells to fetch this run "
+          f"(ledger flush every {args.ledger_every} cell"
+          f"{'s' if args.ledger_every != 1 else ''})\n", flush=True)
 
     for idx, (name, slat, slon) in enumerate(cells):
         key = f"{slat:.1f}_{slon:.1f}"
@@ -307,16 +314,21 @@ def main() -> int:
             continue
         gz = OUT_DIR / f"hres_{key}.csv.gz"
         r2_key = f"{R2_PREFIX}/hres_{key}.csv.gz"
+        # progress = cells processed so far this run (ok + fail), out of the to-do count
+        nth = n_ok + n_fail + 1
+        tag = f"[{nth}/{n_todo}] {name[:28]:28s} {key:14s}"
+        print(f"  {tag} fetching…", flush=True)
+        t_cell = time.time()
         try:
             rows, meta = fetch_hres(host, apikey, slat, slon, s, e, limiter)
         except RateLimitHit as ex:
-            print(f"\n  rate/quota limit reached at cell {idx + 1} ({key}): {ex}")
+            print(f"\n  rate/quota limit reached at cell {nth} ({key}): {ex}")
             print("  stopping cleanly — rerun the same command to continue.")
             stopped = True
             break
         except Exception as ex:  # noqa: BLE001 - log, keep going, retry on rerun
             n_fail += 1
-            print(f"  [{idx + 1}/{len(cells)}] {name[:30]:30s} {key:14s} FAIL: {ex}")
+            print(f"  {tag} FAIL: {ex}", flush=True)
             continue
 
         write_local_gz(gz, rows)
@@ -325,12 +337,17 @@ def main() -> int:
         skip.add(key)
         n_ok += 1
 
-        if n_ok % 20 == 0:
-            cmin = n_ok / max(1e-9, (time.time() - t_start) / 60)
-            print(f"  [{idx + 1}/{len(cells)}] {name[:30]:30s} {key:14s} "
-                  f"{len(rows)} rows  ({cmin:.0f} cells/min)")
+        dt = time.time() - t_cell
+        cmin = n_ok / max(1e-9, (time.time() - t_start) / 60)
+        hl = meta.get("hres_lat")
+        hlon = meta.get("hres_lon")
+        hloc = f"HRES@{hl:.3f},{hlon:.3f}" if hl is not None and hlon is not None else "HRES@?"
+        print(f"  {tag} OK  {len(rows)} rows  {hloc}  "
+              f"{dt:.1f}s  ({cmin:.0f} cells/min)", flush=True)
         if n_ok % args.ledger_every == 0:
             save_ledger(up, ledger)
+            print(f"  {tag} ledger flushed to R2 "
+                  f"({len(done)} cells recorded)", flush=True)
 
     save_ledger(up, ledger)
     print(f"\ndone. ok={n_ok} skip={n_skip} fail={n_fail}  "
