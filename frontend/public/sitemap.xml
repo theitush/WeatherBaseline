@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WeatherBaseline is a SPA whose deep links are dynamic per-cell URLs
+     (/{lat},{lon}/{date}/{metric}); those are infinite and not enumerated here.
+     This sitemap lists the stable, indexable entry points only. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.weatherbaseline.com/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
