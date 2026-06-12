@@ -16,6 +16,20 @@
 
 const TIERS = ['archive', 'recent', 'forecast'];
 
+// Cache-Control per tier, stored as object httpMetadata so R2 serves it as the
+// origin header. This is what keeps the volatile tiers fresh now that the data
+// domain (data.weatherbaseline.com) sits behind Cloudflare's cache: .gz is on
+// the default-cacheable extension list, so without an explicit header the edge
+// would hold recent/forecast for ~2h (and browsers would heuristically cache
+// off Last-Modified) after ensure-fresh rewrites them. archive is settled data;
+// a day of edge/browser caching is safe and re-uploads can purge or wait it out.
+// Keep in sync with r2_upload.py (the producer-side upload path).
+const CACHE_CONTROL = {
+  archive: 'public, max-age=86400',
+  recent: 'no-store',
+  forecast: 'no-store',
+};
+
 const SCHEMA = ['date', 'tmax_C', 'tmin_C', 'precip_mm', 'wind_max_ms'];
 
 /** Snap a coordinate to the fixed 0.1° ERA5-Land grid: round(coord*10)/10. */
@@ -66,6 +80,7 @@ async function writeRows(bucket, tier, lat, lon, rows) {
     httpMetadata: {
       contentType: 'text/csv; charset=utf-8',
       contentEncoding: 'gzip',
+      cacheControl: CACHE_CONTROL[tier],
     },
   });
 }

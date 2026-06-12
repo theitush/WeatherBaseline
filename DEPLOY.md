@@ -10,7 +10,7 @@ deploy by running the commands below.
 |---|---|---|
 | **Frontend** | `https://weather-baseline.pages.dev` | The static site users visit (Cloudflare Pages project `weather-baseline`). |
 | **Worker** | `https://howhotwasit.yajna-auth.workers.dev` | Control-plane API: `/api/geo`, `/api/ensure-fresh`, `/api/health`. Tops up the volatile R2 tiers from Open-Meteo. |
-| **Data** | R2 bucket `weather-baseline`, public at `https://pub-403d94ceb15c48af9cb6005b1d541e82.r2.dev` | The `archive/recent/forecast` `.csv.gz` tier files. The frontend reads these **directly** from R2 — reads never touch the Worker. |
+| **Data** | R2 bucket `weather-baseline`, public at `https://data.weatherbaseline.com` (custom domain; the rate-limited dev fallback `https://pub-403d94ceb15c48af9cb6005b1d541e82.r2.dev` still works) | The `archive/recent/forecast` `.csv.gz` tier files. The frontend reads these **directly** from R2 — reads never touch the Worker. The custom domain runs through Cloudflare's cache; freshness is governed by per-object `Cache-Control` metadata (`archive/` max-age=86400, `recent/`+`forecast/` no-store — set by `r2_upload.py` / the Worker's `cellStore.js`; backfill with `r2_set_cache_control.py`). |
 
 > **Naming note (cosmetic):** the Worker is named `howhotwasit` and the account
 > subdomain is `yajna-auth` — leftovers from the old product name / account.
@@ -103,7 +103,8 @@ curl -s "$BASE/api/ensure-fresh?lat=51.5&lon=-0.1"
   `--upload-r2`. Object keys are `{tier}/{tier}_{lat}_{lon}.csv.gz` — **no**
   `data/` or `era5-land/` prefix.
 - **CORS is required** and easy to get wrong. The frontend fetches the `.csv.gz`
-  files cross-origin (page on `pages.dev`, files on `r2.dev`), so the bucket's
+  files cross-origin (page on `pages.dev` / `www.weatherbaseline.com`, files on
+  `data.weatherbaseline.com`), so the bucket's
   CORS allowlist must contain the **exact** Pages origin, hyphen included:
   `https://weather-baseline.pages.dev`. If it's missing/wrong, the browser
   blocks every data fetch and the chart shows "No weather data received".

@@ -41,6 +41,22 @@ from botocore.config import Config
 DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
 
+# Cache-Control per tier, stored as object metadata so R2 serves it as the
+# origin header. The data domain (data.weatherbaseline.com) sits behind
+# Cloudflare's cache and .gz is default-cacheable, so volatile tiers must say
+# no-store or the edge/browser would serve them stale after a refresh; archive
+# is settled and gets a day. Keep in sync with worker/src/cellStore.js.
+CACHE_CONTROL = {
+    "archive": "public, max-age=86400",
+    "recent": "no-store",
+    "forecast": "no-store",
+}
+
+
+def cache_control_for(key: str) -> str | None:
+    """Cache-Control for an object key, by its tier prefix (None = unknown)."""
+    return CACHE_CONTROL.get(key.split("/", 1)[0])
+
 
 class R2Uploader:
     """Thin wrapper over a boto3 S3 client pointed at R2.
@@ -80,15 +96,13 @@ class R2Uploader:
 
     def upload_file(self, path: Path, key: str) -> None:
         """Upload one .csv.gz file under `key`, with the serve-it-raw headers."""
-        self.client.upload_file(
-            str(path),
-            self.bucket,
-            key,
-            ExtraArgs={
-                "ContentType": "text/csv; charset=utf-8",
-                "ContentEncoding": "gzip",
-            },
-        )
+        extra = {
+            "ContentType": "text/csv; charset=utf-8",
+            "ContentEncoding": "gzip",
+        }
+        if cc := cache_control_for(key):
+            extra["CacheControl"] = cc
+        self.client.upload_file(str(path), self.bucket, key, ExtraArgs=extra)
 
     def put_bytes(self, data: bytes, key: str, content_type: str) -> None:
         """Upload raw bytes under `key` (used for the small overwrite ledger)."""
