@@ -126,6 +126,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const unit = unitLabel(currentMetric, system);
 
+    // Bin edges land on the BIN grid; one decimal can't tell imperial precip's
+    // 0.05-in edges apart (0.05 and 0.10 both round to "0.1").
+    const dp = BIN < 0.1 ? 2 : 1;
+
     // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
     // axis leaves thin white separators between bins, matching the period hists.
     const barSel = g.selectAll('.bar')
@@ -133,16 +137,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .enter()
       .append('rect')
       .attr('class', 'bar')
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'))
-      .on('mouseover', (event, d) => {
-        tooltip
-          .style('opacity', 1)
-          .html(
-            `${(d.x0 as number).toFixed(1)}–${(d.x1 as number).toFixed(1)}${unit}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
-          );
-        placeTooltip(tooltipRef.current, event);
-      })
-      .on('mouseout', () => tooltip.style('opacity', 0));
+      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
 
     if (isVertical) {
       // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
@@ -164,6 +159,42 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .transition()
         .duration(500)
         .attr('width', (d) => countLen(d.length));
+    }
+
+    // Transparent full-extent hit areas, one per non-empty bin, so the tooltip
+    // triggers anywhere in the bin's row/column — a 1-day bar is only a sliver
+    // and near-impossible to point at directly. Appended after the bars so they
+    // capture the mouse (same approach as PeriodHistogramChart).
+    const showTip = (event: MouseEvent, d: d3.Bin<number, number>) => {
+      tooltip
+        .style('opacity', 1)
+        .html(
+          `${(d.x0 as number).toFixed(dp)}–${(d.x1 as number).toFixed(dp)}${unit}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
+        );
+      placeTooltip(tooltipRef.current, event);
+    };
+    const hitSel = g.selectAll('rect.bar-hit')
+      .data(bins.filter((d) => d.length > 0))
+      .enter()
+      .append('rect')
+      .attr('class', 'bar-hit')
+      .attr('fill', 'transparent')
+      .on('mouseover', showTip)
+      .on('mousemove', showTip)
+      .on('mouseout', () => tooltip.style('opacity', 0));
+
+    if (isVertical) {
+      hitSel
+        .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
+        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
+        .attr('y', 0)
+        .attr('height', height);
+    } else {
+      hitSel
+        .attr('x', 0)
+        .attr('width', width)
+        .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
+        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1));
     }
 
     // Count axis

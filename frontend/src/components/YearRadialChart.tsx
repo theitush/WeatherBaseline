@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel } from '../utils/units';
+import { convert, unitLabel, tickCount } from '../utils/units';
 import './YearRadialChart.css';
 
 interface YearRadialChartProps {
@@ -160,7 +160,10 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .style('opacity', 1);
 
     // --- reference rings (a couple of value gridlines) ----------------------
-    const ringTicks = rScale.ticks(4);
+    // tickCount caps precip so ring steps never go below 1 mm / 0.05 in.
+    const ringTicks = rScale.ticks(
+      tickCount(currentMetric, system, (vMax + pad) - (vMin - pad), 4)
+    );
     g.selectAll('.radial-grid-ring')
       .data(ringTicks)
       .enter()

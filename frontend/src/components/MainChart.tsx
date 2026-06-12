@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, axisLabel, axisPad } from '../utils/units';
+import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -111,6 +111,11 @@ const MainChart: React.FC<MainChartProps> = ({
     // Use this for every plotted value; tempScale itself stays bare for the axis.
     const tsv = (v: number) => tempScale(cv(v));
 
+    // Value-axis tick count, capped for precip so the step stays ≥ 1 mm/0.05 in.
+    // PeriodHistogramChart computes the same count from the same domain so the
+    // two charts' shared axes keep identical tick positions.
+    const nTicks = tickCount(currentMetric, system, tempHi - tempLo);
+
     // 'temp' values are raw metric numbers → route through tsv (convert + scale).
     const tx = (t: Date | number, kind: 'time' | 'temp') =>
       isVertical
@@ -127,7 +132,7 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('transform', `translate(0,${height})`)
       .call(
         (isVertical
-          ? d3.axisBottom(tempScale)
+          ? d3.axisBottom(tempScale).ticks(nTicks)
           : d3.axisBottom(timeScale)
         ).tickSize(-height).tickFormat(() => '') as any
       );
@@ -137,7 +142,7 @@ const MainChart: React.FC<MainChartProps> = ({
       .call(
         (isVertical
           ? d3.axisLeft(timeScale)
-          : d3.axisLeft(tempScale)
+          : d3.axisLeft(tempScale).ticks(nTicks)
         ).tickSize(-width).tickFormat(() => '') as any
       );
 
@@ -158,7 +163,7 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('transform', `translate(0,${height})`)
       .call(
         (isVertical
-          ? d3.axisBottom(tempScale)
+          ? d3.axisBottom(tempScale).ticks(nTicks)
           : d3.axisBottom(timeScale)
               .tickValues(yearTicks)
               .tickFormat(d3.timeFormat('%Y') as any)
@@ -170,7 +175,7 @@ const MainChart: React.FC<MainChartProps> = ({
         ? d3.axisLeft(timeScale)
             .tickValues(yearTicks)
             .tickFormat(d3.timeFormat('%Y') as any)
-        : d3.axisLeft(tempScale)
+        : d3.axisLeft(tempScale).ticks(nTicks)
       ) as any
     );
 
@@ -327,6 +332,7 @@ const MainChart: React.FC<MainChartProps> = ({
 
     // Scatter points
     const unit = unitLabel(currentMetric, system);
+    const vdp = valueDecimals(currentMetric, system);
 
     // Forecast rows are model guesses, not settled observations. They're drawn
     // as hollow (outlined) dots, and excluded from the record high/low markers
@@ -373,7 +379,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(1)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
+            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
           );
         place(event);
       })
@@ -425,7 +431,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${r.label}</strong><br/>${fmtDate(r.d.date)}<br/>${cv(r.d[currentMetric] as number).toFixed(1)}${unit}`
+              `<strong>${r.label}</strong><br/>${fmtDate(r.d.date)}<br/>${cv(r.d[currentMetric] as number).toFixed(vdp)}${unit}`
             );
           place(event);
         })
@@ -477,7 +483,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(1)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
+              `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
             );
           place(event);
         })

@@ -87,9 +87,10 @@ const MAX_BINS = 50;
  *   imperial: 1 / 2 / 5 / 10 °F
  * Pass span = 0 (or omit) to get the finest width.
  *
- * Precipitation is also adaptive — the ladder ensures narrow ranges (a dry
- * climate with 0–5 mm) get fine 0.25/0.5 mm bins while wet climates stay tidy:
- *   metric:   0.25 / 0.5 / 1 / 2 / 5 / 10 mm
+ * Precipitation is also adaptive, but the ladder floors at the trace threshold
+ * (sub-1 mm readings are clamped to 0 at ingestion — see tieredData.ts — so
+ * finer bins would only slice the empty band between 0 and 1 mm):
+ *   metric:   1 / 2 / 5 / 10 mm
  *   imperial: 0.05 / 0.1 / 0.25 / 0.5 / 1 in
  *
  * Wind keeps a fixed width:
@@ -105,8 +106,8 @@ export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): numbe
   }
   if (metric === 'precipitation_sum') {
     const ladder = system === 'imperial'
-      ? [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1]
-      : [0.1, 0.2, 0.5, 1, 5, 10];
+      ? [0.05, 0.1, 0.25, 0.5, 1]
+      : [1, 2, 5, 10];
     for (const w of ladder) {
       if (span <= 0 || span / w <= MAX_BINS) return w;
     }
@@ -123,13 +124,46 @@ export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): numbe
  * doesn't end up with a fixed 2-unit cliff on each side.
  *
  * The minimum pad is one bin-width so there's always breathing room above the
- * tallest bar, scaled to the unit system (0.25 mm / 0.05 in for precip).
+ * tallest bar, scaled to the unit system (1 mm / 0.05 in for precip).
  */
 export function axisPad(metric: MetricKey, system: UnitSystem, dataSpan: number): number {
   if (isTemp(metric)) return 2;
   const minPad = binWidth(metric, system); // finest bin width = natural minimum step
   const pct = Math.ceil(dataSpan * 0.15 / minPad) * minPad;
   return Math.max(minPad, pct);
+}
+
+/**
+ * Decimal places for displaying a single value (tooltips, stat lines, the
+ * spectrum card). One decimal everywhere except imperial precipitation, which
+ * needs hundredths — the smallest wet day (1 mm ≈ 0.04 in) would otherwise
+ * display as "0.0 in".
+ */
+export function valueDecimals(metric: MetricKey, system: UnitSystem): number {
+  return metric === 'precipitation_sum' && system === 'imperial' ? 2 : 1;
+}
+
+// ---- axis ticks -------------------------------------------------------------
+
+/**
+ * Tick count for a value axis, capped for precipitation so the tick step never
+ * drops below 1 mm / 0.05 in — sub-threshold steps would label a band that
+ * can't contain data now that trace precip is clamped to 0 at ingestion.
+ *
+ * d3's tick generator picks the nice step closest to span/count, and both
+ * floors are themselves nice numbers, so a count of ⌊span / floor⌋ can never
+ * round below the floor. `dflt` is the chart's normal tick count (d3's
+ * default 10 for the linear axes; the radial dials pass their own 4).
+ */
+export function tickCount(
+  metric: MetricKey,
+  system: UnitSystem,
+  span: number,
+  dflt = 10
+): number {
+  if (metric !== 'precipitation_sum') return dflt;
+  const minStep = system === 'imperial' ? 0.05 : 1;
+  return Math.max(1, Math.min(dflt, Math.floor(span / minStep)));
 }
 
 // ---- distance (location search) -------------------------------------------

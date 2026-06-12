@@ -3,7 +3,7 @@ import type { MetricKey } from '../utils/config';
 import { buildPeriods } from './PeriodHistogramChart';
 import type { PermutationResult } from '../utils/permutationTest';
 import { useUnits } from '../hooks/useUnits';
-import { convertDelta, unitLabel } from '../utils/units';
+import { convertDelta, unitLabel, valueDecimals } from '../utils/units';
 import './SignificancePanel.css';
 
 interface SignificancePanelProps {
@@ -57,7 +57,7 @@ const SignificancePanel: React.FC<SignificancePanelProps> = ({ result, loading, 
           return (
             <div className="sig-body">
               <p className="sig-explain">
-                {statLabel} of {newest.label} is {Math.abs(diff).toFixed(1)} {unit} {dir} than {statLabel.toLowerCase()} of {oldest.label}
+                {statLabel} of {newest.label} is {Math.abs(diff).toFixed(valueDecimals(currentMetric, system))} {unit} {dir} than {statLabel.toLowerCase()} of {oldest.label}
                 {result.pValue >= 0.05
                   ? <>, but the result is not significant (p&nbsp;=&nbsp;{fmtP(result.pValue)}).</>
                   : <>{' '}(p&nbsp;=&nbsp;{fmtP(result.pValue)}).</>

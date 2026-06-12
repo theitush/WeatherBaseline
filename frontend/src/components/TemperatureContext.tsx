@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabelBare } from '../utils/units';
+import { convert, unitLabelBare, valueDecimals } from '../utils/units';
 import { comparablePool } from '../utils/dataProcessor';
 import CONFIG from '../utils/config';
 import './TemperatureContext.css';
@@ -171,9 +171,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   const unit = unitLabelBare(currentMetric, system);
   // fmt takes a raw (metric) value, converts it for display, then formats.
   // Temperature degrees read "12.3°"; other metrics read "12.3 mm".
+  const vdp = valueDecimals(currentMetric, system);
   const fmt = (v: number) => {
     const c = convert(v, currentMetric, system);
-    return unit === '°' ? `${c.toFixed(1)}°` : `${c.toFixed(1)} ${unit}`;
+    return unit === '°' ? `${c.toFixed(vdp)}°` : `${c.toFixed(vdp)} ${unit}`;
   };
 
   // Canonical pool: drop future forecasts, keep today/earlier (incl. recent

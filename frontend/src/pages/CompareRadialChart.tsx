@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel } from '../utils/units';
+import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
 import type { Series, SeriesData } from './compareTypes';
 import './CompareRadialChart.css';
 
@@ -127,7 +127,8 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
     };
 
     // ---- reference rings + value labels ------------------------------------
-    const ringTicks = rScale.ticks(4);
+    // tickCount caps precip so ring steps never go below 1 mm / 0.05 in.
+    const ringTicks = rScale.ticks(tickCount(axisMetric, system, vMax - vMin, 4));
     g.selectAll('.cmp-grid-ring')
       .data(ringTicks)
       .enter()
@@ -344,7 +345,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
               .style('opacity', 1)
               .html(
                 `<strong>${row.date.toDateString()}</strong><br/>` +
-                  `${val.toFixed(1)}${unit}<br/><em>${s.name}</em>`
+                  `${val.toFixed(valueDecimals(axisMetric, system))}${unit}<br/><em>${s.name}</em>`
               );
             placeTip(event);
           })

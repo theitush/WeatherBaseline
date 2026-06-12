@@ -61,6 +61,15 @@ function fileUrl(tier: Tier, lat: number, lon: number): string {
   return `${DATA_BASE}${prefix}/${tier}/${name}`;
 }
 
+/**
+ * Below this, a day's precipitation counts as 0 everywhere in the app. ERA5-Land
+ * reports sub-millimetre trace amounts (drizzle, numerical residue) that read as
+ * "rain" in stats but not in lived experience; the clamp happens here, at the
+ * single ingestion point, so no downstream consumer ever sees a trace value.
+ * The axis/bin floors in units.ts (1 mm / 0.05 in) assume this.
+ */
+const PRECIP_TRACE_MM = 1;
+
 /** One parsed CSV row from a cell file (raw string cells). */
 interface RawRow {
   date: string;
@@ -176,13 +185,18 @@ export async function loadCellTimeline(
     for (const r of rows) {
       if (!r.date) continue;
       const d = new Date(r.date + 'T00:00:00');
+      const precip = numOrNull(r.precip_mm);
       byDate.set(r.date, {
         date: d,
         year: d.getFullYear(),
         data_type: type,
         max_temperature: numOrNull(r.tmax_C) ?? undefined,
         min_temperature: numOrNull(r.tmin_C) ?? undefined,
-        precipitation_sum: numOrNull(r.precip_mm) ?? undefined,
+        // Trace precipitation (< 1 mm) is a dry day for our purposes: clamp it
+        // to 0 at ingestion so every calculation and display downstream
+        // (percentiles, histograms, dials, prose verdict) agrees.
+        precipitation_sum:
+          precip === null ? undefined : precip < PRECIP_TRACE_MM ? 0 : precip,
         wind_speed_10m_max: numOrNull(r.wind_max_ms) ?? undefined,
       });
     }

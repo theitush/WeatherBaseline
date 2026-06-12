@@ -5,7 +5,7 @@ import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, axisLabel, binWidth, axisPad } from '../utils/units';
+import { convert, unitLabel, axisLabel, binWidth, axisPad, tickCount } from '../utils/units';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
@@ -210,6 +210,10 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     const binLo = Math.floor(domainLo / BIN) * BIN;
     const binHi = Math.ceil(domainHi / BIN) * BIN;
     const thresholds = d3.range(binLo, binHi + BIN, BIN);
+
+    // Tooltip decimals: bin edges land on the BIN grid, and one decimal can't
+    // tell imperial precip's 0.05-in edges apart (0.05 and 0.10 both → "0.1").
+    const dp = BIN < 0.1 ? 2 : 1;
     const binGen = d3
       .bin<number, number>()
       .domain([binLo, binHi])
@@ -305,7 +309,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(1)}–${(b.x1 as number).toFixed(1)}${unit}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
+            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(dp)}–${(b.x1 as number).toFixed(dp)}${unit}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
           );
         placeTooltip(tooltipRef.current, event);
       };
@@ -377,7 +381,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(1)}${unit}`
+              `<strong>${pp.period.label} ${statLabel.toLowerCase()}</strong><br/>${(pp.stat as number).toFixed(dp)}${unit}`
             );
           placeTooltip(tooltipRef.current, event);
         };
@@ -420,14 +424,18 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       bracketGeomRef.current = null;
     }
 
-    // Shared x-axis under the bottom panel. Use d3's default tick count (no
-    // .ticks() override) so it matches the main chart's temp axis exactly —
-    // with the same domain and pixel range, the tick positions are identical.
+    // Shared x-axis under the bottom panel. tickCount() computed from the same
+    // domain the main chart uses (default count for temp/wind, precip capped at
+    // a 1 mm/0.05 in step), so the tick positions stay identical between the
+    // two charts' shared axes.
     const xAxisG = g
       .append('g')
       .attr('class', 'axis')
       .attr('transform', `translate(0,${plotHeight})`)
-      .call(d3.axisBottom(tempScale) as any);
+      .call(
+        d3.axisBottom(tempScale)
+          .ticks(tickCount(currentMetric, system, domainHi - domainLo)) as any
+      );
     void xAxisG;
 
     g.append('text')
