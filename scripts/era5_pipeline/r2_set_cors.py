@@ -36,6 +36,11 @@ DEFAULT_ORIGINS = [
     # in case the project is ever renamed; extra origins are harmless.
     "https://weather-baseline.pages.dev",
     "https://weatherbaseline.pages.dev",
+    # Production custom domain. The site redirects apex -> www, so www is the
+    # real serving origin, but list both: the page's Origin header is the exact
+    # host the browser is on, and a stray apex hit must not 403 the data.
+    "https://www.weatherbaseline.com",
+    "https://weatherbaseline.com",
 ]
 
 
