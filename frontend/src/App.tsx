@@ -83,7 +83,9 @@ const AppContent: React.FC = () => {
   // histogram's significance bracket and the verdict panel below it.
   const significance = usePermutationTest(filteredData, currentMetric);
 
-  const formatChartTitle = (dateStr: string) => {
+  // "June 13th" — the target date as prose. Parse at local noon so the day never
+  // shifts across a timezone boundary (matches formatChartTitle).
+  const formatTargetDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
@@ -92,7 +94,11 @@ const AppContent: React.FC = () => {
       day % 10 === 1 && day !== 11 ? 'st' :
       day % 10 === 2 && day !== 12 ? 'nd' :
       day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-    const date = `${months[d.getMonth()]} ${day}${suffix}`;
+    return `${months[d.getMonth()]} ${day}${suffix}`;
+  };
+
+  const formatChartTitle = (dateStr: string) => {
+    const date = formatTargetDate(dateStr);
     const city = location.name ? location.name.split(',')[0].trim() : '';
     const where = city ? ` in ${city}` : '';
     return `± ${CONFIG.chart.seasonalWindowDays} days around ${date}${where}`;
@@ -199,17 +205,37 @@ const AppContent: React.FC = () => {
 
         {!loading && !error && filteredData.length > 0 && (
           <div className="data-panel">
-            {/* Section 1 — the answer at a glance */}
+            {/* Section 1 — the answer at a glance. When the target date has no
+                data row (e.g. a future day the forecast doesn't reach yet, or a
+                cell whose forecast tier is briefly stale), getCurrentTemp() is
+                null: there's no value to headline and no marker to place. Say so
+                plainly instead of silently dropping the card, which reads as a
+                broken page. The charts below still render — they describe the
+                ±-day window across all years, which exists regardless. */}
             <section className="page-section">
-              <TemperatureContextDisplay
-                context={temperatureContext}
-                currentTemp={getCurrentTemp()}
-                filteredData={filteredData}
-                yearTimeline={yearTimeline}
-                currentMetric={currentMetric}
-                currentDate={currentDate}
-                cityName={location.name || ''}
-              />
+              {getCurrentTemp() === null ? (
+                <div className="no-target-data">
+                  <strong>
+                    Whoops — sorry, we couldn't fetch the data for that date for
+                    some reason!
+                  </strong>
+                  <p>
+                    There's nothing on record for {formatTargetDate(currentDate)}
+                    {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
+                    {' '}yet. Try a recent past date, or check back shortly.
+                  </p>
+                </div>
+              ) : (
+                <TemperatureContextDisplay
+                  context={temperatureContext}
+                  currentTemp={getCurrentTemp()}
+                  filteredData={filteredData}
+                  yearTimeline={yearTimeline}
+                  currentMetric={currentMetric}
+                  currentDate={currentDate}
+                  cityName={location.name || ''}
+                />
+              )}
             </section>
 
             {/* Section 2 — the full record */}

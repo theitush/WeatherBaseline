@@ -114,11 +114,21 @@ async function firstMissingRecentDate(bucket, lat, lon, archiveEnd) {
 }
 
 /**
- * Refresh the forecast tier for a cell if its object is older than the TTL.
+ * Refresh the forecast tier for a cell if its object is older than the TTL,
+ * OR if its content stops short of today. The write-age TTL alone is a content
+ * blind spot: a file written late yesterday (UTC) is young-by-age all morning
+ * today, yet its last row is yesterday's date — because forecast_days anchors to
+ * Open-Meteo's UTC "today", a file built yesterday never carried today's row.
+ * The user then asks for today (the picker allows up to today+4) and finds no
+ * matching row: no marker, no value, no context card. Forcing a re-pull when the
+ * last date is behind today closes that gap regardless of write-age.
  * IFS HRES over the −9 to +4 day window in one call. Returns whether it ran.
  */
 async function refreshForecast(bucket, lat, lon, ttlMs) {
-  if ((await store.ageMs(bucket, 'forecast', lat, lon)) < ttlMs) return false;
+  const fresh = (await store.ageMs(bucket, 'forecast', lat, lon)) < ttlMs;
+  const last = await store.lastDate(bucket, 'forecast', lat, lon);
+  const coversToday = last !== null && last >= fmtDate(new Date());
+  if (fresh && coversToday) return false;
 
   const data = await callOpenMeteo('https://api.open-meteo.com/v1/forecast', {
     latitude: lat,
