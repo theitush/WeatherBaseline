@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint, YearlyAggregate } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { comparablePool, findRecords } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
@@ -385,33 +386,37 @@ const MainChart: React.FC<MainChartProps> = ({
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
 
-    // Record high (red) and record low (blue) markers — slightly larger than the target-date dot.
-    // Forecast rows are excluded: a record should be a settled observation, not a model guess.
-    const valid = filteredData.filter((d) => {
-      const v = d[currentMetric];
-      return typeof v === 'number' && Number.isFinite(v) && d.data_type !== 'forecast';
-    });
-    if (valid.length > 0) {
-      let lo = valid[0];
-      let hi = valid[0];
-      for (const d of valid) {
-        if ((d[currentMetric] as number) < (lo[currentMetric] as number)) lo = d;
-        if ((d[currentMetric] as number) > (hi[currentMetric] as number)) hi = d;
+    // 5-point star path, outer radius 9, inner radius ~3.8
+    const starPath = (cx: number, cy: number, outer = 9, inner = 3.8): string => {
+      const pts: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? outer : inner;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        pts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
       }
-      const recs: Array<{ d: typeof lo; color: string; label: string }> = [
-        { d: hi, color: '#c0392b', label: 'Record high' },
-        { d: lo, color: '#2f6fb8', label: 'Record low' },
-      ];
-      // 5-point star path, outer radius 9, inner radius ~3.8
-      const starPath = (cx: number, cy: number, outer = 9, inner = 3.8): string => {
-        const pts: string[] = [];
-        for (let i = 0; i < 10; i++) {
-          const r = i % 2 === 0 ? outer : inner;
-          const a = -Math.PI / 2 + (i * Math.PI) / 5;
-          pts.push(`${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`);
-        }
-        return `M${pts.join(' L')} Z`;
-      };
+      return `M${pts.join(' L')} Z`;
+    };
+
+    // Record high (red) and record low (blue) markers. Use the SAME pool and the
+    // SAME findRecords() the prose verdict uses (comparablePool drops look-ahead
+    // forecast past the target day), so the star and the "Nth Xest" text can
+    // never disagree about which day is the record. Reused below to test whether
+    // the TARGET day IS the record — then it's a shining star, not the plain dot.
+    const { hiRow: recordHiRow, loRow: recordLoRow } = findRecords(
+      comparablePool(filteredData, currentDate),
+      currentMetric
+    );
+    if (recordHiRow && recordLoRow) {
+      // A record that falls on the target day is drawn as the shining target
+      // star below — drop it here so two stars don't stack on the same point.
+      const isTargetDay = (d: WeatherDataPoint) =>
+        d.date.getFullYear() === targetDay.getFullYear() &&
+        d.date.getMonth() === targetDay.getMonth() &&
+        d.date.getDate() === targetDay.getDate();
+      const recs: Array<{ d: WeatherDataPoint; color: string; label: string }> = [
+        { d: recordHiRow, color: '#c0392b', label: 'Record high' },
+        { d: recordLoRow, color: '#2f6fb8', label: 'Record low' },
+      ].filter((r) => !isTargetDay(r.d));
 
       g.selectAll('.record-point')
         .data(recs)
@@ -468,26 +473,66 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('y1', tsv(currentTemp)).attr('y2', tsv(currentTemp));
       }
 
-      g.selectAll('.current-temp-point')
-        .data(currentDateData)
-        .enter()
-        .append('circle')
-        .attr('class', 'current-temp-point')
-        .attr('cx', (d) => isVertical ? tsv(d[currentMetric] as number) : timeScale(d.date))
-        .attr('cy', (d) => isVertical ? timeScale(d.date) : tsv(d[currentMetric] as number))
-        .attr('r', 5)
-        .attr('fill', 'var(--text-h)')
-        .attr('stroke', 'var(--surface)')
-        .attr('stroke-width', 2)
-        .on('mouseover', (event, d) => {
-          tooltip
-            .style('opacity', 1)
-            .html(
-              `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}<br/><em>Target date${d.data_type === 'forecast' ? ' · forecast' : ''}</em>`
-            );
-          place(event);
-        })
-        .on('mouseout', () => tooltip.style('opacity', 0));
+      // If the target day IS the record high/low in the visible pool, mark it as
+      // a shining star (record color) instead of the plain dot — so the "most"
+      // day reads as a record at a glance, not a generic point. Match by date,
+      // since the record rows come from filteredData and the target from fullData.
+      const sameDay = (a: WeatherDataPoint | null) =>
+        !!a &&
+        a.date.getFullYear() === targetDay.getFullYear() &&
+        a.date.getMonth() === targetDay.getMonth() &&
+        a.date.getDate() === targetDay.getDate();
+      const targetRecordColor = sameDay(recordHiRow)
+        ? '#c0392b'
+        : sameDay(recordLoRow)
+        ? '#2f6fb8'
+        : null;
+
+      const cx = isVertical ? tsv(currentTemp) : timeScale(currentDateData[0].date);
+      const cy = isVertical ? timeScale(currentDateData[0].date) : tsv(currentTemp);
+
+      const showTooltip = (event: MouseEvent) => {
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `<strong>${fmtDate(currentDateData[0].date)}</strong><br/>${cv(currentTemp).toFixed(vdp)}${unit}<br/><em>Target date${currentDateData[0].data_type === 'forecast' ? ' · forecast' : ''}</em>`
+          );
+        place(event);
+      };
+
+      if (targetRecordColor) {
+        // Soft radial glow behind the star, then the star itself with a gentle
+        // pulse (see .current-temp-star in MainChart.css).
+        g.append('circle')
+          .attr('class', 'current-temp-glow')
+          .attr('cx', cx)
+          .attr('cy', cy)
+          .attr('r', 14)
+          .attr('fill', targetRecordColor);
+        g.append('path')
+          .attr('class', 'current-temp-star')
+          .attr('d', starPath(cx, cy, 11, 4.6))
+          .attr('fill', targetRecordColor)
+          .attr('stroke', 'var(--surface)')
+          .attr('stroke-width', 1.5)
+          .style('cursor', 'pointer')
+          .on('mouseover', showTooltip)
+          .on('mouseout', () => tooltip.style('opacity', 0));
+      } else {
+        g.selectAll('.current-temp-point')
+          .data(currentDateData)
+          .enter()
+          .append('circle')
+          .attr('class', 'current-temp-point')
+          .attr('cx', cx)
+          .attr('cy', cy)
+          .attr('r', 5)
+          .attr('fill', 'var(--text-h)')
+          .attr('stroke', 'var(--surface)')
+          .attr('stroke-width', 2)
+          .on('mouseover', showTooltip)
+          .on('mouseout', () => tooltip.style('opacity', 0));
+      }
 
       // Target date written just above the marker (mirrors the radial dial), so
       // the legend doesn't need a "Target date" entry. e.g. "Jun 7, 2026".

@@ -30,6 +30,30 @@
   cursor: pointer;
 }
 
+/* Target day that is also the record: a shining star instead of the plain dot. */
+.main-chart-svg .current-temp-glow {
+  opacity: 0.28;
+  filter: blur(4px);
+  animation: current-temp-glow-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.main-chart-svg .current-temp-star {
+  animation: current-temp-star-pulse 2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes current-temp-glow-pulse {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes current-temp-star-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
 .chart-tooltip {
   position: fixed;
   background: var(--tooltip-bg);

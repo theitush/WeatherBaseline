@@ -14,19 +14,76 @@ function parseLocalDate(dateString: string): Date {
 }
 
 /**
- * Canonical comparison pool for rarity/percentile claims. Drops only FUTURE
- * forecasts (model guesses for days that haven't happened); forecast rows dated
- * today or earlier are kept, since those are recent reanalysis-quality figures
- * and more accurate than excluding them. Both the prose verdict
- * (TemperatureContext) and the histogram brackets (HistogramChart) MUST run off
- * this same pool, and compare strictly (> / <), so their percentages agree.
+ * Canonical comparison pool for rarity/percentile claims. Drops forecast rows
+ * dated AFTER the cutoff (model guesses the page isn't showing yet); forecast
+ * rows at or before it are kept, since those are recent reanalysis-quality
+ * figures and more accurate than excluding them. The cutoff is the SELECTED
+ * target date — not today — so the pool matches exactly what the chart draws
+ * (MainChart drops look-ahead forecast past the target too) and the record star
+ * agrees with the prose rank. Pass the target date string; omit only for a
+ * today-relative pool. Both the prose verdict (TemperatureContext) and the
+ * histogram brackets (HistogramChart) MUST run off this same pool, and compare
+ * strictly (> / <), so their percentages agree.
  */
-export function comparablePool(data: WeatherDataPoint[]): WeatherDataPoint[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+export function comparablePool(
+  data: WeatherDataPoint[],
+  cutoffDate?: string
+): WeatherDataPoint[] {
+  const cutoff = cutoffDate ? parseLocalDate(cutoffDate) : new Date();
+  cutoff.setHours(23, 59, 59, 999); // keep the whole cutoff day
   return data.filter(
-    (d) => !(d.data_type === 'forecast' && d.date.getTime() > today.getTime())
+    (d) => !(d.data_type === 'forecast' && d.date.getTime() > cutoff.getTime())
   );
+}
+
+/**
+ * THE one way to find the record high/low rows in a pool. Both the chart's star
+ * markers (MainChart) and the prose verdict (TemperatureContext) call this, so a
+ * day is "the record" in exactly one place. Pass an already-scoped pool (e.g.
+ * comparablePool(data, currentDate)); rows missing the metric are skipped.
+ * Returns null rows when the pool has no valid value.
+ */
+export function findRecords(
+  pool: WeatherDataPoint[],
+  metric: MetricKey
+): { hiRow: WeatherDataPoint | null; loRow: WeatherDataPoint | null } {
+  let hiRow: WeatherDataPoint | null = null;
+  let loRow: WeatherDataPoint | null = null;
+  for (const d of pool) {
+    const v = d[metric];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    if (hiRow === null || v > (hiRow[metric] as number)) hiRow = d;
+    if (loRow === null || v < (loRow[metric] as number)) loRow = d;
+  }
+  return { hiRow, loRow };
+}
+
+/**
+ * THE one way to rank a value within a pool. Operates on plain numbers so the
+ * caller controls the unit space (the prose/histogram compare in CONVERTED
+ * display units; pass converted arrays). Uses INCLUSIVE tails and a shared-worst
+ * "competition" rank — count of values at-or-more-extreme on a side — so ties
+ * share the last position of their group (a 0mm day tied with 300 others ranks
+ * ~300th, not 1st). `side` picks which end to rank from; 'auto' uses the smaller
+ * (rarer) tail. Returns 1-based ranks from each end plus which side is rarer.
+ */
+export function rankValue(
+  value: number,
+  poolValues: number[],
+  side: 'high' | 'low' | 'auto' = 'auto'
+): { rankHigh: number; rankLow: number; total: number; isHighSide: boolean; singleTail: number } {
+  const total = poolValues.length;
+  const rankHigh = poolValues.filter((v) => v >= value).length; // # at-or-above → rank from the top
+  const rankLow = poolValues.filter((v) => v <= value).length; // # at-or-below → rank from the bottom
+  const isHighSide = side === 'auto' ? rankHigh <= rankLow : side === 'high';
+  const tailCount = isHighSide ? rankHigh : rankLow;
+  return {
+    rankHigh,
+    rankLow,
+    total,
+    isHighSide,
+    singleTail: total > 0 ? tailCount / total : 0,
+  };
 }
 
 /**
@@ -158,24 +215,11 @@ export function calculateTemperaturePercentile(
 }
 
 /**
- * Get ordinal suffix for numbers (1st, 2nd, 3rd, etc.)
- */
-function getOrdinalSuffix(num: number): string {
-  const j = num % 10;
-  const k = num % 100;
-  if (j === 1 && k !== 11) return 'st';
-  if (j === 2 && k !== 12) return 'nd';
-  if (j === 3 && k !== 13) return 'rd';
-  return 'th';
-}
-
-/**
  * Phrase vocabulary per metric. Each metric reads as a low↔high spectrum at
  * three intensities (mild / strong / extreme) plus a shared "normal" bank:
  *   - temperature: cold ↔ hot
  *   - precipitation: dry ↔ wet
  *   - wind: calm ↔ gusty
- * `rankLow`/`rankHigh` name the ends for the "Nth Xest in dataset!" line.
  * The percentile branching that picks a bank is identical across metrics.
  */
 interface MetricPhrases {
@@ -186,8 +230,6 @@ interface MetricPhrases {
   strongHigh: string[];
   extremeLow: string[];
   extremeHigh: string[];
-  rankLow: string;
-  rankHigh: string;
 }
 
 const TEMP_PHRASES: MetricPhrases = {
@@ -221,8 +263,6 @@ const TEMP_PHRASES: MetricPhrases = {
     'Scorching rare heat!', 'Blazing anomaly!', 'Infernal heat!',
     'Blistering hot!', 'Record heat!',
   ],
-  rankLow: 'coldest',
-  rankHigh: 'hottest',
 };
 
 const PRECIP_PHRASES: MetricPhrases = {
@@ -254,8 +294,6 @@ const PRECIP_PHRASES: MetricPhrases = {
     'Torrential rare rain!', 'Drenching anomaly!', 'Deluge!',
     'Flooding rain!', 'Record downpour!',
   ],
-  rankLow: 'driest',
-  rankHigh: 'wettest',
 };
 
 const WIND_PHRASES: MetricPhrases = {
@@ -287,8 +325,6 @@ const WIND_PHRASES: MetricPhrases = {
     'Ferocious rare wind!', 'Howling anomaly!', 'Gale-force!',
     'Blasting gusts!', 'Record winds!',
   ],
-  rankLow: 'calmest',
-  rankHigh: 'windiest',
 };
 
 const METRIC_PHRASES: Record<MetricKey, MetricPhrases> = {
@@ -313,17 +349,6 @@ export function generateTemperatureContext(
 
   const percentile = calculateTemperaturePercentile(currentTemp, data, currentMetric);
   const percentileFromBottom = 100 - percentile;
-
-  // Sort all values to get rankings (ascending, so index 0 is the lowest).
-  const allTemps = data
-    .map((d) => d[currentMetric])
-    .filter((t): t is number => t !== null && t !== undefined)
-    .sort((a, b) => a - b);
-  const totalCount = allTemps.length;
-
-  // Find exact ranking from each end of the sorted values.
-  const rankingFromLow = allTemps.findIndex((temp) => temp >= currentTemp) + 1;
-  const rankingFromHigh = totalCount - allTemps.lastIndexOf(currentTemp);
 
   const phrases = METRIC_PHRASES[currentMetric];
 
@@ -354,12 +379,10 @@ export function generateTemperatureContext(
     // Bottom 5% - extreme low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;
     context.description = getRandomPhrase(phrases.extremeLow);
-    context.ranking = `${rankingFromLow}${getOrdinalSuffix(rankingFromLow)} ${phrases.rankLow} in dataset!`;
   } else if (percentile <= 5) {
     // Top 5% - extreme high
     context.percentile = `${percentile.toFixed(0)}th percentile`;
     context.description = getRandomPhrase(phrases.extremeHigh);
-    context.ranking = `${rankingFromHigh}${getOrdinalSuffix(rankingFromHigh)} ${phrases.rankHigh} in dataset!`;
   } else if (percentileFromBottom <= 10) {
     // Bottom 10% - strong low
     context.percentile = `${percentileFromBottom.toFixed(0)}th percentile`;

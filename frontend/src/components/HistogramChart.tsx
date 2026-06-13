@@ -60,10 +60,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const tooltip = d3.select(tooltipRef.current);
 
-    // Drop only FUTURE forecasts; forecast rows for today/earlier are recent
-    // reanalysis-quality and kept. Shared with the prose verdict via
+    // Drop forecasts past the selected target date; forecast rows at/before it
+    // are recent reanalysis-quality and kept. Shared with the prose verdict via
     // comparablePool so both percentages run off the identical pool.
-    const values = comparablePool(filteredData)
+    const values = comparablePool(filteredData, currentDate)
       .map((d) => d[currentMetric])
       .filter((v): v is number => v !== undefined)
       .map((v) => convert(v, currentMetric, system));

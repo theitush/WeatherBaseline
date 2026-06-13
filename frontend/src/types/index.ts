@@ -33,7 +33,6 @@ export interface YearlyAggregate {
 export interface TemperatureContext {
   percentile: string;
   description: string;
-  ranking?: string;
 }
 
 export interface Location {

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabelBare, valueDecimals } from '../utils/units';
-import { comparablePool } from '../utils/dataProcessor';
+import { comparablePool, findRecords, rankValue } from '../utils/dataProcessor';
 import CONFIG from '../utils/config';
 import './TemperatureContext.css';
 
@@ -177,30 +177,22 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     return unit === '°' ? `${c.toFixed(vdp)}°` : `${c.toFixed(vdp)} ${unit}`;
   };
 
-  // Canonical pool: drop future forecasts, keep today/earlier (incl. recent
-  // forecast rows). Shared with the histogram via comparablePool so the prose
-  // rarity and the histogram brackets run off the identical days.
-  const valid = comparablePool(filteredData).filter((d) => {
+  // Canonical pool: drop forecasts past the target date, keep it/earlier (incl.
+  // recent forecast rows). Shared with the histogram AND the chart's record star
+  // via comparablePool so the prose rarity, the brackets, and the star all run
+  // off the identical days.
+  const valid = comparablePool(filteredData, currentDate).filter((d) => {
     const v = d[currentMetric];
     return typeof v === 'number' && Number.isFinite(v);
   });
 
-  let recordLow: number | null = null;
-  let recordHigh: number | null = null;
-  let recordLowDate: Date | null = null;
-  let recordHighDate: Date | null = null;
-
-  for (const d of valid) {
-    const v = d[currentMetric] as number;
-    if (recordLow === null || v < recordLow) {
-      recordLow = v;
-      recordLowDate = d.date;
-    }
-    if (recordHigh === null || v > recordHigh) {
-      recordHigh = v;
-      recordHighDate = d.date;
-    }
-  }
+  // Records via the shared findRecords() — the SAME call the chart star uses, so
+  // "the record" is one definition site, not a loop duplicated per component.
+  const { hiRow, loRow } = findRecords(valid, currentMetric);
+  const recordLow = loRow ? (loRow[currentMetric] as number) : null;
+  const recordHigh = hiRow ? (hiRow[currentMetric] as number) : null;
+  const recordLowDate = loRow ? loRow.date : null;
+  const recordHighDate = hiRow ? hiRow.date : null;
 
   let binnedPct: number | null = null;
   let markerColor = '#222';
@@ -232,35 +224,29 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     const cur = convert(currentTemp, currentMetric, system);
     const values = valid.map((d) => convert(d[currentMetric] as number, currentMetric, system));
     const n = values.length;
+    // Window rank via the shared rankValue() — INCLUSIVE tails + shared-worst
+    // "competition" rank (ties share the LAST position of their group, so a 0mm
+    // day tied with 300 others ranks ~300th, not 1st and never fires confetti).
+    // 'auto' picks the rarer side. THE one ranking implementation; the histogram
+    // brackets and chart star derive from the same pool/logic.
+    const windowRank = rankValue(cur, values, 'auto');
+    const isHighSide = windowRank.isHighSide;
+    const singleTail = windowRank.singleTail;
     if (n > 0) {
-      // INCLUSIVE tails ("this hot or hotter" / "this dry or drier"): count days
-      // AT-OR-beyond today on each side. Inclusive is what keeps a 0mm dry day
-      // from reading as a record drought — when 60% of days are also 0mm, the low
-      // tail is 60%, not 0%. Matches the histogram's inclusive brackets.
-      const atOrAboveN = values.filter((v) => v >= cur).length;
-      const atOrBelowN = values.filter((v) => v <= cur).length;
-      // Today's own side is the smaller tail; that tail is the rarity %.
-      const isHighSide = atOrAboveN <= atOrBelowN;
-      const singleTail = (isHighSide ? atOrAboveN : atOrBelowN) / n;
-      // Shared-worst ("competition") rank: count days at-or-more-extreme on this
-      // side, so ties share the LAST position of their group. This is what stops
-      // the mode from being crowned #1 — a 0mm dry day tied with 300 other 0mm
-      // days ranks ~300th, not 1st, so it never claims a record or fires confetti.
-      rank = isHighSide ? atOrAboveN : atOrBelowN;
-      // All-time rank: same competition-rank logic, but against EVERY day of the
-      // whole record (not just the ±N-day window). A top-1/2/3 here means the
-      // value is, e.g., the hottest day this cell has ever seen on ANY date — far
-      // rarer than topping its calendar neighbours, so it earns louder prose +
-      // 5× confetti. Reuse today's side (isHighSide) so "hottest/coldest" agrees.
+      rank = isHighSide ? windowRank.rankHigh : windowRank.rankLow;
+      // All-time rank: same logic, but against EVERY day of the whole record (not
+      // just the ±N-day window). A top-1/2/3 here means the value is, e.g., the
+      // hottest day this cell has ever seen on ANY date — far rarer than topping
+      // its calendar neighbours, so it earns louder prose + 5× confetti. Force the
+      // same side (isHighSide) so "hottest/coldest" agrees with the window verdict.
       {
-        const allVals = comparablePool(yearTimeline)
+        const allVals = comparablePool(yearTimeline, currentDate)
           .map((d) => d[currentMetric])
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
           .map((v) => convert(v, currentMetric, system));
         if (allVals.length > 0) {
-          allTimeRank = isHighSide
-            ? allVals.filter((v) => v >= cur).length
-            : allVals.filter((v) => v <= cur).length;
+          const allTime = rankValue(cur, allVals, isHighSide ? 'high' : 'low');
+          allTimeRank = isHighSide ? allTime.rankHigh : allTime.rankLow;
         }
       }
       // Name the actual comparison pool: every day within a ±seasonalWindowDays
@@ -324,7 +310,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Instead describe the position softly: dead-center days get a mocked
         // "perfectly average" verdict; off-center-but-mild days get a hedged
         // "a bit warmer than most", naming today's actual side.
-        const pctile = atOrBelowN / n; // 0..1, where today sits in the pack
+        const pctile = windowRank.rankLow / n; // 0..1, where today sits in the pack
         const isDeadCenter = pctile >= 0.45 && pctile <= 0.55;
         if (isDeadCenter) {
           extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for ${nounP}${since}.`;
