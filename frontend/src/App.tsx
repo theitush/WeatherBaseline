@@ -119,7 +119,31 @@ const AppContent: React.FC = () => {
       <div className="app-container">
         <div className="sticky-bar">
           <header className="app-header">
-            <h1>WeatherBaseline.com</h1>
+            <h1>
+              <svg
+                className="brand-mark"
+                viewBox="0 0 32 32"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <g fill="currentColor">
+                  <rect x="4" y="20" width="4.2" height="8" rx="0.6" />
+                  <rect x="10.4" y="14" width="4.2" height="14" rx="0.6" />
+                  <rect x="16.8" y="9" width="4.2" height="19" rx="0.6" />
+                  <rect x="23.2" y="16" width="4.2" height="12" rx="0.6" />
+                </g>
+                <line
+                  x1="3"
+                  y1="28.5"
+                  x2="29"
+                  y2="28.5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              WeatherBaseline.com
+            </h1>
             <SettingsMenu />
             <ShareButton
               placeName={location.name || ''}

@@ -113,6 +113,17 @@ body {
   line-height: 1.1;
   color: var(--text-strong);
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+}
+
+/* Histogram brand mark (favicon motif), scales with the title via em. */
+.brand-mark {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
 }
 
 .controls-panel {

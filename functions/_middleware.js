@@ -4,8 +4,10 @@
 // they only see the static index.html — which carries ONE generic preview card
 // for every path. This middleware fixes that for deep links: when (and only
 // when) a known crawler requests a /<lat,lon>/<date>/<metric> URL, it rewrites
-// the og/twitter description in the served HTML to "<Date> · <City>". The title
-// is always the fixed question (set in index.html); only the description varies.
+// the og/twitter description in the served HTML to "<Date> · <City>", and
+// retargets canonical/og:url at the share URL (Facebook/WhatsApp otherwise
+// follow them to the root and use ITS metadata). The title is always the fixed
+// question (set in index.html); only the description varies.
 //
 // Real visitors are never touched: non-crawler requests, and any path that
 // isn't a valid share link (e.g. the bare root), pass straight through to the
@@ -135,13 +137,14 @@ function escapeAttr(s) {
     .replace(/>/g, '&gt;');
 }
 
-// HTMLRewriter handler that overwrites a meta tag's content attribute.
-class SetContent {
-  constructor(value) {
+// HTMLRewriter handler that overwrites one attribute on matched elements.
+class SetAttr {
+  constructor(attr, value) {
+    this.attr = attr;
     this.value = value;
   }
   element(el) {
-    el.setAttribute('content', this.value);
+    el.setAttribute(this.attr, this.value);
   }
 }
 
@@ -169,9 +172,17 @@ export async function onRequest(context) {
   // changes per link: "<Date> · <City>".
   const desc = escapeAttr(`${formatDate(share.date)} · ${city}`);
 
+  // The static HTML's canonical/og:url point at the bare root. Facebook's
+  // crawler (WhatsApp previews) follows them and swaps in the ROOT's metadata,
+  // discarding the per-link description — so retarget both at this share URL,
+  // always on the canonical www host.
+  const shareUrl = `https://www.weatherbaseline.com${url.pathname.replace(/\/+$/, '')}`;
+
   return new HTMLRewriter()
-    .on('meta[property="og:description"]', new SetContent(desc))
-    .on('meta[name="twitter:description"]', new SetContent(desc))
-    .on('meta[name="description"]', new SetContent(desc))
+    .on('meta[property="og:description"]', new SetAttr('content', desc))
+    .on('meta[name="twitter:description"]', new SetAttr('content', desc))
+    .on('meta[name="description"]', new SetAttr('content', desc))
+    .on('meta[property="og:url"]', new SetAttr('content', shareUrl))
+    .on('link[rel="canonical"]', new SetAttr('href', shareUrl))
     .transform(response);
 }
