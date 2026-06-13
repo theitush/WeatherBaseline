@@ -103,7 +103,13 @@ export function calculateYearlyAggregates(
     return [];
   }
 
-  const yearGroups = d3.group(data, (d) => d.year);
+  // Drop look-ahead forecast rows dated past the target day, exactly as the
+  // chart's dots and comparablePool do. Otherwise the current year's percentile
+  // band would be computed over forecast days the chart doesn't plot, so the
+  // shading would extend past where this year's dots stop (see MainChart).
+  const pool = comparablePool(data, currentDate);
+
+  const yearGroups = d3.group(pool, (d) => d.year);
   const aggregates: YearlyAggregate[] = [];
 
   yearGroups.forEach((values, year) => {

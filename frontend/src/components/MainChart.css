@@ -30,6 +30,12 @@
   cursor: pointer;
 }
 
+/* The target-date text sits on top of the scatter; let pointer events fall
+   through to the dots/hit-targets underneath so they keep their tooltips. */
+.main-chart-svg .current-temp-label {
+  pointer-events: none;
+}
+
 /* Target day that is also the record: a shining star instead of the plain dot. */
 .main-chart-svg .current-temp-glow {
   opacity: 0.28;
