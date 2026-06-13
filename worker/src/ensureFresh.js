@@ -146,7 +146,9 @@ async function refreshForecast(bucket, lat, lon, ttlMs) {
 }
 
 /**
- * Refresh the recent tier for a cell if its object is older than the TTL.
+ * Refresh the recent tier for a cell. An internal hole (a settled missing date
+ * well behind today) heals on every call; a fresh tail extension is gated by the
+ * TTL (see the frontier check below).
  *
  * Recent is SETTLED era5-land history, so we fetch only the dates we're missing
  * — never the whole seam. The complete set is archive_end+1 .. today; subtract
@@ -159,8 +161,6 @@ async function refreshForecast(bucket, lat, lon, ttlMs) {
  * forecast), joined by date, appended last-wins. Returns whether it ran.
  */
 async function refreshRecent(bucket, lat, lon, ttlMs) {
-  if ((await store.ageMs(bucket, 'recent', lat, lon)) < ttlMs) return false;
-
   // No archive ⇒ forecast-only cell, no seam to fill: skip (the forecast tier
   // already carries its own past_days for display).
   const archiveEnd = await store.lastDate(bucket, 'archive', lat, lon);
@@ -170,6 +170,21 @@ async function refreshRecent(bucket, lat, lon, ttlMs) {
   // recent is already complete up to today, so there's nothing to fetch.
   const startIso = await firstMissingRecentDate(bucket, lat, lon, archiveEnd);
   if (!startIso) return false;
+
+  // The TTL must gate only the *tail extension*, never an internal hole. A hole
+  // (a settled date missing well behind today — e.g. left by an old archive that
+  // got re-extended past where recent began) would otherwise be immortal: this
+  // cell is reloaded more often than once a TTL, so a write-age guard at the top
+  // resets the clock before the gap is ever re-scanned, and the missing day never
+  // heals. So: if the earliest missing date sits within the publish frontier (the
+  // last few days era5-land hasn't released), it's just the unsettled tail — apply
+  // the TTL early-out. If it's older than the frontier, it's a real hole — heal it
+  // now regardless of write-age.
+  const frontier = new Date();
+  frontier.setUTCDate(frontier.getUTCDate() - FORECAST_PAST_DAYS);
+  const isTailOnly = startIso > fmtDate(frontier);
+  if (isTailOnly && (await store.ageMs(bucket, 'recent', lat, lon)) < ttlMs) return false;
+
   const dateRange = { start_date: startIso, end_date: fmtDate(new Date()) };
 
   const [tempData, pwData] = await Promise.all([
