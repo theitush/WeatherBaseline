@@ -1,6 +1,8 @@
-// Unit system: metric (the stored/canonical units) or imperial. All raw data is
-// stored in metric (°C, m/s, mm; distances in km), so "imperial" is purely a
-// display-time transform applied at every boundary where a number is shown.
+// Unit system: metric (display units) or imperial. All raw data is stored in
+// canonical metric (°C, m/s, mm; distances in km). Display is a transform
+// applied at every boundary where a number is shown — for temperature/precip the
+// "metric" display equals the stored value, but wind is stored in m/s and shown
+// in km/h (×3.6), so even metric wind goes through a conversion.
 //
 // This module is the single source of truth for that transform: value
 // conversion, delta conversion (for differences, where temperature has no +32
@@ -19,9 +21,10 @@ const isTemp = (m: MetricKey) =>
 
 /** Convert a stored metric value to the chosen system for display. */
 export function convert(value: number, metric: MetricKey, system: UnitSystem): number {
+  // Wind is stored in m/s but never displayed in it: km/h (metric) or mph.
+  if (metric === 'wind_speed_10m_max') return value * (system === 'imperial' ? 2.2369362921 : 3.6);
   if (system === 'metric') return value;
   if (isTemp(metric)) return value * 9 / 5 + 32;        // °C → °F
-  if (metric === 'wind_speed_10m_max') return value * 2.2369362921; // m/s → mph
   if (metric === 'precipitation_sum') return value / 25.4;          // mm → in
   return value;
 }
@@ -31,19 +34,19 @@ export function convert(value: number, metric: MetricKey, system: UnitSystem): n
  * except temperature drops the +32 offset — a 1°C gap is 1.8°F, not 33.8°F.
  */
 export function convertDelta(value: number, metric: MetricKey, system: UnitSystem): number {
+  if (metric === 'wind_speed_10m_max') return value * (system === 'imperial' ? 2.2369362921 : 3.6);
   if (system === 'metric') return value;
   if (isTemp(metric)) return value * 9 / 5;             // Δ°C → Δ°F
-  if (metric === 'wind_speed_10m_max') return value * 2.2369362921;
   if (metric === 'precipitation_sum') return value / 25.4;
   return value;
 }
 
 // ---- labels ---------------------------------------------------------------
 
-/** Unit suffix for tooltips/stats, e.g. "°C"/"°F", "m/s"/"mph", "mm"/"in". */
+/** Unit suffix for tooltips/stats, e.g. "°C"/"°F", "km/h"/"mph", "mm"/"in". */
 export function unitLabel(metric: MetricKey, system: UnitSystem): string {
   if (isTemp(metric)) return system === 'imperial' ? '°F' : '°C';
-  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 'mph' : 'm/s';
+  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 'mph' : 'km/h';
   if (metric === 'precipitation_sum') return system === 'imperial' ? 'in' : 'mm';
   return '';
 }
@@ -94,7 +97,7 @@ const MAX_BINS = 50;
  *   imperial: 0.05 / 0.1 / 0.25 / 0.5 / 1 in
  *
  * Wind keeps a fixed width:
- *   0.5 m/s / 1 mph
+ *   2 km/h / 1 mph
  */
 export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): number {
   if (isTemp(metric)) {
@@ -113,7 +116,7 @@ export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): numbe
     }
     return ladder[ladder.length - 1];
   }
-  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 1.0 : 0.5;
+  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 1.0 : 2.0;
   return 0.5;
 }
 

@@ -24,7 +24,7 @@ const METRIC_NAME: Record<MetricKey, string> = {
 };
 
 // Metrics that share a UNIT belong on the same dial. Min and max temperature are
-// both °C/°F, so they pool together; precip (mm/in) and wind (m/s/mph) stand
+// both °C/°F, so they pool together; precip (mm/in) and wind (km/h/mph) stand
 // alone. Grouping/domain key on this family rather than the exact metric.
 type UnitFamily = 'temp' | 'precip' | 'wind';
 const unitFamily = (m: MetricKey): UnitFamily =>
@@ -143,7 +143,7 @@ const ComparePage: React.FC = () => {
             ← Main app
           </a>
           <button type="button" className="cmp-units" onClick={toggleUnits}>
-            {system === 'metric' ? '°C / m·s⁻¹' : '°F / mph'}
+            {system === 'metric' ? '°C / km·h⁻¹' : '°F / mph'}
           </button>
           <button
             type="button"
