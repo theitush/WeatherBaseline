@@ -195,9 +195,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           <div className="city-suggestions">
             {suggestions.map((suggestion, index) => {
               const { place, snapped } = suggestion;
-              // The row's headline is the CELL we'll serve; the typed place
-              // appears below as context for which search this answers.
-              const searched = place.display_name.split(',')[0];
+              // The row's headline is the place the user searched (with its
+              // distance to the data we'll actually serve); the cell that data
+              // comes from appears below as context.
+              const searched = place.display_name;
 
               return (
                 <div
@@ -207,12 +208,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
                   <div className="city-suggestion-main">
-                    <span className="city-name">{snapped.cell.name}</span>
+                    <span className="city-name">{searched}</span>
                     <span className={`city-snap-dist ${distClass(snapped.distanceKm)}`}>
                       {formatDistance(snapped.distanceKm, system)}
                     </span>
                   </div>
-                  <div className="city-details">for “{searched}”</div>
+                  <div className="city-details">{snapped.cell.name}</div>
                 </div>
               );
             })}

@@ -124,6 +124,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Temperature context
   const [temperatureContext, setTemperatureContext] = useState<TemperatureContext | null>(null);
 
+  // Gate the first fetch on a bare-root visit until the IP lookup has resolved,
+  // so we load the visitor's city directly instead of fetching the default city
+  // first and then re-fetching after geolocation. A URL-seeded load already
+  // knows its location, so it's resolved from the start.
+  const [geoResolved, setGeoResolved] = useState<boolean>(initial !== null);
+
   // Loading & Error
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,8 +145,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setForecastWarningDismissed(false);
 
     try {
-      console.log('Fetching data for:', location, currentDate);
-
       // One loadCellTimeline call: archive cached, ensure-fresh runs once,
       // forecastFresh tells us whether the Worker was reachable.
       const { data: timeline, forecastFresh } = await loadCellTimeline(
@@ -176,8 +180,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       if (!data || data.length === 0) {
         throw new Error('No weather data received from the API. The location or date range might not be available.');
       }
-
-      console.log(`Loaded ${data.length} records`);
 
       // Update full data
       setFullData(data);
@@ -276,31 +278,43 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [currentMetric, fullData, currentDate, filteredData, startYear, endYear]);
 
-  // Auto-fetch on mount and whenever location or target date changes.
+  // Auto-fetch whenever location or target date changes — but on a bare-root
+  // visit, wait for the IP lookup below to resolve first (geoResolved) so we
+  // don't fetch the default city only to immediately re-fetch the visitor's.
   useEffect(() => {
+    if (!geoResolved) return;
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, currentDate]);
+  }, [location, currentDate, geoResolved]);
 
   // Bare-root visit (no shareable URL): guess the visitor's location from their
   // IP, snap it to a servable cell, and adopt it. Setting location then triggers
   // the fetch + URL-sync effects, so the address bar becomes shareable too. Runs
-  // once, only when the URL didn't already pin a location.
+  // once, only when the URL didn't already pin a location. Either way it flips
+  // geoResolved so the gated fetch above runs exactly once with the final
+  // location (the snapped city on success, the default city on any failure).
   useEffect(() => {
-    if (initial) return; // URL already decided the location
+    if (initial) return; // URL already decided the location (geoResolved=true)
     let cancelled = false;
     (async () => {
-      const [ip, cells] = await Promise.all([geolocateByIp(), loadCells()]);
-      if (cancelled || !ip) return; // failure -> keep the default city
-      const snapped = snapToNearestCell(ip.lat, ip.lon, cells);
-      if (!snapped) return;
-      // Adopt the snapped cell's own name (the only label we show), not the IP
-      // service's, so it matches what a search or a shared link would display.
-      setLocation({
-        lat: snapped.cell.lat,
-        lon: snapped.cell.lon,
-        name: snapped.cell.name,
-      });
+      try {
+        const [ip, cells] = await Promise.all([geolocateByIp(), loadCells()]);
+        if (cancelled) return;
+        const snapped = ip ? snapToNearestCell(ip.lat, ip.lon, cells) : null;
+        // Adopt the snapped cell's own name (the only label we show), not the IP
+        // service's, so it matches what a search or a shared link would display.
+        if (snapped) {
+          setLocation({
+            lat: snapped.cell.lat,
+            lon: snapped.cell.lon,
+            name: snapped.cell.name,
+          });
+        }
+      } finally {
+        // Release the fetch gate on every path — success or failure (which keeps
+        // the default city) — so the bare-root visit always loads something.
+        if (!cancelled) setGeoResolved(true);
+      }
     })();
     return () => {
       cancelled = true;

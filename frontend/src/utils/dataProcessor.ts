@@ -38,18 +38,15 @@ export function calculateYearlyAggregates(
   currentDate: string
 ): YearlyAggregate[] {
   if (!data || data.length === 0) {
-    console.log('No data provided to calculateYearlyAggregates');
     return [];
   }
 
   // Only calculate aggregates if the current metric is active
   if (!CONFIG.isMetricActive(currentMetric)) {
-    console.log(`Metric ${currentMetric} is not active, skipping aggregates calculation`);
     return [];
   }
 
   const yearGroups = d3.group(data, (d) => d.year);
-  console.log('Year groups:', yearGroups.size);
   const aggregates: YearlyAggregate[] = [];
 
   yearGroups.forEach((values, year) => {
@@ -119,7 +116,6 @@ export function filterDataByYearRange(
   endYear: number
 ): WeatherDataPoint[] {
   const filtered = data.filter((d) => d.year >= startYear && d.year <= endYear);
-  console.log(`Filtered data: ${filtered.length} rows for years ${startYear}-${endYear}`);
   return filtered;
 }
 
@@ -132,7 +128,6 @@ export function filterAggregatesByYearRange(
   endYear: number
 ): YearlyAggregate[] {
   const filtered = aggregates.filter((d) => d.year >= startYear && d.year <= endYear);
-  console.log(`Yearly aggregates: ${filtered.length} items`);
   return filtered;
 }
 

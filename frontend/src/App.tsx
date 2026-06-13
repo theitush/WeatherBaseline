@@ -576,7 +576,7 @@ const AppContent: React.FC = () => {
                 <details className="faq-item">
                   <summary>Why do this?!</summary>
                   <div className="faq-body">
-                    <p>I just wanted to know if certain days realy ARE as extreme as 
+                    <p>I just wanted to know if certain days really ARE as extreme as
                        they feel.. and now we know!
                     </p>
                   </div>

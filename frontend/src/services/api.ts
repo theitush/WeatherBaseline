@@ -52,8 +52,6 @@ export async function getTemperatureHistory(
   _startYear: number = 1940,
   daysRange: number = 7
 ): Promise<WeatherDataPoint[]> {
-  console.log(`Getting ${targetDate} ±${daysRange} days data for ${latitude}, ${longitude}`);
-
   const targetDt = parseDate(targetDate);
 
   // No horizon guard here: the date picker already caps selection to the cell's
