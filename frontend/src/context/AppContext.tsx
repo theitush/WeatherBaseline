@@ -87,12 +87,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // IP lookup in App may override the location).
   const initial = typeof window !== 'undefined' ? parsePath(window.location.pathname) : null;
 
-  // Default location: Tel Aviv, Israel (unless the URL specified one). A URL
+  // Default location: Reykjavík, Iceland (unless the URL specified one). A URL
   // carries coords only — the name is resolved from the cell list below.
   const [location, setLocation] = useState<Location>(
     initial
       ? { lat: initial.lat, lon: initial.lon, name: '' }
-      : { lat: 32.0853, lon: 34.7818, name: 'Tel Aviv, Israel' }
+      : { lat: 64.1, lon: -21.9, name: 'Reykjavík, Iceland' }
   );
 
   // Default to today's date (unless the URL specified one).
