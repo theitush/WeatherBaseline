@@ -10,6 +10,7 @@
 // file reads never touch the Worker request budget. This Worker only does the
 // live tail work.
 import { ensureFresh } from './ensureFresh.js';
+import { handleAnalyticsData, handleDashboard } from './analytics.js';
 
 // CORS: the frontend is served from a different origin (Pages / R2) than this
 // Worker, so allow cross-origin XHR. Reads of the data files are plain public
@@ -52,6 +53,15 @@ export default {
     if (url.pathname === '/api/view') {
       ctx.waitUntil(logHit(request, env, { kind: 'toggle', page: url.searchParams.get('u') }));
       return new Response(null, { status: 204, headers: CORS });
+    }
+
+    // Private analytics dashboard. The page is a static shell (reveals nothing);
+    // the data route is password-gated by env.DASHBOARD_TOKEN. See analytics.js.
+    if (url.pathname === '/dashboard') {
+      return handleDashboard(request, env);
+    }
+    if (url.pathname === '/api/analytics') {
+      return handleAnalyticsData(request, url, env);
     }
 
     return json({ error: 'not found' }, 404);

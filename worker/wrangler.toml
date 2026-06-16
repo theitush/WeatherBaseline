@@ -35,6 +35,14 @@ RECENT_TTL_MS = "86400000"
 # Keep it fixed: changing it later makes every past visitor look brand new.
 VISITOR_SALT = "hhwi-2026-change-me"
 
+# NOTE: DASHBOARD_TOKEN — the password for /dashboard and /api/analytics — is a
+# real secret and is deliberately NOT defined here (this file is committed).
+# Set it once for prod, never in the repo:
+#   cd worker && npx wrangler secret put DASHBOARD_TOKEN
+# For local dev, put it in worker/.dev.vars (gitignored):
+#   DASHBOARD_TOKEN = "your-password"
+# The dashboard returns 503 until it's set, and 401 on any wrong password.
+
 # D1 binding for unique-visitor logging (env.DB). COMMENTED OUT so the current
 # `wrangler dev --remote` keeps starting without a database; the Worker no-ops
 # logging whenever env.DB is absent. To turn it on, create the DB, paste its id
