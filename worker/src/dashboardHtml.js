@@ -101,6 +101,14 @@ export const DASHBOARD_HTML = `<!doctype html>
   <header class="top">
     <h1>HowHotWasIt <span class="sub">first-party analytics · D1 <code>hits</code></span></h1>
     <div class="controls">
+      <label class="count" for="range">Range</label>
+      <select id="range" title="Time window counted back from now">
+        <option value="3h">Last 3 hours</option>
+        <option value="24h">Last 24 hours</option>
+        <option value="week">Last week</option>
+        <option value="month">Last month</option>
+        <option value="all" selected>All time</option>
+      </select>
       <span id="gen" class="count"></span>
       <button id="refresh">Refresh</button>
     </div>
@@ -171,6 +179,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   var ALL = [];        // raw rows + derived 'time' string
   var bucket = 'hour';
+  var range = 'all';   // time window counted back from now ('all' = no cap)
   // col -> raw filter text. Defaults: only humans (the 'who' column reads
   // 'human'/'bot') and the owner's own traffic excluded (~ita). Both defaults
   // are real filter text, so they appear in the column boxes and can be edited
@@ -446,13 +455,19 @@ export const DASHBOARD_HTML = `<!doctype html>
     return true;
   }
 
+  // The range dropdown → a millisecond window counted back from NOW, so it always
+  // means "the last 3h/24h/week/month up to this instant". 'all' = no cap.
+  var RANGE_MS = { '3h': 3 * 3600e3, '24h': 24 * 3600e3, week: 7 * 864e5, month: 30 * 864e5 };
+
   function applyFilterSort() {
     var active = [];
     Object.keys(filters).forEach(function (k) {
       var pf = parseFilter(filters[k]);
       if (pf.inc.length || pf.exc.length) active.push([k, pf]);
     });
+    var cutoff = RANGE_MS[range] ? Date.now() - RANGE_MS[range] : 0;
     var out = ALL.filter(function (r) {
+      if (r.ts < cutoff) return false;
       for (var i = 0; i < active.length; i++) {
         if (!matchCell(cellText(r, active[i][0]), active[i][1])) return false;
       }
@@ -540,6 +555,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   // ---- wiring ------------------------------------------------------------
   $('refresh').addEventListener('click', load);
+  $('range').addEventListener('change', function () { range = this.value; refresh(); });
   $('clearf').addEventListener('click', function () { filters = {}; renderHead(); refresh(); });
   $('csv').addEventListener('click', downloadCsv);
   $('bucketseg').querySelectorAll('button').forEach(function (el) {

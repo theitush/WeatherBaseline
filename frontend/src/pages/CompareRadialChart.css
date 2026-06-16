@@ -16,7 +16,7 @@
 }
 
 .cmp-tooltip {
-  position: absolute;
+  position: fixed; /* viewport coords — placeTooltip clamps it on-screen */
   pointer-events: none;
   background: var(--tooltip-bg);
   color: var(--tooltip-text);
@@ -27,7 +27,16 @@
   opacity: 0;
   transition: opacity 0.12s ease;
   white-space: nowrap;
-  z-index: 10;
+  z-index: 1000;
+  /* Never wider than the viewport, or it can't be kept on-screen. */
+  max-width: calc(100vw - 16px);
+}
+
+@media (max-width: 640px) {
+  .cmp-tooltip {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .cmp-marker-dot {

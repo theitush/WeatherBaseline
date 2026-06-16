@@ -72,4 +72,15 @@
   z-index: 1000;
   white-space: nowrap;
   line-height: 1.5;
+  /* Never wider than the viewport, or placeTooltip can't keep it on-screen. */
+  max-width: calc(100vw - 16px);
+}
+
+/* On a narrow phone a nowrap tooltip can be wider than the screen and spill off
+   the edge; let it wrap so it always fits within the clamped box. */
+@media (max-width: 640px) {
+  .chart-tooltip {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

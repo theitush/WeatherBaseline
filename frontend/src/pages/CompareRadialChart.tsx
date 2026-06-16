@@ -4,6 +4,7 @@ import type { MetricKey } from '../utils/config';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
 import type { Series, SeriesData } from './compareTypes';
+import { placeTooltip } from '../utils/tooltip';
 import './CompareRadialChart.css';
 
 // A single series resolved against its loaded data, ready to draw.
@@ -76,12 +77,9 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
     const rInner = rOuter * 0.12;
 
     const tooltip = d3.select(tooltipRef.current);
-    const placeTip = (event: MouseEvent) => {
-      const el = tooltipRef.current;
-      if (!el) return;
-      el.style.left = `${event.offsetX + 14}px`;
-      el.style.top = `${event.offsetY + 14}px`;
-    };
+    // Shared viewport-aware placement: keeps the tooltip on-screen near any edge
+    // (it overflowed off the right/bottom on mobile when placed by raw offset).
+    const placeTip = (event: MouseEvent) => placeTooltip(tooltipRef.current, event);
 
     const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 

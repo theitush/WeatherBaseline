@@ -141,7 +141,14 @@ async function ensureFresh(lat: number, lon: number, viewUrl?: string): Promise<
     // Pass the app's real page URL (/lat,lon/date/metric) so the Worker logs the
     // exact link viewed — metric included — for analytics. ensure-fresh is a
     // functional call, so this arrival hit can't be stripped by adblockers.
-    if (viewUrl) params.set('u', viewUrl);
+    // Fall back to the current location when no explicit URL is given (e.g. the
+    // compare page / year chart) so EVERY app call is attributable: a bare
+    // ensure-fresh with no `u` therefore means "not from our UI" — a clean bot
+    // signal the analytics relies on (see worker/src/analytics.js).
+    const u =
+      viewUrl ??
+      (typeof location !== 'undefined' ? location.pathname + location.search : undefined);
+    if (u) params.set('u', u);
     const res = await fetch(apiUrl(`/api/ensure-fresh?${params}`));
     return res.ok;
   } catch {

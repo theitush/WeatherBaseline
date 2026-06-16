@@ -11,9 +11,9 @@
 // credentials it sends them on every same-origin request, so /api/analytics is
 // authorised automatically with no token plumbing in the page.
 //
-// Bot/human classification mirrors scripts/analytics/query.py so the dashboard's
-// "real people" matches the CLI report. We serve the raw rows and let the page
-// do the charting/filtering, so the chart and the table share a single fetch.
+// Bot/human classification lives here — it's what the dashboard's "real people"
+// count is built from. We serve the raw rows and let the page do the
+// charting/filtering, so the chart and the table share a single fetch.
 import { DASHBOARD_HTML } from './dashboardHtml.js';
 
 const CORS = { 'Access-Control-Allow-Origin': '*' };
@@ -52,23 +52,99 @@ function privatePage() {
   );
 }
 
-// Datacenter operators → almost always bots/scanners, not humans. Lowercased
-// substring match against cf.asOrganization. Keep in sync with query.py.
-const BOT_ORGS = [
-  'amazon', 'google', 'microsoft', 'azure', 'ovh', 'hetzner', 'digitalocean',
-  'linode', 'akamai', 'fastly', 'cloudflare', 'oracle', 'alibaba', 'tencent',
-  'leaseweb', 'datacamp', 'm247', 'scaleway', 'censys', 'palo alto',
-  'vultr', 'contabo', 'choopa', 'godaddy', 'hostinger',
+// Bot/human classification — the single source of truth for the dashboard.
+//
+// Lowercased substring match against cf.asOrganization, split into two tiers
+// because a raw datacenter and an egress relay are NOT the same thing:
+//   • DATACENTER_ORGS — pure hosting / scanners / residential-proxy operators.
+//     Real users never originate here, so a match is a bot (rescuable only by
+//     the drill-down behaviour below).
+//   • RELAY_ORGS — egress relays that BOTH bots and real people sit behind:
+//     iCloud Private Relay (egresses via Cloudflare/Akamai/Fastly) and consumer
+//     VPNs ("vpn" in the org, incl. "VPN by Google"). A match is a bot ONLY when
+//     the UA isn't a real browser — a genuine browser through a relay is a real
+//     person (e.g. an iPhone on Private Relay), not a scanner.
+const DATACENTER_ORGS = [
+  'amazon', 'microsoft', 'azure', 'google cloud', 'ovh', 'hetzner',
+  'digitalocean', 'linode', 'oracle', 'alibaba', 'tencent', 'leaseweb',
+  'datacamp', 'm247', 'scaleway', 'censys', 'palo alto', 'vultr', 'contabo',
+  'choopa', 'godaddy', 'hostinger',
+  // Residential-proxy operators: sell scraping exits on real consumer IPs, so
+  // they look like home users and slip past the datacenter names above.
+  'code200', 'oxylabs', 'tesonet', 'bright data', 'luminati', 'smartproxy',
+  'iproyal', 'packetstream', 'webshare',
 ];
-// User-agents that self-identify as automation.
-const BOT_UAS = ['bot', 'spider', 'crawl', 'python', 'curl', 'wget', 'http', 'scan', 'go-http'];
+const RELAY_ORGS = ['cloudflare', 'akamai', 'fastly', 'vpn'];
+// User-agents that self-identify as automation — a hard signal, never rescued.
+const BOT_UAS = [
+  'bot', 'spider', 'crawl', 'python', 'curl', 'wget', 'go-http', 'scan',
+  'okhttp', 'java/', 'headless', 'node-fetch', 'axios', 'libwww',
+];
+// A genuine consumer browser: Mozilla token + a real engine token.
+const BROWSER_RE = /mozilla\/.*(safari|chrome|crios|firefox|fxios|edg|opr|samsungbrowser|version\/)/i;
+// A bare "/lat,lon" page (no date/metric) — see U_REQUIRED_SINCE.
+const BARE_COORD_RE = /^\/-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/;
+// The app always sends its real URL as `?u=` on /api/ensure-fresh, so a bare
+// "/lat,lon" page means the call did NOT come from our UI (a direct API hit =
+// bot). Only trusted from this instant on, after EVERY frontend path began
+// sending `u` (the compare page / year chart used to omit it). Bump this to
+// your actual frontend deploy time.
+const U_REQUIRED_SINCE = Date.parse('2026-06-17T00:00:00Z');
+// A browsing session ends after a gap this long; HUMAN_MIN_PAGES distinct
+// content pages within one session marks a real person.
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const HUMAN_MIN_PAGES = 3;
 
-export function isHuman(asnOrg, ua) {
+const hasAny = (hay, needles) => needles.some((n) => hay.includes(n));
+
+// Hard automation signal — no behaviour can rescue it.
+export function automationUA(ua) {
+  return hasAny((ua || '').toLowerCase(), BOT_UAS);
+}
+
+// Per-row "looks like a bot by network / route" — rescuable by drill-down.
+export function signatureBot(asnOrg, ua, page, ts) {
   const org = (asnOrg || '').toLowerCase();
-  for (const o of BOT_ORGS) if (org.includes(o)) return false;
-  const u = (ua || '').toLowerCase();
-  for (const b of BOT_UAS) if (u.includes(b)) return false;
-  return true;
+  if (hasAny(org, DATACENTER_ORGS)) return true; // raw hosting / proxy
+  if (hasAny(org, RELAY_ORGS) && !BROWSER_RE.test(ua || '')) return true; // relay w/o browser
+  if (page && BARE_COORD_RE.test(page) && Number(ts) >= U_REQUIRED_SINCE) return true; // direct API hit
+  return false;
+}
+
+// A real content URL the app emits (/lat,lon/date/metric, /compare/…) — i.e.
+// >=3 path segments. A bare "/lat,lon" or the home "/" doesn't count.
+function isContentPage(page) {
+  return /^\/[^/]+\/[^/]+\/[^/]+/.test(String(page || ''));
+}
+
+// Behavioural rescue: visitors who opened >=HUMAN_MIN_PAGES distinct content
+// pages within a single browsing session (consecutive hits < SESSION_GAP_MS
+// apart) are clicking around like a person — across ANY cities/dates/metrics,
+// not tied to one location. Strong enough to override a datacenter-org /
+// bare-coord flag (but never an automation UA). `geo` events are deliberately
+// NOT counted: a rendering scanner (e.g. Palo Alto's URL filter) fires them too.
+export function behaviouralHumans(rows) {
+  const byVisitor = new Map(); // visitor -> [{ ts, page }]
+  for (const r of rows) {
+    if (!isContentPage(r.page)) continue;
+    let evs = byVisitor.get(r.visitor);
+    if (!evs) byVisitor.set(r.visitor, (evs = []));
+    evs.push({ ts: Number(r.ts) || 0, page: r.page });
+  }
+  const human = new Set();
+  for (const [visitor, evs] of byVisitor) {
+    evs.sort((a, b) => a.ts - b.ts);
+    let start = 0;
+    for (let i = 1; i <= evs.length; i++) {
+      const sessionEnd = i === evs.length || evs[i].ts - evs[i - 1].ts > SESSION_GAP_MS;
+      if (!sessionEnd) continue;
+      const pages = new Set();
+      for (let j = start; j < i; j++) pages.add(evs[j].page);
+      if (pages.size >= HUMAN_MIN_PAGES) { human.add(visitor); break; }
+      start = i;
+    }
+  }
+  return human;
 }
 
 // The metric is the last path segment of page (/lat,lon/date/metric).
@@ -84,8 +160,8 @@ function deriveMetric(page) {
 // same file the frontend snaps against in cellIndex.ts). We fetch it once per
 // isolate (cached in module scope, plus Cloudflare's edge cache) and decode each
 // distinct page to "City, …". Exact 0.1° grid lookup with a nearest-cell
-// fallback, mirroring query.py. Best-effort: if the fetch fails, place stays
-// null and the dashboard still works.
+// fallback. Best-effort: if the fetch fails, place stays null and the dashboard
+// still works.
 const CELLS_URL = 'https://weatherbaseline.com/cells.csv';
 const PAGE_RE = /^\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
 let cellsPromise = null;
@@ -200,9 +276,16 @@ export async function handleAnalyticsData(request, url, env) {
     return p;
   };
 
+  // Behavioural rescue needs the whole result set (per-visitor), so compute the
+  // set of behaviourally-human visitors once, then label each row.
+  const rescued = behaviouralHumans(results || []);
   const rows = (results || []).map((r) => ({
     ...r,
-    human: isHuman(r.asn_org, r.ua) ? 1 : 0,
+    human:
+      !automationUA(r.ua) &&
+      (!signatureBot(r.asn_org, r.ua, r.page, r.ts) || rescued.has(r.visitor))
+        ? 1
+        : 0,
     metric: deriveMetric(r.page),
     place: placeFor(r.page), // human label for the location they viewed
   }));

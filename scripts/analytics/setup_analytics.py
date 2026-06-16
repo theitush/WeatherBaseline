@@ -14,8 +14,8 @@ Safe to re-run — every step skips itself if it's already done. The only thing 
 can't do for you is the browser login: if you're not logged in it stops and tells
 you to run `npx wrangler login` (opens a browser, one click) and re-run this.
 
-After it finishes, see your numbers any time with:
-    python3 scripts/analytics/query.py
+After it finishes, see your numbers any time on the private /dashboard page
+(HTTP Basic auth, password = the Worker's DASHBOARD_TOKEN secret).
 """
 import json
 import os
@@ -112,7 +112,6 @@ if dep.returncode != 0:
 print("\n" + "=" * 60)
 print("✅ Done — your site is now logging unique visitors.")
 print("=" * 60)
-print("It counts from now on (no backfill). See the numbers any time with:")
-print("\n    python3 scripts/analytics/query.py\n")
-print("That prints a report to your terminal — there's no dashboard to log into;")
-print("the data lives in your own Cloudflare D1 database and query.py reads it.")
+print("It counts from now on (no backfill). See the numbers any time on the")
+print("private /dashboard page (HTTP Basic auth = the DASHBOARD_TOKEN secret).")
+print("The data lives in your own Cloudflare D1 database.")

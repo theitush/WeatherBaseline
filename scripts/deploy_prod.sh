@@ -31,5 +31,4 @@ echo
 echo "============================================================"
 echo "✅ Deployed — Worker + frontend are live with metric capture."
 echo "============================================================"
-echo "Try it: open your site, switch a metric, then run:"
-echo "    python3 scripts/analytics/query.py"
+echo "Try it: open your site, switch a metric, then check the private /dashboard."

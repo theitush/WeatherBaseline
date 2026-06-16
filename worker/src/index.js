@@ -130,7 +130,7 @@ function handleGeo(request, env, ctx) {
 // bot-filtering — and deliberately nothing about how anyone interacts (no
 // metric, no click trail). Best-effort: any failure (incl. no D1 binding in
 // local dev) is swallowed so logging never affects the response. Read it back
-// with scripts/analytics/query.py.
+// on the private /dashboard page (served by analytics.js).
 // ---------------------------------------------------------------------------
 async function sha256Hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
