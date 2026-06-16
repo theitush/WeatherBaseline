@@ -85,11 +85,10 @@ const DEAD_CENTER_LINE = [
 
 // Verdict banks answering "How extreme is this weather?" — random per render.
 // #1-on-record gets the exclusive "Record-breaker!" (handled separately).
-const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!'];
+const VERDICT_TOP3 = ['Wow, crazy!', 'Off the charts!', 'One for the history books!', 'Legend.'];
 // Reserved for a top-1/2/3 value across the WHOLE record (not just its ±N-day
 // window) — the rarest thing the page can show, so the lines go big.
-const VERDICT_ALLTIME_1 = ['For the ages.', 'Nothing tops this.', 'The all-time benchmark.', 'History, made.'];
-const VERDICT_ALLTIME_23 = ['Practically unheard of.', 'A page in the record books.', 'Almost legendary.', 'Rarefied air.'];
+const VERDICT_ALLTIME = ['Practically unheard of!', 'A page in the record books.', 'Legendary!', 'For the ages.'];
 const VERDICT_EXTREME = ['Extreme!', 'Seriously extreme.', 'Pretty wild.'];
 const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.'];
 const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
@@ -109,14 +108,6 @@ const hashSeed = (s: string): number => {
 };
 const pick = (bank: string[], seed: string) => bank[hashSeed(seed) % bank.length];
 
-const ordinal = (n: number): string => {
-  const j = n % 10;
-  const k = n % 100;
-  if (j === 1 && k !== 11) return `${n}st`;
-  if (j === 2 && k !== 12) return `${n}nd`;
-  if (j === 3 && k !== 13) return `${n}rd`;
-  return `${n}th`;
-};
 
 // Lightweight confetti burst — no dependency. Fires once when called.
 // `multiplier` scales the piece count: 1 for an in-window top-3, 5 for an
@@ -209,7 +200,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
 
   // Verdict (bold line) + rarity line, both keyed off how far into the day's
   // own tail it sits. Tier by SINGLE-tailed rarity (top/bottom X% on its side):
-  //   - top-3 on record: rank line ("Hottest day on record!") + party verdict + confetti
+  //   - top-5 all-time / top-3 in-window: "one of the hottest …" (no exact ordinal —
+  //       grid noise can't resolve #1 vs #2) + rarity % + party verdict + confetti
   //   - extreme  (≤5%):  single-tailed %, named direction, "!"  → "Only 2.4% … this hot!"
   //   - notable  (≤20%): single-tailed %, cumulative           → "About 10% … this hot or hotter."
   //   - mild     (>20%): DOUBLE-tailed %, mocked "extreme"      → "About 70% … this "extreme"."
@@ -271,23 +263,24 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
       const seed = `${currentMetric}:${currentTemp}:${rank}`;
 
-      if (allTimeRank >= 1 && allTimeRank <= 3) {
-        // Top-1/2/3 across the WHOLE record — the rarest thing the page shows.
-        // Drop the ±window qualifier: this is the all-time extreme on ANY date,
-        // not just nearby ones.
-        extremeLine =
-          allTimeRank === 1
-            ? `The ${sup} ${noun} EVER recorded!`
-            : `${ordinal(allTimeRank)}-${sup} ${noun} ever recorded!`;
-        verdict =
-          allTimeRank === 1 ? pick(VERDICT_ALLTIME_1, seed) : pick(VERDICT_ALLTIME_23, seed);
+      if (allTimeRank >= 1 && allTimeRank <= 5) {
+        // Among the rarest the page shows: a top-5 value across the WHOLE record.
+        // We deliberately DON'T name the exact slot — ERA5-Land on a 0.1° grid
+        // can't credibly resolve #1 vs #2 vs … #5; those gaps sit inside the noise.
+        // And NO % here: a share of ALL days (~27k) uses a wildly different
+        // denominator than the seasonal line below (~530), so the two numbers
+        // can't be compared — plus an all-time top-5 is always a summer day, so
+        // the figure would mostly just say "it's summer." This tier's currency is
+        // SCOPE, not rarity: "any day of any year" vs the seasonal "this season."
+        extremeLine = `One of the ${sup} ${nounP} EVER recorded!!!`;
+        verdict = pick(VERDICT_ALLTIME, seed);
       } else if (rank <= 3) {
-        // Top-3 in its ±window — name the rank, celebrate.
-        extremeLine =
-          rank === 1
-            ? `${sup.charAt(0).toUpperCase() + sup.slice(1)} ${noun}${since} on record!`
-            : `${ordinal(rank)} ${sup} ${noun}${since} on record!`;
-        // #1 gets the exclusive phrase; #2/#3 draw from the party bank.
+        // Top-3 within its ±window. Same rationale — no exact ordinal; "one of the
+        // hottest near this date" backed by the seasonal rarity %, which IS robust.
+        const pctWin = singleTail * 100;
+        const shownWin = pctWin < 0.1 ? '<0.1' : pctWin.toFixed(1);
+        extremeLine = `Only ${shownWin}% of ${nounP}${since} were this ${adj}!`;
+        // #1 still gets the exclusive phrase + bigger confetti; #2/#3 the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
       } else if (singleTail <= 0.05) {
         // Extreme — one decimal, floored so a record never prints "0.0%".
@@ -325,15 +318,15 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     }
   }
 
-  // Confetti for any top-3 day. An in-window top-3 gets the normal burst; an
-  // all-time top-1/2/3 (rarest on the page) gets a 5× burst. Re-fires when the
-  // rank-bearing day changes (new date/metric/location landing in the top 3).
+  // Confetti for any top day. An in-window top-3 gets the normal burst; an
+  // all-time top-5 (rarest on the page) gets a 5× burst. Re-fires when the
+  // rank-bearing day changes (new date/metric/location landing near the top).
   const isTop3 = rank >= 1 && rank <= 3;
-  const isAllTimeTop3 = allTimeRank >= 1 && allTimeRank <= 3;
+  const isAllTimeTop5 = allTimeRank >= 1 && allTimeRank <= 5;
   useEffect(() => {
-    if (isAllTimeTop3) fireConfetti(5);
+    if (isAllTimeTop5) fireConfetti(5);
     else if (isTop3) fireConfetti(1);
-  }, [isTop3, isAllTimeTop3, currentMetric, currentTemp]);
+  }, [isTop3, isAllTimeTop5, currentMetric, currentTemp]);
 
   // Lead line above the punchy verdict: "June 7th in Tel Aviv is".
   const leadDate = (() => {
