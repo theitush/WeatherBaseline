@@ -115,7 +115,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   </header>
 
   <section class="card" id="topcard">
-    <h2>Hits over time</h2>
+    <h2 id="charttitle">Hits over time</h2>
     <p class="note">Mirrors the filtered table below — exactly the rows shown there, bucketed by time, hue = country (top 8 + Other). By default the <code>who</code> filter is set to <code>human</code>, so bot/datacenter traffic is excluded; clear or edit it to change the chart.</p>
     <div class="chips" id="chips"></div>
     <div class="controls" style="margin-bottom:14px">
@@ -124,6 +124,11 @@ export const DASHBOARD_HTML = `<!doctype html>
         <button data-b="10m">10 min</button>
         <button data-b="hour" class="on">Hour</button>
         <button data-b="day">Day</button>
+      </span>
+      <span class="count" style="margin-left:14px">Y axis</span>
+      <span class="seg" id="metricseg">
+        <button data-m="hits" class="on">Hits</button>
+        <button data-m="users">Unique users</button>
       </span>
     </div>
     <div class="chartrow">
@@ -173,15 +178,20 @@ export const DASHBOARD_HTML = `<!doctype html>
   // The public site — page values are stored as paths (/lat,lon/date/metric),
   // so prepend this to make the 'page' cells real, clickable links.
   var SITE = 'https://www.weatherbaseline.com';
-  // The owner's own pseudonymous visitor id → shown as a friendly label so it's
-  // trivial to filter in/out (excluded by default via the 'visitor' filter).
-  var ME = '62a0f4068c1762bb', ME_LABEL = 'ita';
+  // The owner's own visitor id → shown as a friendly label so it's trivial to
+  // filter in/out (excluded by default via the 'visitor' filter). The Worker
+  // stamps owner-keyed hits with this stable id (see logHit + ?owner=), so it
+  // holds across the owner's changing IPs / browsers / countries.
+  var ME = 'owner', ME_LABEL = 'OWNER';
 
   var ALL = [];        // raw rows + derived 'time' string
   var bucket = 'hour';
+  // y-axis metric: 'hits' counts every row; 'users' collapses each bucket to the
+  // number of DISTINCT visitors (so one person's 7 views in a bucket → 1).
+  var metric = 'hits';
   var range = 'all';   // time window counted back from now ('all' = no cap)
   // col -> raw filter text. Defaults: only humans (the 'who' column reads
-  // 'human'/'bot') and the owner's own traffic excluded (~ita). Both defaults
+  // 'human'/'bot') and the owner's own traffic excluded (~OWNER). Both defaults
   // are real filter text, so they appear in the column boxes and can be edited
   // or cleared. Syntax: comma-separated terms; a leading '~' excludes.
   var filters = { human: 'human', visitor: '~' + ME_LABEL };
@@ -261,9 +271,20 @@ export const DASHBOARD_HTML = `<!doctype html>
     // The chart shows exactly what the table shows — the same filtered/sorted
     // set — so they can never disagree.
     var views = srcRows;
-    // country totals → top 8 + Other (null country shown as '??')
+    // country totals → top 8 + Other (null country shown as '??'). In 'users'
+    // mode a country counts DISTINCT visitors over the whole window (so the
+    // ranking + legend reflect people, not views).
     var tot = {};
-    views.forEach(function (r) { var c = r.country || '??'; tot[c] = (tot[c] || 0) + 1; });
+    if (metric === 'users') {
+      var ctry = {}; // country -> { visitorId: 1 }
+      views.forEach(function (r) {
+        var c = r.country || '??';
+        (ctry[c] || (ctry[c] = {}))[r.visitor] = 1;
+      });
+      Object.keys(ctry).forEach(function (c) { tot[c] = Object.keys(ctry[c]).length; });
+    } else {
+      views.forEach(function (r) { var c = r.country || '??'; tot[c] = (tot[c] || 0) + 1; });
+    }
     var ranked = Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; });
     var top = ranked.slice(0, 8);
     var topSet = {}; top.forEach(function (c) { topSet[c] = 1; });
@@ -273,15 +294,33 @@ export const DASHBOARD_HTML = `<!doctype html>
     top.forEach(function (c, i) { colorMap[c] = PALETTE[i % PALETTE.length]; });
     colorMap['Other'] = OTHER_COLOR;
 
-    // bucket → country → count (countries outside the top 8 collapse to 'Other')
+    // bucket → country → value (countries outside the top 8 collapse to 'Other').
+    // 'hits' = row count per bucket; 'users' = distinct visitors per bucket, so a
+    // visitor with several views in one bucket counts once (but is re-counted in
+    // each separate bucket they appear in — that's per-bucket uniqueness).
     var buckets = {};
-    views.forEach(function (r) {
-      var k = bucketKey(r.ts);
-      var c = r.country || '??';
-      var key = topSet[c] ? c : 'Other';
-      if (!buckets[k]) buckets[k] = {};
-      buckets[k][key] = (buckets[k][key] || 0) + 1;
-    });
+    if (metric === 'users') {
+      var bseen = {}; // bucketKey -> country -> { visitorId: 1 }
+      views.forEach(function (r) {
+        var k = bucketKey(r.ts);
+        var c = r.country || '??';
+        var key = topSet[c] ? c : 'Other';
+        var b = bseen[k] || (bseen[k] = {});
+        (b[key] || (b[key] = {}))[r.visitor] = 1;
+      });
+      Object.keys(bseen).forEach(function (k) {
+        buckets[k] = {};
+        Object.keys(bseen[k]).forEach(function (c) { buckets[k][c] = Object.keys(bseen[k][c]).length; });
+      });
+    } else {
+      views.forEach(function (r) {
+        var k = bucketKey(r.ts);
+        var c = r.country || '??';
+        var key = topSet[c] ? c : 'Other';
+        if (!buckets[k]) buckets[k] = {};
+        buckets[k][key] = (buckets[k][key] || 0) + 1;
+      });
+    }
 
     var keys = Object.keys(buckets).sort();
     var list = [];
@@ -301,12 +340,13 @@ export const DASHBOARD_HTML = `<!doctype html>
       order.forEach(function (c) { total += seg[c] || 0; });
       return { key: k, seg: seg, total: total };
     });
+    $('charttitle').textContent = metric === 'users' ? 'Unique users over time' : 'Hits over time';
     drawSvg(rows, order);
     drawLegend(order, tot, topSet);
   }
 
   function drawSvg(rows, order) {
-    var W = 1000, H = 420, mL = 48, mR = 14, mT = 14, mB = 78;
+    var W = 1000, H = 420, mL = 56, mR = 14, mT = 14, mB = 78;
     var plotW = W - mL - mR, plotH = H - mT - mB;
     var maxV = 0; rows.forEach(function (b) { if (b.total > maxV) maxV = b.total; });
     var ticks = niceTicks(maxV), topV = ticks[ticks.length - 1] || 1;
@@ -340,6 +380,9 @@ export const DASHBOARD_HTML = `<!doctype html>
           (x + bw / 2) + ' ' + (mT + plotH + 14) + ')">' + esc(lab) + '</text>';
       }
     });
+    // y-axis title (rotated) — names what the bars count
+    s += '<text transform="rotate(-90 13 ' + (mT + plotH / 2) + ')" x="13" y="' +
+      (mT + plotH / 2) + '" text-anchor="middle">' + (metric === 'users' ? 'unique users' : 'hits') + '</text>';
     // axes
     s += '<line class="axis" x1="' + mL + '" y1="' + (mT + plotH) + '" x2="' + (W - mR) + '" y2="' + (mT + plotH) + '"/>';
     s += '<line class="axis" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + plotH) + '"/>';
@@ -354,7 +397,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     box.querySelectorAll('rect.bar').forEach(function (el) {
       el.addEventListener('mousemove', function (e) {
         tip.innerHTML = '<b>' + esc(el.getAttribute('data-c')) + '</b> · ' + el.getAttribute('data-v') +
-          ' views<br>' + esc(el.getAttribute('data-b'));
+          (metric === 'users' ? ' users' : ' views') + '<br>' + esc(el.getAttribute('data-b'));
         tip.style.left = (e.clientX + 12) + 'px';
         tip.style.top = (e.clientY + 12) + 'px';
         tip.style.opacity = '1';
@@ -562,6 +605,13 @@ export const DASHBOARD_HTML = `<!doctype html>
     el.addEventListener('click', function () {
       bucket = el.getAttribute('data-b');
       $('bucketseg').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      refresh();
+    });
+  });
+  $('metricseg').querySelectorAll('button').forEach(function (el) {
+    el.addEventListener('click', function () {
+      metric = el.getAttribute('data-m');
+      $('metricseg').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === el); });
       refresh();
     });
   });
