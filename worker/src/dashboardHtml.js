@@ -80,7 +80,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   tbody td { padding: 5px 10px; border-bottom: 1px solid var(--line2); white-space: nowrap; vertical-align: top; }
   tbody tr:hover { background: #fcfbf7; }
   td.mono, .num { font-family: var(--mono); }
-  td.page, td.ua, td.ref { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  td.page, td.ref { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  /* user-agents are long — let them wrap so the whole string is readable */
+  td.ua { white-space: normal; overflow-wrap: anywhere; word-break: break-word; min-width: 240px; max-width: 440px; }
   td.place { max-width: 220px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
   .muted { color: #c4c4c4; }
   .pill { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); }
@@ -105,8 +107,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   </header>
 
   <section class="card" id="topcard">
-    <h2>Views by real people, over time</h2>
-    <p class="note">City loads + bare-root landings from non-bot traffic. In-app metric toggles excluded. Hue = country (top 8 + Other). Bot/datacenter traffic is filtered out.</p>
+    <h2>Hits over time</h2>
+    <p class="note">Mirrors the filtered table below — exactly the rows shown there, bucketed by time, hue = country (top 8 + Other). By default the <code>who</code> filter is set to <code>human</code>, so bot/datacenter traffic is excluded; clear or edit it to change the chart.</p>
     <div class="chips" id="chips"></div>
     <div class="controls" style="margin-bottom:14px">
       <span class="count">Bucket</span>
@@ -124,7 +126,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   <section class="card">
     <h2>Every hit</h2>
-    <p class="note">The raw <code>hits</code> table, newest first. Type in any column box to filter (substring, case-insensitive). Click a header to sort.</p>
+    <p class="note">The raw <code>hits</code> table, newest first. Filter any column (substring, case-insensitive): comma-separate to match more (<code>tmax, tmin</code>), prefix <code>~</code> to exclude (<code>~bot</code>, or <code>~bot, ~python</code>). Click a header to sort. The chart above tracks whatever's shown here.</p>
     <div class="tablebar">
       <span class="count" id="rowcount"></span>
       <div class="controls">
@@ -160,10 +162,20 @@ export const DASHBOARD_HTML = `<!doctype html>
   ];
   var PALETTE = ['#b3471f', '#2f6f9f', '#3a8a5f', '#c79a1e', '#7a5aa6', '#1f9a9a', '#c2557a', '#6b8e23'];
   var OTHER_COLOR = '#9aa0a6';
+  // The public site — page values are stored as paths (/lat,lon/date/metric),
+  // so prepend this to make the 'page' cells real, clickable links.
+  var SITE = 'https://www.weatherbaseline.com';
+  // The owner's own pseudonymous visitor id → shown as a friendly label so it's
+  // trivial to filter in/out (excluded by default via the 'visitor' filter).
+  var ME = '62a0f4068c1762bb', ME_LABEL = 'ita';
 
   var ALL = [];        // raw rows + derived 'time' string
   var bucket = 'hour';
-  var filters = {};    // col -> lowercase substring
+  // col -> raw filter text. Defaults: only humans (the 'who' column reads
+  // 'human'/'bot') and the owner's own traffic excluded (~ita). Both defaults
+  // are real filter text, so they appear in the column boxes and can be edited
+  // or cleared. Syntax: comma-separated terms; a leading '~' excludes.
+  var filters = { human: 'human', visitor: '~' + ME_LABEL };
   var sortCol = 'time', sortDir = -1;  // default newest first (ts desc)
   var colorMap = {};
 
@@ -236,8 +248,10 @@ export const DASHBOARD_HTML = `<!doctype html>
     return out;
   }
 
-  function buildChart() {
-    var views = ALL.filter(function (r) { return r.human && r.kind !== 'toggle'; });
+  function buildChart(srcRows) {
+    // The chart shows exactly what the table shows — the same filtered/sorted
+    // set — so they can never disagree.
+    var views = srcRows;
     // country totals → top 8 + Other (null country shown as '??')
     var tot = {};
     views.forEach(function (r) { var c = r.country || '??'; tot[c] = (tot[c] || 0) + 1; });
@@ -280,7 +294,6 @@ export const DASHBOARD_HTML = `<!doctype html>
     });
     drawSvg(rows, order);
     drawLegend(order, tot, topSet);
-    return { views: views, countries: Object.keys(tot).length };
   }
 
   function drawSvg(rows, order) {
@@ -323,7 +336,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     s += '<line class="axis" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + plotH) + '"/>';
     s += '</svg>';
     var box = $('chart');
-    box.innerHTML = rows.length ? s : '<div class="empty">No human views in range yet.</div>';
+    box.innerHTML = rows.length ? s : '<div class="empty">No rows match the current filters.</div>';
     wireTips(box);
   }
 
@@ -354,20 +367,21 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   // ---- summary chips -----------------------------------------------------
-  function renderChips(views) {
-    var humans = ALL.filter(function (r) { return r.human; });
-    var uniq = {}; humans.forEach(function (r) { uniq[r.visitor] = 1; });
-    var bots = ALL.length - humans.length;
+  // Describe the DISPLAYED rows (the same set the chart draws), with total rows
+  // as context, so the numbers always agree with what's on screen.
+  function renderChips(rows) {
+    var uniq = {}; rows.forEach(function (r) { uniq[r.visitor] = 1; });
     var span = '—';
-    if (ALL.length) {
-      var min = ALL[ALL.length - 1].time.slice(0, 10), max = ALL[0].time.slice(0, 10);
-      span = min === max ? min : min + ' → ' + max;
+    if (rows.length) {
+      var lo = Infinity, hi = -Infinity;
+      rows.forEach(function (r) { if (r.ts < lo) lo = r.ts; if (r.ts > hi) hi = r.ts; });
+      var a = fmtTime(lo).slice(0, 10), b = fmtTime(hi).slice(0, 10);
+      span = a === b ? a : a + ' → ' + b;
     }
     var chips = [
-      ['views (real ppl)', views.length],
+      ['shown', rows.length],
       ['unique people', Object.keys(uniq).length],
       ['total rows', ALL.length],
-      ['bots filtered', bots],
       ['date range', span]
     ];
     $('chips').innerHTML = chips.map(function (c) {
@@ -384,6 +398,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   function cellText(r, k) {
     if (k === 'human') return r.human ? 'human' : 'bot';
     if (k === 'place') return r.place || '';
+    if (k === 'visitor') return r.visitor === ME ? ME_LABEL : r.visitor;
     return r[k];
   }
   function cellHtml(r, k) {
@@ -394,17 +409,52 @@ export const DASHBOARD_HTML = `<!doctype html>
       var co = coordsOf(r.page);
       return co ? '<span class="muted">' + esc(co) + '</span>' : '<span class="muted">·</span>';
     }
-    var v = r[k];
+    // The raw page path → a clickable link to the live site (new tab).
+    if (k === 'page') {
+      if (!r.page) return '<span class="muted">·</span>';
+      return '<a class="link" href="' + esc(SITE + r.page) + '" target="_blank" rel="noopener">' + esc(r.page) + '</a>';
+    }
+    var v = cellText(r, k);
     if (v == null || v === '') return '<span class="muted">·</span>';
     return esc(v);
   }
 
+  // Parse a filter box into include/exclude terms. Comma-separates the terms;
+  // a leading '~' marks an exclude. Case-insensitive, substring.
+  //   "tmax, tmin"   → include tmax OR tmin
+  //   "~bot"         → exclude anything containing bot
+  //   "~bot, ~python"→ exclude both
+  function parseFilter(raw) {
+    var inc = [], exc = [];
+    String(raw || '').split(',').forEach(function (t) {
+      t = t.trim().toLowerCase();
+      if (!t) return;
+      if (t.charAt(0) === '~') { var e = t.slice(1).trim(); if (e) exc.push(e); }
+      else inc.push(t);
+    });
+    return { inc: inc, exc: exc };
+  }
+  // A cell passes when it contains NONE of the excludes and (if any includes are
+  // given) at least ONE include.
+  function matchCell(val, pf) {
+    var s = String(val == null ? '' : val).toLowerCase();
+    for (var i = 0; i < pf.exc.length; i++) if (s.indexOf(pf.exc[i]) !== -1) return false;
+    if (pf.inc.length) {
+      for (var j = 0; j < pf.inc.length; j++) if (s.indexOf(pf.inc[j]) !== -1) return true;
+      return false;
+    }
+    return true;
+  }
+
   function applyFilterSort() {
-    var keys = Object.keys(filters).filter(function (k) { return filters[k]; });
+    var active = [];
+    Object.keys(filters).forEach(function (k) {
+      var pf = parseFilter(filters[k]);
+      if (pf.inc.length || pf.exc.length) active.push([k, pf]);
+    });
     var out = ALL.filter(function (r) {
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if (String(cellText(r, k) == null ? '' : cellText(r, k)).toLowerCase().indexOf(filters[k]) === -1) return false;
+      for (var i = 0; i < active.length; i++) {
+        if (!matchCell(cellText(r, active[i][0]), active[i][1])) return false;
       }
       return true;
     });
@@ -433,19 +483,20 @@ export const DASHBOARD_HTML = `<!doctype html>
       el.addEventListener('click', function () {
         var k = el.getAttribute('data-sort');
         if (sortCol === k) sortDir = -sortDir; else { sortCol = k; sortDir = 1; }
-        renderHead(); renderBody();
+        renderHead(); refresh();
       });
     });
     $('thead').querySelectorAll('input[data-f]').forEach(function (el) {
       el.addEventListener('input', function () {
-        filters[el.getAttribute('data-f')] = el.value.trim().toLowerCase();
-        renderBody();
+        // Store the raw text (parseFilter handles trimming/case); refresh both
+        // the chart and the table so the chart always mirrors what's shown.
+        filters[el.getAttribute('data-f')] = el.value;
+        refresh();
       });
     });
   }
 
-  function renderBody() {
-    var rows = applyFilterSort();
+  function renderBody(rows) {
     var MAXR = 3000, shown = rows.slice(0, MAXR);
     var body = shown.map(function (r) {
       return '<tr>' + COLS.map(function (c) {
@@ -474,22 +525,28 @@ export const DASHBOARD_HTML = `<!doctype html>
     a.click();
   }
 
+  // One filtered/sorted set drives the chart, the chips and the table together.
+  function refresh() {
+    var rows = applyFilterSort();
+    buildChart(rows);
+    renderChips(rows);
+    renderBody(rows);
+  }
+
   function renderAll() {
-    var r = buildChart();
-    renderChips(r.views);
     renderHead();
-    renderBody();
+    refresh();
   }
 
   // ---- wiring ------------------------------------------------------------
   $('refresh').addEventListener('click', load);
-  $('clearf').addEventListener('click', function () { filters = {}; renderHead(); renderBody(); });
+  $('clearf').addEventListener('click', function () { filters = {}; renderHead(); refresh(); });
   $('csv').addEventListener('click', downloadCsv);
   $('bucketseg').querySelectorAll('button').forEach(function (el) {
     el.addEventListener('click', function () {
       bucket = el.getAttribute('data-b');
       $('bucketseg').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === el); });
-      var r = buildChart(); renderChips(r.views);
+      refresh();
     });
   });
 
