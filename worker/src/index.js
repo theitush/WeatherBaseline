@@ -150,7 +150,19 @@ async function logHit(request, env, meta) {
     // Stable id (no per-day rotation) so a returning person hashes the same on a
     // later day. Pseudonymous: no raw IP is stored and no cookie is set.
     const salt = env.VISITOR_SALT || 'hhwi';
-    const visitor = (await sha256Hex(`${ip}|${ua}|${salt}`)).slice(0, 16);
+    let visitor = (await sha256Hex(`${ip}|${ua}|${salt}`)).slice(0, 16);
+    // Owner self-exclusion. The hash above changes whenever the owner switches
+    // IP/UA/country, so it can't pin them. Instead the owner carries a deliberate
+    // key (?owner=, persisted per browser by the frontend) that only this Worker
+    // can validate against env.OWNER_KEY. A match collapses the hit to a single
+    // stable 'owner' id — across any network/browser — which the dashboard
+    // excludes by default. No key set ⇒ feature is simply off.
+    if (env.OWNER_KEY) {
+      try {
+        const okey = new URL(request.url).searchParams.get('owner');
+        if (okey && okey === env.OWNER_KEY) visitor = 'owner';
+      } catch { /* malformed URL — keep the hash */ }
+    }
     await db
       .prepare(
         `INSERT INTO hits (ts, visitor, kind, page, country, city, referer, asn_org, ua)

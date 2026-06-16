@@ -5,6 +5,7 @@
 // recent  (era5_land, ~daily)     ─┼─► recent overrides forecast on overlap;
 // forecast (model, ~12h)          ─┘   forecast only fills dates the others miss.
 import type { WeatherDataPoint } from '../types';
+import { appendOwner } from './owner';
 
 // Base URL for the cell files — the R2/CDN origin. Set in BOTH dev and prod via
 // VITE_DATA_BASE (committed in frontend/.env): local dev reads the tier files
@@ -149,7 +150,7 @@ async function ensureFresh(lat: number, lon: number, viewUrl?: string): Promise<
       viewUrl ??
       (typeof location !== 'undefined' ? location.pathname + location.search : undefined);
     if (u) params.set('u', u);
-    const res = await fetch(apiUrl(`/api/ensure-fresh?${params}`));
+    const res = await fetch(appendOwner(apiUrl(`/api/ensure-fresh?${params}`)));
     return res.ok;
   } catch {
     // Network error — still read whatever files exist in R2.
@@ -166,7 +167,7 @@ async function ensureFresh(lat: number, lon: number, viewUrl?: string): Promise<
  */
 export function logMetricView(viewUrl: string): void {
   try {
-    void fetch(apiUrl(`/api/view?u=${encodeURIComponent(viewUrl)}`), {
+    void fetch(appendOwner(apiUrl(`/api/view?u=${encodeURIComponent(viewUrl)}`)), {
       keepalive: true,
     }).catch(() => {});
   } catch {
