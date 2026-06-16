@@ -30,3 +30,20 @@ bucket_name = "weather-baseline"
 # 24h. ensureFresh.js falls back to these same defaults if the vars are absent.
 FORECAST_TTL_MS = "43200000"
 RECENT_TTL_MS = "86400000"
+# Pepper for the stable visitor hash: visitor = sha256(ip + ua + salt). Not a
+# true secret (we never store the raw IP) — it just stops trivial recomputation.
+# Keep it fixed: changing it later makes every past visitor look brand new.
+VISITOR_SALT = "hhwi-2026-change-me"
+
+# D1 binding for unique-visitor logging (env.DB). COMMENTED OUT so the current
+# `wrangler dev --remote` keeps starting without a database; the Worker no-ops
+# logging whenever env.DB is absent. To turn it on, create the DB, paste its id
+# below, uncomment this block, apply the migration, then deploy:
+#   npx wrangler d1 create howhotwasit-analytics
+#   # → copy the printed database_id into database_id below
+#   npx wrangler d1 execute howhotwasit-analytics --remote --file=migrations/0001_create_hits.sql
+#   npx wrangler deploy
+[[d1_databases]]
+binding = "DB"
+database_name = "howhotwasit-analytics"
+database_id = "603904f7-113b-4aaa-866c-c49d8c38fca0"

@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { geolocateByIp, parseDate, addDays } from '../services/api';
-import { loadCellTimeline, getCellHasArchive } from '../services/tieredData';
+import { loadCellTimeline, getCellHasArchive, logMetricView } from '../services/tieredData';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
@@ -145,11 +145,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setForecastWarningDismissed(false);
 
     try {
+      // The app's real page URL — built by the same function that fills the
+      // address bar — so the analytics arrival hit logs the exact link (metric
+      // and all) reliably, not a stale window.location read mid-navigation.
+      const viewUrl = buildPath({
+        lat: location.lat,
+        lon: location.lon,
+        date: currentDate,
+        metric: currentMetric,
+      });
       // One loadCellTimeline call: archive cached, ensure-fresh runs once,
       // forecastFresh tells us whether the Worker was reachable.
       const { data: timeline, forecastFresh } = await loadCellTimeline(
         location.lat,
-        location.lon
+        location.lon,
+        viewUrl
       );
       setForecastUnavailable(!forecastFresh);
 
@@ -355,6 +365,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       window.history.replaceState(null, '', path);
     }
   }, [location, currentDate, currentMetric]);
+
+  // Analytics: tell the backend when the user switches metric in-app — the one
+  // interaction the server can't otherwise see. Skips the initial mount (a fresh
+  // load / shared link is already logged by ensure-fresh's arrival hit) and only
+  // fires on a metric change, sending the app's canonical URL for the new metric.
+  const metricPinged = useRef(false);
+  useEffect(() => {
+    if (!metricPinged.current) {
+      metricPinged.current = true;
+      return;
+    }
+    logMetricView(
+      buildPath({
+        lat: location.lat,
+        lon: location.lon,
+        date: currentDate,
+        metric: currentMetric,
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMetric]);
 
   const value: AppState = {
     location,

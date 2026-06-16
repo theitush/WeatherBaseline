@@ -135,14 +135,35 @@ function parseCsv(text: string): RawRow[] {
  * Returns true if the call succeeded, false if it failed (network error or
  * non-2xx). A false result means recent/forecast data may be stale.
  */
-async function ensureFresh(lat: number, lon: number): Promise<boolean> {
+async function ensureFresh(lat: number, lon: number, viewUrl?: string): Promise<boolean> {
   try {
     const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    // Pass the app's real page URL (/lat,lon/date/metric) so the Worker logs the
+    // exact link viewed — metric included — for analytics. ensure-fresh is a
+    // functional call, so this arrival hit can't be stripped by adblockers.
+    if (viewUrl) params.set('u', viewUrl);
     const res = await fetch(apiUrl(`/api/ensure-fresh?${params}`));
     return res.ok;
   } catch {
     // Network error — still read whatever files exist in R2.
     return false;
+  }
+}
+
+/**
+ * Fire-and-forget ping when the user switches metric in-app — the one signal the
+ * Worker can't otherwise see (flipping the metric is pure client state, with no
+ * other request). Sends the app's current page URL so the metric they switched
+ * to is recorded. Best-effort: never awaited, never throws, keepalive so it
+ * survives navigation. Logging never affects the UI.
+ */
+export function logMetricView(viewUrl: string): void {
+  try {
+    void fetch(apiUrl(`/api/view?u=${encodeURIComponent(viewUrl)}`), {
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* swallow — analytics must never break the page */
   }
 }
 
@@ -166,12 +187,13 @@ export interface CellTimeline {
  */
 export async function loadCellTimeline(
   rawLat: number,
-  rawLon: number
+  rawLon: number,
+  viewUrl?: string
 ): Promise<CellTimeline> {
   const lat = snap(rawLat);
   const lon = snap(rawLon);
 
-  const forecastFresh = await ensureFresh(lat, lon);
+  const forecastFresh = await ensureFresh(lat, lon, viewUrl);
 
   const [archive, recent, forecast] = await Promise.all([
     fetchTier('archive', lat, lon),
