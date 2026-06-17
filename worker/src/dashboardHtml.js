@@ -271,21 +271,13 @@ export const DASHBOARD_HTML = `<!doctype html>
     // The chart shows exactly what the table shows — the same filtered/sorted
     // set — so they can never disagree.
     var views = srcRows;
-    // country totals → top 8 + Other (null country shown as '??'). In 'users'
-    // mode a country counts DISTINCT visitors over the whole window (so the
-    // ranking + legend reflect people, not views).
-    var tot = {};
-    if (metric === 'users') {
-      var ctry = {}; // country -> { visitorId: 1 }
-      views.forEach(function (r) {
-        var c = r.country || '??';
-        (ctry[c] || (ctry[c] = {}))[r.visitor] = 1;
-      });
-      Object.keys(ctry).forEach(function (c) { tot[c] = Object.keys(ctry[c]).length; });
-    } else {
-      views.forEach(function (r) { var c = r.country || '??'; tot[c] = (tot[c] || 0) + 1; });
-    }
-    var ranked = Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; });
+    // Country grouping — which 8 countries break out (+ Other) and what color
+    // each gets — is ALWAYS ranked by overall hit volume, independent of the
+    // y-axis metric. That keeps the colors + legend fixed when you toggle
+    // hits <-> users; only the bar heights change. (null country shown as '??'.)
+    var hitTot = {};
+    views.forEach(function (r) { var c = r.country || '??'; hitTot[c] = (hitTot[c] || 0) + 1; });
+    var ranked = Object.keys(hitTot).sort(function (a, b) { return hitTot[b] - hitTot[a]; });
     var top = ranked.slice(0, 8);
     var topSet = {}; top.forEach(function (c) { topSet[c] = 1; });
     var order = top.slice();
@@ -293,6 +285,21 @@ export const DASHBOARD_HTML = `<!doctype html>
     colorMap = {};
     top.forEach(function (c, i) { colorMap[c] = PALETTE[i % PALETTE.length]; });
     colorMap['Other'] = OTHER_COLOR;
+
+    // Legend values still reflect the DISPLAYED metric: hits = row count, users
+    // = DISTINCT visitors over the whole window.
+    var tot;
+    if (metric === 'users') {
+      var ctry = {}; // country -> { visitorId: 1 }
+      views.forEach(function (r) {
+        var c = r.country || '??';
+        (ctry[c] || (ctry[c] = {}))[r.visitor] = 1;
+      });
+      tot = {};
+      Object.keys(ctry).forEach(function (c) { tot[c] = Object.keys(ctry[c]).length; });
+    } else {
+      tot = hitTot;
+    }
 
     // bucket → country → value (countries outside the top 8 collapse to 'Other').
     // 'hits' = row count per bucket; 'users' = distinct visitors per bucket, so a
