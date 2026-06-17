@@ -294,8 +294,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!geoResolved) return;
     fetchData();
+    // Key off the coordinates, not the whole `location` object: a shared/coords
+    // link mounts with name:'' and a separate effect fills the name in via
+    // setLocation, minting a new object reference. Depending on `location` here
+    // would re-fire this fetch on that cosmetic change — a double ensure-fresh
+    // (and a duplicate `view` analytics hit) on every shared-link load. The name
+    // never affects what we fetch, so lat/lon are the real fetch identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, currentDate, geoResolved]);
+  }, [location.lat, location.lon, currentDate, geoResolved]);
 
   // Bare-root visit (no shareable URL): guess the visitor's location from their
   // IP, snap it to a servable cell, and adopt it. Setting location then triggers
