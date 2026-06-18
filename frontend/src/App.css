@@ -126,6 +126,31 @@ body {
   flex-shrink: 0;
 }
 
+/* Wordmark, positioned so the BETA sticker can sit over the trailing ".com". */
+.brand-word {
+  position: relative;
+  display: inline-block;
+}
+
+/* Small BETA sticker peeking off the top-right corner of the wordmark. */
+.brand-beta {
+  position: absolute;
+  top: -0.2em;
+  right: -1.7em;
+  font-family: var(--mono);
+  font-size: 0.28em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 0.28em 0.45em;
+  border-radius: 0.35em;
+  color: var(--surface);
+  background-color: var(--accent, var(--text-strong));
+  transform: rotate(4deg);
+  text-transform: uppercase;
+  vertical-align: baseline;
+}
+
 .controls-panel {
   padding: 0 0 16px;
 }
@@ -318,6 +343,11 @@ body {
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-secondary);
+}
+
+/* Beta-period caution; uses the shared error token so it adapts to dark mode. */
+.faq-caution {
+  color: var(--error-text);
 }
 
 .faq-body a {

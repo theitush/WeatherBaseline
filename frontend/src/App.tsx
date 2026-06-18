@@ -148,7 +148,10 @@ const AppContent: React.FC = () => {
                   strokeLinecap="round"
                 />
               </svg>
-              WeatherBaseline.com
+              <span className="brand-word">
+                WeatherBaseline.com
+                <sup className="brand-beta">BETA</sup>
+              </span>
             </h1>
             <SettingsMenu />
             <ShareButton
@@ -392,13 +395,25 @@ const AppContent: React.FC = () => {
                       
                     </p>
                     <p>
-                      One caveat: this most-recent tail is the least settled part of
-                      the record. The last several days are a forecast rather than a
-                      reconstruction, and even the just-past days haven't been through
-                      the full reanalysis yet — so a value here can shift by a degree
-                      or two as the model firms up, and won't always match a reading
-                      you remember. It's shown for context only and is{' '}
-                      <em>never</em> mixed into the long-run statistics below.
+                      <strong>Caveat 1:</strong> The forecast is a forecast. Thus, it may change as the
+                      forecast date approaches.
+                    </p>
+                    <p>
+                      <strong>Caveat 2:</strong> It may take the historical temperature data up to 7 days
+                      to be uploaded and then fetched, and the precipitation data can take upwards
+                      of a month. Thus, the last several days of temperature data are a forecast
+                      and the last month of wind and precipitation are a forecast. You can always see in the chart
+                      and by hovering over a data point whether a datapoint is a forecast or a reanalysis.
+                    </p>
+                    <p>
+                      <strong>Caveat 3:</strong> This site is still in beta, and part of what that
+                      means is that the biases between the historical ERA5-Land archive and
+                      the ECMWF forecast tier are still under review, so{' '}
+                      <strong className="faq-caution">
+                        the forecast number should be taken with extra caution until the
+                        beta period is over
+                      </strong>
+                      .
                     </p>
                   </div>
                 </details>
@@ -531,9 +546,9 @@ const AppContent: React.FC = () => {
                   <div className="faq-body">
                     <p>
                       We chose <strong>medians</strong> in order to compare typical days.
-                      It is a more conserative and stable statistic than the the mean,
+                      It is a more conservative and stable statistic than the mean,
                       so it is less affected by extreme events and arguably answers
-                      whether the baseline change more truthfuly.
+                      whether the baseline changed more truthfully.
                     </p>
                     <p>
                       <strong>Equal 15-year windows.</strong> We split the record
@@ -594,7 +609,7 @@ const AppContent: React.FC = () => {
                       empirical evidence gets.
                     </p>
                     <p>
-                      So yes. Even if you don't evidence of change at a given location 
+                      So yes. Even if you don't see evidence of change at a given location
                       and time, the global picture is clear.
                     </p>
                   </div>

@@ -342,6 +342,19 @@ const MainChart: React.FC<MainChartProps> = ({
     // dots dated past the selected day are dropped, since the page is "how hot
     // was it on <date>", not a look-ahead at the rest of the forecast horizon.
     const targetDay = new Date(currentDate + 'T12:00:00');
+
+    // Recent-tier precip/wind aren't ERA5-Land: the recent seam pulls those two
+    // from the IFS historical-forecast API (era5_land returns null for p/w), so
+    // for these metrics a `recent` row is model output, not settled reanalysis —
+    // mark it exactly like a forecast point (hollow dot + "Forecast" tooltip).
+    // Temperature in the recent tier IS era5_land, so it stays a normal point.
+    // Note: only the forecast *tier* is dropped past the target day below; recent
+    // rows are settled past data (never look-ahead), so they're always plotted.
+    const recentIsModel =
+      currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
+    const isForecastLike = (d: WeatherDataPoint) =>
+      d.data_type === 'forecast' || (recentIsModel && d.data_type === 'recent');
+
     const dotData = filteredData.filter(
       (d) =>
         d[currentMetric] !== undefined &&
@@ -352,13 +365,13 @@ const MainChart: React.FC<MainChartProps> = ({
       .data(dotData)
       .enter()
       .append('circle')
-      .attr('class', (d) => `data-point${d.data_type === 'forecast' ? ' data-point-forecast' : ''}`)
+      .attr('class', (d) => `data-point${isForecastLike(d) ? ' data-point-forecast' : ''}`)
       .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
       .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
-      .attr('r', (d) => (d.data_type === 'forecast' ? 2.5 : 2))
-      .attr('fill', (d) => (d.data_type === 'forecast' ? 'var(--surface)' : dotColor))
-      .attr('stroke', (d) => (d.data_type === 'forecast' ? dotColor : 'none'))
-      .attr('stroke-width', (d) => (d.data_type === 'forecast' ? 1 : 0))
+      .attr('r', (d) => (isForecastLike(d) ? 2.5 : 2))
+      .attr('fill', (d) => (isForecastLike(d) ? 'var(--surface)' : dotColor))
+      .attr('stroke', (d) => (isForecastLike(d) ? dotColor : 'none'))
+      .attr('stroke-width', (d) => (isForecastLike(d) ? 1 : 0))
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
@@ -380,7 +393,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}${d.data_type === 'forecast' ? '<br/><em>Forecast</em>' : ''}`
+            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}${isForecastLike(d) ? '<br/><em>Forecast</em>' : ''}`
           );
         place(event);
       })
@@ -495,7 +508,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${fmtDate(currentDateData[0].date)}</strong><br/>${cv(currentTemp).toFixed(vdp)}${unit}<br/><em>Target date${currentDateData[0].data_type === 'forecast' ? ' · forecast' : ''}</em>`
+            `<strong>${fmtDate(currentDateData[0].date)}</strong><br/>${cv(currentTemp).toFixed(vdp)}${unit}<br/><em>Target date${isForecastLike(currentDateData[0]) ? ' · forecast' : ''}</em>`
           );
         place(event);
       };
