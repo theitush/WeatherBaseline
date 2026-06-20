@@ -4,6 +4,7 @@ import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { geolocateByIp, parseDate, addDays } from '../services/api';
 import { loadCellTimeline, getCellHasArchive, logMetricView } from '../services/tieredData';
+import { fetchBands } from '../services/ci';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
@@ -162,6 +163,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         viewUrl
       );
       setForecastUnavailable(!forecastFresh);
+
+      // Attach local CatBoost confidence-interval bands to the forecast rows
+      // (dev-only; a no-op without the CI server). Mutates the timeline rows in
+      // place so the filtered slices below share the same objects and carry the
+      // band through to the card. Best-effort: fetchBands never throws.
+      const forecastRows = timeline.filter((d) => d.data_type === 'forecast');
+      if (forecastRows.length > 0) {
+        // Local calendar day (rows were parsed as local midnight) — matches the
+        // CSV date and the model's day-of-year features.
+        const isoLocal = (dt: Date) =>
+          `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+            dt.getDate()
+          ).padStart(2, '0')}`;
+        const bands = await fetchBands(
+          location.lat,
+          location.lon,
+          forecastRows.map((d) => ({
+            date: isoLocal(d.date),
+            max_temperature: d.max_temperature,
+            min_temperature: d.min_temperature,
+            precipitation_sum: d.precipitation_sum,
+            wind_speed_10m_max: d.wind_speed_10m_max,
+          }))
+        );
+        for (const d of forecastRows) {
+          const b = bands[isoLocal(d.date)];
+          if (b) d.band = b;
+        }
+      }
 
       // Seasonal slice for charts: filter the full timeline to ±seasonalWindowDays.
       const targetDt = parseDate(currentDate);

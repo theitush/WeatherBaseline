@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey } from '../types';
+import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey, MetricBand } from '../types';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabelBare, valueDecimals } from '../utils/units';
+import { convert, convertDelta, unitLabel, unitLabelBare, valueDecimals } from '../utils/units';
 import { comparablePool, findRecords, rankValue } from '../utils/dataProcessor';
 import CONFIG from '../utils/config';
 import './TemperatureContext.css';
@@ -9,6 +9,9 @@ import './TemperatureContext.css';
 interface TemperatureContextProps {
   context: TempContext | null;
   currentTemp: number | null;
+  // Bias-corrected 90% band for the headline day/metric (forecast rows only;
+  // null on settled history or when the local CI server is off).
+  band?: MetricBand | null;
   filteredData: WeatherDataPoint[];
   // Full daily record (every day, all years) for the cell — used to test whether
   // today is a top-1/2/3 value across the ENTIRE record, not just its ±N-day window.
@@ -146,6 +149,7 @@ const fireConfetti = (multiplier = 1) => {
 const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   context,
   currentTemp,
+  band,
   filteredData,
   yearTimeline,
   currentMetric,
@@ -160,13 +164,23 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   }
 
   const unit = unitLabelBare(currentMetric, system);
+  // The headline value: on a forecast day with a model band we show the
+  // bias-corrected best estimate (q0.50) so the band sits honestly around the
+  // number; settled history has no band and is shown as-is.
+  const displayTemp = band ? band.mid : currentTemp;
   // fmt takes a raw (metric) value, converts it for display, then formats.
-  // Temperature degrees read "12.3°"; other metrics read "12.3 mm".
+  // Temperature degrees read "12.3°"; other metrics read "12.3 mm". Used for the
+  // record-low/high end labels.
   const vdp = valueDecimals(currentMetric, system);
   const fmt = (v: number) => {
     const c = convert(v, currentMetric, system);
     return unit === '°' ? `${c.toFixed(vdp)}°` : `${c.toFixed(vdp)} ${unit}`;
   };
+  // Bare number (no unit) for the big marker value — the unit is rendered once,
+  // as its own element, after the uncertainty deltas.
+  const fmtNum = (v: number) => convert(v, currentMetric, system).toFixed(vdp);
+  // Full unit incl. C/F (e.g. "°C"/"°F", "mm", "km/h") for that single label.
+  const fullUnit = unitLabel(currentMetric, system);
 
   // Canonical pool: drop forecasts past the target date, keep it/earlier (incl.
   // recent forecast rows). Shared with the histogram AND the chart's record star
@@ -188,7 +202,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let binnedPct: number | null = null;
   let markerColor = '#222';
   if (recordLow !== null && recordHigh !== null && recordHigh > recordLow) {
-    const raw = (currentTemp - recordLow) / (recordHigh - recordLow);
+    const raw = (displayTemp - recordLow) / (recordHigh - recordLow);
     const clamped = Math.max(0, Math.min(1, raw));
     const bin = Math.round(clamped * BIN_COUNT);
     const binT = bin / BIN_COUNT;
@@ -197,6 +211,33 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   }
 
   const hasScale = binnedPct !== null && recordLow !== null && recordHigh !== null;
+
+  // Forecast-uncertainty band shown beside the headline value: the model's 90%
+  // half-widths around the displayed value — +x (q0.95 side) stacked over −y
+  // (q0.05 side), in display units, with the unit after them. Each is tinted by
+  // the gradient colour at its own endpoint (value+x / value−y) on the record
+  // scale, so the small numbers read in the same colour language as the big one.
+  let ci: {
+    up: string;
+    down: string;
+    upColor: string;
+    downColor: string;
+  } | null = null;
+  if (band && hasScale && recordHigh! > recordLow!) {
+    const span = recordHigh! - recordLow!;
+    const colorAt = (raw: number) => interpolateGradient((raw - recordLow!) / span);
+    // Half-widths around the (corrected) displayed value: hi = displayTemp+up,
+    // lo = displayTemp−down. convertDelta keeps Δ magnitudes honest (a 1°C gap
+    // is 1.8°F, not 33.8°F; wind m/s→km/h; mm→in).
+    const upDisp = Math.max(0, convertDelta(band.hi - band.mid, currentMetric, system));
+    const downDisp = Math.max(0, convertDelta(band.mid - band.lo, currentMetric, system));
+    ci = {
+      up: `+${upDisp.toFixed(vdp)}`,
+      down: `−${downDisp.toFixed(vdp)}`,
+      upColor: colorAt(band.hi),
+      downColor: colorAt(band.lo),
+    };
+  }
 
   // Verdict (bold line) + rarity line, both keyed off how far into the day's
   // own tail it sits. Tier by SINGLE-tailed rarity (top/bottom X% on its side):
@@ -213,7 +254,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   {
     // Compare in CONVERTED (display-unit) space, exactly as the histogram does,
     // so the prose rarity and the histogram bracket agree to the decimal.
-    const cur = convert(currentTemp, currentMetric, system);
+    const cur = convert(displayTemp, currentMetric, system);
     const values = valid.map((d) => convert(d[currentMetric] as number, currentMetric, system));
     const n = values.length;
     // Window rank via the shared rankValue() — INCLUSIVE tails + shared-worst
@@ -261,7 +302,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       const noun = currentMetric === 'min_temperature' ? 'night' : 'day';
       const nounP = noun + 's';
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
-      const seed = `${currentMetric}:${currentTemp}:${rank}`;
+      const seed = `${currentMetric}:${displayTemp}:${rank}`;
 
       if (allTimeRank >= 1 && allTimeRank <= 5) {
         // Among the rarest the page shows: a top-5 value across the WHOLE record.
@@ -292,7 +333,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Notable — whole percent, cumulative ("or hotter"). Drop the comparative
         // when nothing can be more extreme (a 0mm day can't be "drier").
         const pct = singleTail * 100;
-        const atFloor = currentTemp === 0 && !isHighSide;
+        const atFloor = displayTemp === 0 && !isHighSide;
         extremeLine = atFloor
           ? `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj}.`
           : `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj} or ${comp}.`;
@@ -326,7 +367,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   useEffect(() => {
     if (isAllTimeTop5) fireConfetti(5);
     else if (isTop3) fireConfetti(1);
-  }, [isTop3, isAllTimeTop5, currentMetric, currentTemp]);
+  }, [isTop3, isAllTimeTop5, currentMetric, displayTemp]);
 
   // Lead line above the punchy verdict: "June 7th in Tel Aviv is".
   const leadDate = (() => {
@@ -366,12 +407,21 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
               className="record-scale-marker"
               style={{ left: `${binnedPct}%` }}
             >
-              <span
-                className="record-scale-marker-value"
-                style={{ color: markerColor }}
-              >
-                {fmt(currentTemp)}
-              </span>
+              <div className="record-scale-marker-readout">
+                <span
+                  className="record-scale-marker-value"
+                  style={{ color: markerColor }}
+                >
+                  {fmtNum(displayTemp)}
+                </span>
+                {ci && (
+                  <span className="record-scale-marker-ci" aria-label="forecast uncertainty">
+                    <span className="ci-delta" style={{ color: ci.upColor }}>{ci.up}</span>
+                    <span className="ci-delta" style={{ color: ci.downColor }}>{ci.down}</span>
+                  </span>
+                )}
+                <span className="record-scale-marker-ci-unit" style={{ color: markerColor }}>{fullUnit}</span>
+              </div>
               <span
                 className="record-scale-marker-tick"
                 style={{ background: markerColor }}

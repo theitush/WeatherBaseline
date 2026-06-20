@@ -1,6 +1,19 @@
 // Type definitions for the application
 
 export type { MetricKey } from '../utils/config';
+import type { MetricKey } from '../utils/config';
+
+/**
+ * A bias-corrected 90% band for one metric on one day, in native units
+ * (°C / mm / m·s⁻¹). `mid` is the q0.50 (bias-corrected best estimate); `lo`/`hi`
+ * are q0.05/q0.95. Produced by the local CatBoost CI server (dev-only) for
+ * forecast rows; absent on settled history.
+ */
+export interface MetricBand {
+  lo: number;
+  mid: number;
+  hi: number;
+}
 
 export interface WeatherDataPoint {
   date: Date;
@@ -13,6 +26,8 @@ export interface WeatherDataPoint {
   min_temperature?: number;
   precipitation_sum?: number;
   wind_speed_10m_max?: number;
+  // Forecast-uncertainty band per metric (forecast rows only).
+  band?: Partial<Record<MetricKey, MetricBand>>;
 }
 
 export interface YearlyAggregate {

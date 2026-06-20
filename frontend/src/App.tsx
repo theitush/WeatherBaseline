@@ -118,6 +118,15 @@ const AppContent: React.FC = () => {
     return null;
   };
 
+  // The forecast-uncertainty band for the headline day/metric, if the local CI
+  // server provided one (forecast rows only). Same row lookup as getCurrentTemp.
+  const getCurrentBand = () => {
+    const row = filteredData.find(
+      (d) => d.date.toDateString() === new Date(currentDate + 'T00:00:00').toDateString()
+    );
+    return row?.band?.[currentMetric] ?? null;
+  };
+
   return (
     <div className="app">
       <LoadingOverlay show={loading} />
@@ -232,6 +241,7 @@ const AppContent: React.FC = () => {
                 <TemperatureContextDisplay
                   context={temperatureContext}
                   currentTemp={getCurrentTemp()}
+                  band={getCurrentBand()}
                   filteredData={filteredData}
                   yearTimeline={yearTimeline}
                   currentMetric={currentMetric}
