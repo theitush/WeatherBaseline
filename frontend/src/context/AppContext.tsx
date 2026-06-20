@@ -164,12 +164,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       );
       setForecastUnavailable(!forecastFresh);
 
-      // Attach local CatBoost confidence-interval bands to the forecast rows
+      // Attach local CatBoost confidence-interval bands to model-output rows
       // (dev-only; a no-op without the CI server). Mutates the timeline rows in
       // place so the filtered slices below share the same objects and carry the
       // band through to the card. Best-effort: fetchBands never throws.
-      const forecastRows = timeline.filter((d) => d.data_type === 'forecast');
-      if (forecastRows.length > 0) {
+      //
+      // Forecast rows are model output for every metric. `recent` rows are model
+      // output ONLY for precip/wind — the recent seam pulls those two from the
+      // IFS historical-forecast API (era5_land lags), while recent temperature
+      // is settled reanalysis. So recent rows keep precip/wind bands only; their
+      // (settled) temperature stays band-free and is shown as the real value.
+      const RECENT_MODEL_METRICS: MetricKey[] = ['precipitation_sum', 'wind_speed_10m_max'];
+      const bandRows = timeline.filter(
+        (d) => d.data_type === 'forecast' || d.data_type === 'recent'
+      );
+      if (bandRows.length > 0) {
         // Local calendar day (rows were parsed as local midnight) — matches the
         // CSV date and the model's day-of-year features.
         const isoLocal = (dt: Date) =>
@@ -179,7 +188,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const bands = await fetchBands(
           location.lat,
           location.lon,
-          forecastRows.map((d) => ({
+          bandRows.map((d) => ({
             date: isoLocal(d.date),
             max_temperature: d.max_temperature,
             min_temperature: d.min_temperature,
@@ -187,9 +196,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             wind_speed_10m_max: d.wind_speed_10m_max,
           }))
         );
-        for (const d of forecastRows) {
+        for (const d of bandRows) {
           const b = bands[isoLocal(d.date)];
-          if (b) d.band = b;
+          if (!b) continue;
+          if (d.data_type === 'recent') {
+            // Drop the temperature bands the model also returns: recent temp is
+            // settled era5_land, not a guess, so it gets no uncertainty band.
+            const pw: NonNullable<WeatherDataPoint['band']> = {};
+            for (const m of RECENT_MODEL_METRICS) if (b[m]) pw[m] = b[m];
+            if (Object.keys(pw).length > 0) d.band = pw;
+          } else {
+            d.band = b;
+          }
         }
       }
 
