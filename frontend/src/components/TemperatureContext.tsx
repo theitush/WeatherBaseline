@@ -414,13 +414,13 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
                 >
                   {fmtNum(displayTemp)}
                 </span>
+                <span className="record-scale-marker-ci-unit" style={{ color: markerColor }}>{fullUnit}</span>
                 {ci && (
                   <span className="record-scale-marker-ci" aria-label="forecast uncertainty">
                     <span className="ci-delta" style={{ color: ci.upColor }}>{ci.up}</span>
                     <span className="ci-delta" style={{ color: ci.downColor }}>{ci.down}</span>
                   </span>
                 )}
-                <span className="record-scale-marker-ci-unit" style={{ color: markerColor }}>{fullUnit}</span>
               </div>
               <span
                 className="record-scale-marker-tick"

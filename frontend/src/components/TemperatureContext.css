@@ -139,7 +139,7 @@
   border: 1px solid #111;
 }
 
-/* Value + uncertainty stack + unit, in one row floated above the tick. */
+/* Value + unit + uncertainty stack, in one row floated above the tick. */
 .record-scale-marker-readout {
   position: absolute;
   top: -44px;
@@ -186,8 +186,8 @@
   paint-order: stroke fill;
 }
 
-/* The one unit label (°C/°F, mm, km/h) after the deltas — same size, colour and
-   outline as the headline value (colour set inline to the marker colour). */
+/* The one unit label (°C/°F, mm, km/h) right after the value — same size, colour
+   and outline as the headline value (colour set inline to the marker colour). */
 .record-scale-marker-ci-unit {
   font-size: 42px;
   font-weight: 700;
