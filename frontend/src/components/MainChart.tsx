@@ -335,6 +335,15 @@ const MainChart: React.FC<MainChartProps> = ({
     const unit = unitLabel(currentMetric, system);
     const vdp = valueDecimals(currentMetric, system);
 
+    // 90% CI suffix for a model row's tooltip — the CatBoost lo–hi band in
+    // display units. Empty for settled rows (no band). The dot already sits at
+    // the band median (snapped at the source); this shows how wide the guess is.
+    const ciLine = (d: WeatherDataPoint): string => {
+      const b = d.band?.[currentMetric];
+      if (!b) return '';
+      return `<br/><span class="tt-ci">90% CI ${cv(b.lo).toFixed(vdp)}–${cv(b.hi).toFixed(vdp)}${unit}</span>`;
+    };
+
     // Forecast rows are model guesses, not settled observations. They're drawn
     // as hollow (outlined) dots, and excluded from the record high/low markers
     // and the histogram (see HistogramChart) so they don't masquerade as records.
@@ -393,7 +402,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}${isForecastLike(d) ? '<br/><em>Forecast</em>' : ''}`
+            `<strong>${fmtDate(d.date)}</strong><br/>${cv(d[currentMetric] as number).toFixed(vdp)}${unit}${isForecastLike(d) ? '<br/><em>Forecast</em>' : ''}${ciLine(d)}`
           );
         place(event);
       })
@@ -449,7 +458,7 @@ const MainChart: React.FC<MainChartProps> = ({
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${r.label}</strong><br/>${fmtDate(r.d.date)}<br/>${cv(r.d[currentMetric] as number).toFixed(vdp)}${unit}`
+              `<strong>${r.label}</strong><br/>${fmtDate(r.d.date)}<br/>${cv(r.d[currentMetric] as number).toFixed(vdp)}${unit}${ciLine(r.d)}`
             );
           place(event);
         })
@@ -508,7 +517,7 @@ const MainChart: React.FC<MainChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${fmtDate(currentDateData[0].date)}</strong><br/>${cv(currentTemp).toFixed(vdp)}${unit}<br/><em>Target date${isForecastLike(currentDateData[0]) ? ' · forecast' : ''}</em>`
+            `<strong>${fmtDate(currentDateData[0].date)}</strong><br/>${cv(currentTemp).toFixed(vdp)}${unit}<br/><em>Target date${isForecastLike(currentDateData[0]) ? ' · forecast' : ''}</em>${ciLine(currentDateData[0])}`
           );
         place(event);
       };

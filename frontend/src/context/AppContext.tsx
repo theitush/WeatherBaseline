@@ -164,16 +164,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       );
       setForecastUnavailable(!forecastFresh);
 
-      // Attach local CatBoost confidence-interval bands to model-output rows
-      // (dev-only; a no-op without the CI server). Mutates the timeline rows in
-      // place so the filtered slices below share the same objects and carry the
-      // band through to the card. Best-effort: fetchBands never throws.
+      // Attach local CatBoost confidence-interval bands to model-output rows AND
+      // snap the row's value to the band median, in one place (dev-only; a no-op
+      // without the CI server). Mutates the timeline rows in place so the filtered
+      // slices below share the same objects — so the corrected value flows to
+      // EVERY downstream consumer (chart dots, the shaded percentile aggregates,
+      // record markers, the prose verdict, the spectrum card) straight off
+      // d[metric], with no per-chart special-casing. Best-effort: fetchBands
+      // never throws.
       //
       // Forecast rows are model output for every metric. `recent` rows are model
       // output ONLY for precip/wind — the recent seam pulls those two from the
       // IFS historical-forecast API (era5_land lags), while recent temperature
-      // is settled reanalysis. So recent rows keep precip/wind bands only; their
-      // (settled) temperature stays band-free and is shown as the real value.
+      // is settled reanalysis. So recent rows get precip/wind bands only; their
+      // (settled) temperature stays band-free and keeps its real value.
       const RECENT_MODEL_METRICS: MetricKey[] = ['precipitation_sum', 'wind_speed_10m_max'];
       const bandRows = timeline.filter(
         (d) => d.data_type === 'forecast' || d.data_type === 'recent'
@@ -199,15 +203,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         for (const d of bandRows) {
           const b = bands[isoLocal(d.date)];
           if (!b) continue;
-          if (d.data_type === 'recent') {
-            // Drop the temperature bands the model also returns: recent temp is
-            // settled era5_land, not a guess, so it gets no uncertainty band.
-            const pw: NonNullable<WeatherDataPoint['band']> = {};
-            for (const m of RECENT_MODEL_METRICS) if (b[m]) pw[m] = b[m];
-            if (Object.keys(pw).length > 0) d.band = pw;
-          } else {
-            d.band = b;
+          // Which metrics are model output for THIS row: every metric a forecast
+          // row carries a band for; precip/wind only for a recent row (recent
+          // temperature is settled era5_land — not a guess, so no band, no snap).
+          const applicable =
+            d.data_type === 'recent'
+              ? RECENT_MODEL_METRICS
+              : (Object.keys(b) as MetricKey[]);
+          const band: NonNullable<WeatherDataPoint['band']> = {};
+          for (const m of applicable) {
+            const mb = b[m];
+            if (!mb) continue;
+            band[m] = mb;
+            d[m] = mb.mid; // snap the value to the bias-corrected median (q0.50)
           }
+          if (Object.keys(band).length > 0) d.band = band;
         }
       }
 
