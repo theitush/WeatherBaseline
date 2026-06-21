@@ -186,10 +186,10 @@
   paint-order: stroke fill;
 }
 
-/* The one unit label (°C/°F, mm, km/h) right after the value — same size, colour
-   and outline as the headline value (colour set inline to the marker colour). */
+/* The one unit label (°C/°F, mm, km/h) right after the value — ~20% smaller than
+   the headline value, same colour and outline (colour set inline to the marker colour). */
 .record-scale-marker-ci-unit {
-  font-size: 42px;
+  font-size: 32px;
   font-weight: 700;
   align-self: center;
   font-variant-numeric: tabular-nums;
