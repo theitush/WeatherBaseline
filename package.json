@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd worker && npx wrangler dev --remote --port 8787'",
     "dev:frontend": "bash -c 'source $HOME/.nvm/nvm.sh && nvm use --silent 22 && cd frontend && npm run dev'",
-    "dev:all": "bash -c 'npm run dev & npm run dev:frontend & wait'"
+    "dev:ci": "scripts/era5_pipeline/.venv/bin/python scripts/bias_study/ci_server.py",
+    "dev:all": "bash -c 'npm run dev & npm run dev:frontend & npm run dev:ci & wait'"
   },
   "dependencies": {
     "cors": "^2.8.5",
