@@ -5,6 +5,9 @@
   "description": "HowHotWasIt v2 control-plane Worker: ensure-fresh + geo, R2-backed.",
   "type": "module",
   "scripts": {
+    "gen:cells": "node scripts/gen-cell-keys.mjs",
+    "predev": "node scripts/gen-cell-keys.mjs",
+    "predeploy": "node scripts/gen-cell-keys.mjs",
     "dev": "wrangler dev --remote --port 8787",
     "dev:local": "wrangler dev --local",
     "seed": "bash scripts/seed-local-r2.sh",

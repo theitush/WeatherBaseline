@@ -10,6 +10,8 @@
 // file reads never touch the Worker request budget. This Worker only does the
 // live tail work.
 import { ensureFresh } from './ensureFresh.js';
+import { cellKey } from './cellStore.js';
+import { CELL_KEYS } from './cellKeys.js';
 import { handleAnalyticsData, handleDashboard } from './analytics.js';
 
 // CORS: the frontend is served from a different origin (Pages / R2) than this
@@ -73,6 +75,17 @@ async function handleEnsureFresh(request, url, env, ctx) {
   const lon = parseFloat(url.searchParams.get('lon') ?? url.searchParams.get('longitude'));
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return json({ error: 'lat and lon query params are required' }, 400);
+  }
+  // Curated-cell gate. We have archive data and a real name ONLY for the cells
+  // in cells.csv, and the frontend always snaps a search to its nearest one
+  // before calling here — so any request whose snapped cell isn't on the
+  // allowlist is a bot or a hand-typed coordinate, not a real view. Reject it
+  // BEFORE logging or touching Open-Meteo/R2: otherwise every probe of a random
+  // point would mint a forecast object in R2 (refreshForecast has no archive
+  // guard) and a junk analytics row. This is what left ~stray recent/forecast
+  // cells (e.g. a point south of Shanghai, one in Texas) that aren't real cells.
+  if (!CELL_KEYS.has(cellKey(lat, lon))) {
+    return json({ error: 'not a servable cell' }, 404);
   }
   // Unique-visitor logging. ensure-fresh fires once per city-view and is a
   // functional call (the app needs it), so adblockers can't strip it. The app
