@@ -1,9 +1,9 @@
 // tieredData — v2 client: snap to grid, ensure-fresh, fetch the three cell
 // files, merge by date (last-wins). See ARCHITECTURE.md.
 //
-// archive (era5_land, immutable) ─┐
-// recent  (era5_land, ~daily)     ─┼─► recent overrides forecast on overlap;
-// forecast (model, ~12h)          ─┘   forecast only fills dates the others miss.
+// forecast (model, ~12h)            ─┐
+// recent  (era5_land + IFS, ~daily) ─┼─► archive overrides recent on overlap;
+// archive (era5_land, canonical)    ─┘   recent only fills dates archive doesn't reach.
 import type { WeatherDataPoint } from '../types';
 import { appendOwner } from './owner';
 
@@ -187,11 +187,16 @@ export interface CellTimeline {
 /**
  * Load the full merged daily timeline for a snapped cell.
  *
- * Merge precedence per date (last-wins): forecast < archive < recent, so recent
- * supersedes the forecast guess on overlap and archive/recent (the real
- * ERA5-Land data) always beat the model. data_type marks forecast rows so the
- * chart can style them; once a day ages past the publish frontier the next
- * recent refresh replaces its forecast row with the settled value.
+ * Merge precedence per date (last-wins): forecast < recent < archive. archive is
+ * the canonical era5_land pull (scripts/era5_pipeline/) and always wins when
+ * present — recent's precip/wind come from Open-Meteo's live IFS model (era5_land
+ * returns null for those there), a lower-fidelity stand-in for the seam before
+ * archive catches up, so it must never outrank archive on a shared date. recent
+ * still beats forecast (a real settled reading beats a model guess). data_type
+ * marks forecast rows so the chart can style them; once a day ages past the
+ * publish frontier the next recent refresh replaces its forecast row with the
+ * settled value, and once the archive extends past a date, the next load
+ * re-tags it 'historical' automatically.
  */
 export async function loadCellTimeline(
   rawLat: number,
@@ -233,8 +238,8 @@ export async function loadCellTimeline(
   };
 
   apply(forecast, 'forecast'); // lowest precedence
-  apply(archive, 'historical');
-  apply(recent, 'recent'); // highest precedence — real, but not settled archive
+  apply(recent, 'recent'); // real, but not settled archive
+  apply(archive, 'historical'); // highest precedence — canonical era5_land archive
 
   // Record whether this cell has the settled long-run history the charts/stats
   // need. Only the archive counts: the `recent` tier is topped up daily from the
