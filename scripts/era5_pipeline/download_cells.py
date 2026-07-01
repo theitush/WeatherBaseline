@@ -613,6 +613,12 @@ def archive_name(lat: float, lon: float) -> str:
     return f"archive_{lat:.1f}_{lon:.1f}.csv.gz"
 
 
+def recent_name(lat: float, lon: float) -> str:
+    """v2 `recent` tier filename for a snapped 0.1deg cell centre — same lat/lon
+    formatting as archive_name, matching worker/src/cellStore.js's objectKey."""
+    return f"recent_{lat:.1f}_{lon:.1f}.csv.gz"
+
+
 # Writes share OUT_DIR across tile threads; serialise the read-merge-write so two
 # threads never clobber the same (or a freshly created) archive.
 _WRITE_LOCK = threading.Lock()
@@ -800,6 +806,12 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
     `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
     disk is ephemeral) instead of the local archives. `ledger` (--overwrite)
     rebuilds every year from scratch and resumes via its own (cell, span) index.
+
+    When `refresh_latest` pushes an archive that now reaches further than before,
+    the cell's `recent/` object in R2 is deleted: the frontend already prefers
+    archive over recent on a shared date, but leftover recent rows are dead
+    weight (stale IFS-sourced precip/wind nobody reads anymore) — ensure-fresh
+    lazily rebuilds only the real remaining gap on the cell's next visit.
     """
     if ledger is not None:
         # Overwrite mode recomputes ALL requested years; year-resume is bypassed
@@ -838,6 +850,8 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
             path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e))
             if uploader is not None:
                 uploader.upload_file(path, f"archive/{path.name}")
+                if refresh_latest:
+                    uploader.delete_object(f"recent/{recent_name(lat, lon)}")
             written += 1
         span = f"{s}" if s == e else f"{s}-{e}"
         log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives"

@@ -189,12 +189,15 @@ the 12h/24h windows, or cap distinct cells refreshed per day.
 4. **Merge by date, last-wins, in priority order:**
 
    ```
-   archive (era5_land)  ─┐
-   recent  (era5_land)  ─┼─► recent overrides forecast on overlap;
-   forecast (model)     ─┘   forecast only fills dates recent/archive don't reach
+   forecast (model)          ─┐
+   recent  (era5_land + IFS) ─┼─► archive overrides recent on overlap;
+   archive (era5_land)       ─┘   recent only fills dates archive doesn't reach
    ```
 
-   So a day shown as "forecast" is replaced by its real ERA5-Land value once it
+   archive always wins on a shared date — it's the canonical pull, while
+   recent's precip/wind come from a lower-fidelity live model (era5_land returns
+   null for those on the recent path) as a stand-in until archive catches up.
+   A day shown as "forecast" is replaced by its real ERA5-Land value once it
    ages past the 5-day frontier and the next 24h append picks it up.
 
 The original v1 `/api/archive` fetch-and-cache model (1940→now per location) is
