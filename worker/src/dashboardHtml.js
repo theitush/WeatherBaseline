@@ -560,9 +560,10 @@ export const DASHBOARD_HTML = `<!doctype html>
       });
     });
     $('thead').querySelectorAll('input[data-f]').forEach(function (el) {
-      el.addEventListener('input', function () {
-        // Store the raw text (parseFilter handles trimming/case); refresh both
-        // the chart and the table so the chart always mirrors what's shown.
+      // Apply on Enter only, not on every keystroke — filtering up to 50k
+      // rows on each keypress is noticeably slow.
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
         filters[el.getAttribute('data-f')] = el.value;
         refresh();
       });
@@ -612,6 +613,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   // ---- wiring ------------------------------------------------------------
+  // The <select> is a real form element, so on a plain page reload browsers
+  // often restore its previously-shown value even though this script always
+  // starts from range = 'all' — sync to whatever's actually selected before
+  // the first load, or the dropdown can show '24h' while all-time data loads.
+  range = $('range').value;
   $('refresh').addEventListener('click', load);
   $('range').addEventListener('change', function () { range = this.value; refresh(); });
   $('clearf').addEventListener('click', function () { filters = {}; renderHead(); refresh(); });
