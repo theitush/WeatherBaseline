@@ -43,11 +43,20 @@ TIERS = ("archive", "recent", "forecast")
 
 # Cache-Control per tier, stored as object metadata so R2 serves it as the
 # origin header. The data domain (data.weatherbaseline.com) sits behind
-# Cloudflare's cache and .gz is default-cacheable, so volatile tiers must say
-# no-store or the edge/browser would serve them stale after a refresh; archive
-# is settled and gets a day. Keep in sync with worker/src/cellStore.js.
+# Cloudflare's cache and .gz is default-cacheable, so without an explicit header
+# the edge/browser would serve stale copies after a refresh.
+#
+# recent/forecast are rewritten constantly -> no-store. archive USED to get a
+# fixed day (max-age=86400), but the trailing-year top-up now rewrites the
+# archive's tail on a monthly rerun AND deletes the cell's `recent` object once
+# the archive reaches past it (see run_tile). That makes the archive the SOLE
+# source for those newly-covered days: a client still holding yesterday's shorter
+# archive finds no recent to fall back on and shows a gap. So archive is
+# `no-cache` -> the browser/edge may keep the (large) body but must revalidate it
+# via ETag on each use, so a freshly-extended archive is picked up immediately
+# while an unchanged one costs only a 304. Keep in sync with worker/src/cellStore.js.
 CACHE_CONTROL = {
-    "archive": "public, max-age=86400",
+    "archive": "public, no-cache",
     "recent": "no-store",
     "forecast": "no-store",
 }
