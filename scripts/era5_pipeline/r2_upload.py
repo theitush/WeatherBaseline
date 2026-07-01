@@ -140,12 +140,15 @@ class R2Uploader:
                 sizes[obj["Key"]] = obj["Size"]
         return sizes
 
-    def read_years(self, key: str) -> set[int]:
-        """Download one archive object and return the set of years it covers.
+    def read_coverage(self, key: str):
+        """Download one archive object; return (years covered, newest date).
 
-        Only used to disambiguate the small archives that size alone can't classify
-        (a tiny but COMPLETE cell vs. a genuinely partial one). Reads just the date
-        column out of the gzip, so the parse stays cheap.
+        Used by the producer's resume to disambiguate the small archives that size
+        alone can't classify (a tiny but COMPLETE cell vs. a genuinely partial one)
+        AND to tell a complete trailing year from one still lagging the store — so
+        a monthly rerun refetches only a genuinely-behind cell. Reads just the date
+        column out of the gzip, so the parse stays cheap. Newest date is None if
+        the archive is empty. Returns (set[int], datetime.date | None).
         """
         import gzip
         import io
@@ -154,8 +157,10 @@ class R2Uploader:
 
         body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
         with gzip.open(io.BytesIO(body), "rt") as fh:
-            dates = pd.read_csv(fh, usecols=["date"])["date"]
-        return set(pd.to_datetime(dates).dt.year.unique().tolist())
+            dates = pd.to_datetime(pd.read_csv(fh, usecols=["date"])["date"])
+        if dates.empty:
+            return set(), None
+        return set(dates.dt.year.unique().tolist()), dates.max().date()
 
 
 def _iter_tier_files(data_dir: Path, tiers):
