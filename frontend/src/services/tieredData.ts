@@ -175,6 +175,33 @@ export function logMetricView(viewUrl: string): void {
   }
 }
 
+/**
+ * Fire-and-forget ping when someone picks a suggestion from the city search —
+ * captures what they typed, the real-world place the geocoder matched it to,
+ * and which of our curated cells we served instead (plus the gap between the
+ * two), so the owner can see queries that snap a long way from any served
+ * city. Best-effort: never awaited, never throws, keepalive so it survives
+ * navigation. Logging never affects the UI.
+ */
+export function logSearchSelect(params: {
+  query: string;
+  matched: string;
+  servedName: string;
+  distanceKm: number;
+}): void {
+  try {
+    const qs = new URLSearchParams({
+      q: params.query,
+      matched: params.matched,
+      served: params.servedName,
+      dist_km: params.distanceKm.toFixed(1),
+    });
+    void fetch(appendOwner(apiUrl(`/api/search-log?${qs}`)), { keepalive: true }).catch(() => {});
+  } catch {
+    /* swallow — analytics must never break the page */
+  }
+}
+
 const numOrNull = (s: string | undefined): number | null =>
   s === undefined || s === '' ? null : Number(s);
 

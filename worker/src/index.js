@@ -55,6 +55,23 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
+    // Search-intent ping: log-only, fired when someone picks a suggestion from
+    // the city search. Captures what they typed, which real-world place the
+    // geocoder matched, and which of our curated cells we served instead (plus
+    // the gap between the two) — see logSearchSelect in the frontend.
+    if (url.pathname === '/api/search-log') {
+      ctx.waitUntil(
+        logHit(request, env, {
+          kind: 'search',
+          query: url.searchParams.get('q'),
+          matched: url.searchParams.get('matched'),
+          served: url.searchParams.get('served'),
+          distKm: url.searchParams.has('dist_km') ? Number(url.searchParams.get('dist_km')) : null,
+        })
+      );
+      return new Response(null, { status: 204, headers: CORS });
+    }
+
     // Private analytics dashboard. The page is a static shell (reveals nothing);
     // the data route is password-gated by env.DASHBOARD_TOKEN. See analytics.js.
     if (url.pathname === '/dashboard') {
@@ -165,19 +182,23 @@ async function logHit(request, env, meta) {
     }
     await db
       .prepare(
-        `INSERT INTO hits (ts, visitor, kind, page, country, city, referer, asn_org, ua)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO hits (ts, visitor, kind, page, country, city, referer, asn_org, ua, query, matched, served, dist_km)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         Date.now(),
         visitor,
         meta.kind,
-        meta.page,
+        meta.page ?? null,
         cf.country || null,
         cf.city || null,
         refHost,
         cf.asOrganization || null,
-        ua || null
+        ua || null,
+        meta.query ?? null,
+        meta.matched ?? null,
+        meta.served ?? null,
+        meta.distKm ?? null
       )
       .run();
   } catch (e) {

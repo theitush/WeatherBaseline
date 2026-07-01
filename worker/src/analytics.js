@@ -254,8 +254,8 @@ export async function handleAnalyticsData(request, url, env) {
 
   const { results } = await env.DB
     .prepare(
-      'SELECT rowid AS id, ts, visitor, kind, page, country, city, referer, asn_org, ua ' +
-        'FROM hits ORDER BY ts DESC LIMIT ?'
+      'SELECT rowid AS id, ts, visitor, kind, page, country, city, referer, asn_org, ua, ' +
+        'query, matched, served, dist_km FROM hits ORDER BY ts DESC LIMIT ?'
     )
     .bind(limit)
     .all();

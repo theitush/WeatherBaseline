@@ -163,6 +163,10 @@ export const DASHBOARD_HTML = `<!doctype html>
     { k: 'time',    label: 'time',           cls: 'mono' },
     { k: 'visitor', label: 'visitor id',     cls: 'mono' },
     { k: 'kind',    label: 'kind',           cls: 'mono' },
+    { k: 'query',   label: 'searched',       cls: '' },
+    { k: 'matched', label: 'matched place',  cls: '' },
+    { k: 'served',  label: 'served cell',    cls: '' },
+    { k: 'dist_km', label: 'snap gap',       cls: 'num' },
     { k: 'human',   label: 'who',            cls: '' },
     { k: 'city',    label: 'from · city',    cls: '' },
     { k: 'country', label: 'from · country', cls: 'mono' },
@@ -472,6 +476,10 @@ export const DASHBOARD_HTML = `<!doctype html>
     if (k === 'page') {
       if (!r.page) return '<span class="muted">·</span>';
       return '<a class="link" href="' + esc(SITE + r.page) + '" target="_blank" rel="noopener">' + esc(r.page) + '</a>';
+    }
+    if (k === 'dist_km') {
+      if (r.dist_km == null || r.dist_km === '') return '<span class="muted">·</span>';
+      return esc(Number(r.dist_km).toFixed(1)) + ' km';
     }
     var v = cellText(r, k);
     if (v == null || v === '') return '<span class="muted">·</span>';
