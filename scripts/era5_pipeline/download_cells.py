@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import threading
 import time
 from collections import defaultdict
@@ -661,6 +662,14 @@ def recent_name(lat: float, lon: float) -> str:
 # threads never clobber the same (or a freshly created) archive.
 _WRITE_LOCK = threading.Lock()
 
+# In --upload-r2 mode, R2 — not the local disk — is the source of truth: the local
+# disk may be stale (missing years R2 already has) or empty (a fresh box), and
+# merging a fetched span onto a stale local file then uploading would CLOBBER the
+# newer years R2 holds. So the FIRST write of each cell per run seeds its merge
+# base from R2; later spans merge onto the (now-correct) local file we just wrote.
+# This set records which cells have been seeded this run. Guarded by _WRITE_LOCK.
+_R2_SEEDED: set[tuple[float, float]] = set()
+
 
 class OverwriteLedger:
     """Resumable progress index for --overwrite runs.
@@ -797,8 +806,80 @@ class OverwriteLedger:
                 log(f"overwrite: R2 ledger delete failed ({e})")
 
 
+def _read_archive_frame(source, *, compression="infer"):
+    """Read one gzip cell archive into a frame with `date` as datetime.date.
+
+    `source` is a local path (compression inferred from .gz) or a BytesIO of raw
+    gzip bytes (pass compression="gzip"). Raises the underlying read error if the
+    archive is truncated/corrupt — callers decide how to recover.
+    """
+    import pandas as pd
+
+    df = pd.read_csv(source, parse_dates=["date"], compression=compression)
+    df["date"] = df["date"].dt.date
+    return df
+
+
+def _read_r2_base(uploader, name: str):
+    """The cell's current R2 archive as a merge base — frame, or None if R2 has
+    no (readable) copy. A missing/unreadable R2 object is fine: whatever years it
+    lacks are exactly the years this run is fetching, so writing fresh loses
+    nothing. Best-effort: a transient R2 read error also yields None (write fresh).
+    """
+    import io
+
+    try:
+        body = uploader.get_bytes(f"archive/{name}")
+    except Exception as e:  # noqa: BLE001 - reseed is best-effort
+        log(f"  WARN R2 read failed for {name} ({e}); merging without an R2 base")
+        return None
+    if not body:
+        return None  # R2 has no copy yet — the fetch is producing the full history
+    try:
+        return _read_archive_frame(io.BytesIO(body), compression="gzip")
+    except (EOFError, OSError, ValueError) as e:
+        log(f"  WARN R2 archive {name} unreadable ({e.__class__.__name__}); "
+            "merging without an R2 base")
+        return None
+
+
+def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
+    """The frame to merge a freshly-fetched span onto (None ⇒ write fresh).
+
+    - --overwrite (`fresh`): None — rebuild the cell from scratch, dropping stale
+      rows the recompute no longer produces.
+    - Upload mode, first touch of this cell this run: seed from R2, the source of
+      truth. The local disk is deliberately IGNORED here — it may be stale or
+      empty, and every year it could contribute is one the fetch is reproducing
+      anyway. One R2 GET per cell per run (not per span).
+    - Later span this run, or a local (--no-upload) run: merge onto the local file
+      — freshly R2-seeded this run, or the self-consistent base for a no-upload
+      run whose resume itself reads local coverage. A corrupt local file (should
+      not happen now writes are atomic) reseeds from R2 when an uploader exists.
+    """
+    if fresh:
+        return None
+    if uploader is not None and (lat, lon) not in _R2_SEEDED:
+        _R2_SEEDED.add((lat, lon))
+        return _read_r2_base(uploader, path.name)
+    if not path.exists():
+        return None
+    try:
+        return _read_archive_frame(path)
+    except (EOFError, OSError, ValueError) as e:
+        detail = "no R2 uploader — writing fresh from current span only"
+        base = None
+        if uploader is not None:
+            base = _read_r2_base(uploader, path.name)
+            detail = ("reseeded merge base from R2" if base is not None
+                      else "no readable R2 copy — writing fresh")
+        log(f"  WARN corrupt local archive {path.name} "
+            f"({e.__class__.__name__}); {detail}")
+        return base
+
+
 def write_archive(lat: float, lon: float, frame, *, ledger=None,
-                  span=None) -> Path:
+                  span=None, uploader=None) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
     Merge-by-date makes re-running an overlapping span idempotent: existing dates
@@ -807,6 +888,11 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     (so a recompute drops stale rows the new run no longer produces); subsequent
     span-writes for that cell merge as usual. `span` (s, e) records completion so
     a crashed run can resume past it.
+
+    Merge base = R2, the source of truth (see `_merge_base`): in upload mode the
+    local disk is treated as scratch, so a stale or empty box can't clobber R2 on
+    upload, and a truncated local archive can't crash the tile. The write itself is
+    atomic (temp file + os.replace) so a killed run never leaves a truncated file.
     """
     import pandas as pd
 
@@ -814,17 +900,20 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / archive_name(lat, lon)
         fresh = ledger is not None and not ledger.is_replaced(lat, lon)
-        if path.exists() and not fresh:
-            old = pd.read_csv(path, parse_dates=["date"])
-            old["date"] = old["date"].dt.date
+        base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader)
+        if base is not None:
             merged = (
-                pd.concat([old, frame])
+                pd.concat([base, frame])
                 .drop_duplicates(subset="date", keep="last")
                 .sort_values("date")
             )
         else:
             merged = frame.sort_values("date")
-        merged.to_csv(path, index=False, compression="gzip")
+        # Atomic write: never leave a half-written .csv.gz that the next merge
+        # (or the frontend) can't read if this process is killed mid-write.
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        merged.to_csv(tmp, index=False, compression="gzip")
+        os.replace(tmp, path)
         if ledger is not None:
             if fresh:
                 ledger.mark_replaced(lat, lon)
@@ -886,7 +975,8 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
         for (lat, lon), frame in frames.items():
             if ledger is not None and ledger.span_done(lat, lon, s, e):
                 continue  # already landed before a crash
-            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e))
+            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e),
+                                  uploader=uploader)
             if uploader is not None:
                 uploader.upload_file(path, f"archive/{path.name}")
                 # This span reaches the store's newest year, so the archive now
