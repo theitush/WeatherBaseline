@@ -1,7 +1,9 @@
 """Train the quantile debias models (M2/M3 x base/cross) on the FULL cell grid.
 
 The production training run of ml_debias.ipynb's pipeline, as a script for the
-gcloud box (e2-highmem-8). Per variable (tmax, tmin, precip, wind) it fits FOUR
+gcloud box (e2-highcpu-16 — 16 vCPUs but only 16 GB RAM, hence the dtype
+shrink + per-var column slicing below; the float64/object full-grid frame gets
+the process OOM-killed). Per variable (tmax, tmin, precip, wind) it fits FOUR
 CatBoost MultiQuantile models — quantiles 1/5/10/50/90/95/99 in one fit each,
 so q50 is the point correction and the outer pairs give 90%/98% bands:
 
@@ -341,6 +343,22 @@ def split(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def shrink(df: pd.DataFrame) -> pd.DataFrame:
+    """float64 -> float32, strings -> category. Runs AFTER features + split so
+    no ranking/split math changes (CatBoost quantizes to float32 anyway). The
+    full-grid frame is several GB of float64 + per-row str objects without
+    this, and the per-var slices in main() copy from it."""
+    for col in df.columns:
+        if df[col].dtype == np.float64:
+            df[col] = df[col].astype(np.float32)
+        elif (isinstance(df[col].dtype, pd.StringDtype)  # pandas>=3 str cols
+              or df[col].dtype == object):               # pandas 2 str cols
+            df[col] = df[col].astype("category")
+    log(f"shrunk frame to {df.memory_usage(deep=True).sum() / 2**30:.2f} GiB "
+        "(float32 + categoricals)")
+    return df
+
+
 # ------------------------------------------------------------ 5. train + eval
 def hres_col(var_name: str) -> str:
     return f"hres_{next(v['col'] for v in VARS if v['name'] == var_name)}"
@@ -440,6 +458,7 @@ def main() -> int:
     df = load_and_verify(static, args.allow_partial)
     df = add_features(df)
     df = split(df)
+    df = shrink(df)
 
     MODELS.mkdir(exist_ok=True)
     tag = f"qn{df.key.nunique()}_s{SEED}"
@@ -458,7 +477,12 @@ def main() -> int:
     headline_rows, per_cell_rows = [], []
     for var in VARS:
         name = var["name"]
-        var_df = df.dropna(subset=[f"bias_{name}"])
+        # slice to this var's columns BEFORE copying: four per-var copies of
+        # the full frame is most of the peak RSS
+        var_cols = (feature_cols(name, with_cell=True, with_cross=True)
+                    + [f"era5_{var['col']}", f"bias_{name}", f"dec_{name}",
+                       f"dec1_{name}", "role"])
+        var_df = df.loc[df[f"bias_{name}"].notna(), var_cols]
         train = var_df[var_df.role == "train"]
         val = var_df[var_df.role == "val"]
         test = var_df[var_df.role == "test"]
