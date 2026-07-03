@@ -19,20 +19,24 @@ Design notes:
    connections under load, so keep the worker count modest; the per-step retry
    covers the occasional drop.
 
-3. RESUME + MONTHLY TOP-UP. Before fetching, we compute the set of YEARS already
-   present for each tile and fetch only the missing ones — including interior gaps
-   (a hole left by an interrupted run), not just the tail. The source of truth is
-   the local disk, OR (with --upload-r2) the R2 bucket, since the VM's disk is
-   ephemeral: a fresh box has no local archives but R2 still holds what earlier
-   runs produced. R2 coverage is read cheaply — one object listing gives every
-   cell archive's size, and a tile is taken as complete on size alone (only the
-   few small/ambiguous cells are downloaded and date-checked).
-   A present year is normally skipped — EXCEPT the trailing year, which is
-   re-fetched automatically whenever the tile's newest day is behind the newest
-   day the store now has (ERA5-Land lags ~6 days and keeps appending). That IS the
-   monthly refresh: rerun the same command and every tile that's fallen behind
-   gets its last days merged in (idempotent merge-by-date), while up-to-date tiles
-   are skipped. No flag needed. --no-resume forces a full refetch.
+3. RESUME + MONTHLY TOP-UP. Before fetching, we compute how COMPLETE each year
+   already is for each tile — its daily-ROW count, not merely whether the year is
+   present — and fetch only the years still short of a full year of days. That one
+   rule catches a wholly-absent year, an interior gap (a hole from an interrupted
+   run), AND a year that's present but nearly empty (e.g. a lone stray row old code
+   left behind — a bare year-set check wrongly treated that as "have"). The source
+   of truth is the local disk, OR (with --upload-r2) the R2 bucket, since the VM's
+   disk is ephemeral: a fresh box has no local archives but R2 still holds what
+   earlier runs produced. R2 coverage is read cheaply — one object listing gives
+   every cell archive's size, then one representative cell per tile is downloaded
+   and its per-year row counts checked.
+   A year is "complete" when a past year has ~365/366 rows and the trailing
+   (current) store year has caught up to the store's newest day. The trailing year
+   is thus re-fetched automatically whenever the tile lags the store (ERA5-Land
+   lags ~6 days and keeps appending): it reads as incomplete until it catches up.
+   That IS the monthly refresh — rerun the same command and every tile that's
+   fallen behind gets its last days merged in (idempotent merge-by-date), while
+   up-to-date tiles are skipped. No flag needed. --no-resume forces a full refetch.
 
 Usage:
   source .venv/bin/activate
@@ -43,6 +47,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import calendar
 import csv
 import os
 import threading
@@ -303,19 +308,21 @@ class R2Resume:
 
     def coverage_for_tile(
         self, tile_cells: list[dict]
-    ) -> tuple[set[int], date | None]:
-        """(years R2 already has, newest date) for this whole tile.
+    ) -> tuple[dict[int, int], date | None]:
+        """(per-year row counts R2 has, newest date) for this whole tile.
 
         A tile is written all-cells-together per span, so every cell in a tile
         shares the same coverage — so we inspect exactly ONE cell. We can't infer
-        completeness from file size (a cell missing only its last few years is
+        completeness from file size (a cell missing only a single recent year is
         barely smaller than a complete one, and a tiny-but-complete desert cell is
-        smaller than a large partial one), so we read the cell's actual dates. We
-        pick the SMALLEST present cell as the one to read — it's the cheapest
-        download and, since all cells share coverage, fully representative. The
-        newest date lets the caller top up a trailing year that lags the store.
+        smaller than a large partial one), so we read the cell's actual per-year row
+        counts. We pick the SMALLEST present cell as the one to read — it's the
+        cheapest download and, since all cells share coverage, representative. The
+        caller (missing_years) judges each year's counts against the store's newest
+        day, so a nearly-empty or lagging year is caught, not just a wholly-absent
+        one.
 
-        Any cell key missing -> (set(), None): tile not safely done, refetch it.
+        Any cell key missing -> ({}, None): tile not safely done, refetch it.
         """
         smallest_key: str | None = None
         smallest_size = None
@@ -323,47 +330,89 @@ class R2Resume:
             key = f"archive/{archive_name(c['lat'], c['lon'])}"
             size = self.sizes.get(key)
             if size is None:
-                return set(), None  # a missing cell -> tile not safely done
+                return {}, None  # a missing cell -> tile not safely done
             if smallest_size is None or size < smallest_size:
                 smallest_size, smallest_key = size, key
         if smallest_key is None:
-            return set(), None
+            return {}, None
         return self.up.read_coverage(smallest_key)
 
 
 def local_coverage_for_tile(
     tile_cells: list[dict],
-) -> tuple[set[int], date | None]:
-    """(years covered by EVERY cell, newest date across the tile) on local disk.
+) -> tuple[dict[int, int], date | None]:
+    """(per-year row counts across the tile, newest date) on local disk.
 
-    A year counts for a cell only if its archive has a row in that year. We
-    intersect across the tile's cells so a year is "done" only when all cells have
-    it — a tile fetch writes all cells together, so a year missing from any cell
-    means that whole tile-year still needs fetching. Interior gaps (a year missing
-    in the middle, e.g. from an interrupted run) are caught too, because we look at
-    the actual set of years, not just the max date. The newest date is the MIN of
-    the cells' max dates — the tile is only as caught-up as its least-complete
-    cell — and lets the caller top up a trailing year that lags the store.
+    For each year we take the MIN row count across the tile's cells: a year is only
+    as complete as its least-covered cell, so a year fully present in some cells but
+    missing (or nearly empty) in another counts as incomplete for the tile and is
+    refetched. (A tile fetch writes all cells together, so coverage is normally
+    uniform; the min makes an interrupted, non-uniform tile self-heal.) The caller
+    (missing_years) judges completeness from these counts against the store's newest
+    day, so a wholly-absent year, an interior hole, AND a present-but-nearly-empty
+    year are all caught — not just the trailing tail. The newest date is the MIN of
+    the cells' max dates — the tile is only as caught-up as its least-complete cell.
 
-    Returns (set(), None) if any cell file is absent or empty.
+    Returns ({}, None) if any cell file is absent or empty.
     """
     import pandas as pd
 
-    per_cell_years: list[set[int]] = []
+    per_cell_counts: list[dict[int, int]] = []
     max_dates: list[date] = []
     for c in tile_cells:
         path = OUT_DIR / archive_name(c["lat"], c["lon"])
         if not path.exists():
-            return set(), None  # a missing cell file means nothing is safely done
+            return {}, None  # a missing cell file means nothing is safely done
         # Only need the date column; parse years cheaply.
         dates = pd.to_datetime(pd.read_csv(path, usecols=["date"])["date"])
         if dates.empty:
-            return set(), None
-        per_cell_years.append(set(dates.dt.year.unique().tolist()))
+            return {}, None
+        per_cell_counts.append(
+            {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
+        )
         max_dates.append(dates.max().date())
-    if not per_cell_years:
-        return set(), None
-    return set.intersection(*per_cell_years), min(max_dates)
+    if not per_cell_counts:
+        return {}, None
+    all_years = set().union(*(set(d) for d in per_cell_counts))
+    min_counts = {y: min(d.get(y, 0) for d in per_cell_counts) for y in all_years}
+    return min_counts, min(max_dates)
+
+
+def _complete_years(year_counts: dict[int, int], latest_date: date | None,
+                    tol: int = 5) -> set[int]:
+    """Years present AND essentially complete, given the store's newest day.
+
+    `year_counts` maps year -> daily-row count (see read_coverage /
+    local_coverage_for_tile). A year is "complete" when it holds close to a full
+    year of days:
+      - a PAST year (< the store's newest year): >= 365/366 rows (minus `tol` to
+        absorb the ±1-day slack from bucketing on the LOCAL solar day);
+      - the TRAILING/current store year: >= the store's day-of-year so far. It is
+        legitimately partial (ERA5-Land lags ~6 days), so we require only that the
+        cell caught up to the newest day the store holds, not a full year.
+    `tol` (days) both absorbs local-day boundary slack and keeps a just-fetched
+    trailing year from re-fetching every run. A year present but well short of its
+    expected days — a lone stray row, an interior hole, or a lagging tail — is NOT
+    complete, so missing_years puts it back in the fetch list.
+
+    latest_date None (couldn't read the store) -> fall back to presence (any row),
+    the old behaviour, so a store-read failure can't trigger a full refetch.
+    """
+    if latest_date is None:
+        return {int(y) for y, n in year_counts.items() if n > 0}
+    newest_year = latest_date.year
+    doy = latest_date.timetuple().tm_yday
+    complete: set[int] = set()
+    for y, n in year_counts.items():
+        if y < newest_year:
+            expected = 366 if calendar.isleap(int(y)) else 365
+        elif y == newest_year:
+            expected = doy
+        else:
+            continue  # beyond the store's newest year — nothing to have
+        if n >= expected - tol:
+            complete.add(int(y))
+    return complete
 
 
 def missing_years(tile_cells: list[dict], years: list[int], resume: bool,
@@ -371,37 +420,27 @@ def missing_years(tile_cells: list[dict], years: list[int], resume: bool,
                   latest_date: date | None) -> list[int]:
     """The subset of `years` still to fetch for this tile.
 
-    Resume off: fetch all requested years. Resume on: drop years already present
-    in every cell (source of truth = R2 when `r2_resume` is given, since the VM's
-    disk is ephemeral, else the local disk) — EXCEPT the trailing year is topped
-    up automatically when the tile's newest day still lags the store.
+    Resume off: fetch all requested years. Resume on: keep only years that aren't
+    already COMPLETE in the tile (source of truth = R2 when `r2_resume` is given,
+    since the VM's disk is ephemeral, else the local disk).
 
-    ERA5-Land lags ~6 days and keeps appending, so the last stored year is usually
-    partial. `latest_date` is the newest day the store now holds; if the tile's
-    newest day is before the newest day available WITHIN its trailing year, we
-    re-fetch that one year so a merge-by-date write appends the days since added.
-    Once the tile has caught up to the store, nothing is re-fetched. This is what
-    makes a plain monthly rerun a top-up with no flag.
+    Completeness is row-count based, not mere presence (see `_complete_years`): a
+    past year needs ~365/366 rows, the trailing (current) store year needs rows up
+    to the store's newest day. This catches three cases with one rule — a
+    wholly-absent year, an interior hole, AND a year that's present but nearly empty
+    (e.g. a lone stray 2025 row a year-set check would wrongly accept). Because the
+    trailing year reads as incomplete until it catches up to the store, ERA5-Land's
+    ~6-day lag makes a plain monthly rerun a top-up with no flag; once caught up,
+    nothing is re-fetched.
     """
     if not resume:
         return years
     if r2_resume is not None:
-        have, max_date = r2_resume.coverage_for_tile(tile_cells)
+        counts, _max_date = r2_resume.coverage_for_tile(tile_cells)
     else:
-        have, max_date = local_coverage_for_tile(tile_cells)
-    want = set(years)
-    todo = [y for y in years if y not in have]
-    # Automatic trailing-year top-up: the tile's newest day is behind the newest
-    # the store has within that same year -> refetch the year so the merge fills
-    # the gap. Years AFTER max_date's year are wholly absent and already in `todo`;
-    # earlier years are complete. `target` guards the "year already complete but
-    # the store has since rolled into the next year" case (no needless refetch).
-    if max_date is not None and latest_date is not None:
-        trailing = max_date.year
-        target = min(date(trailing, 12, 31), latest_date)
-        if trailing in want and max_date < target and trailing not in todo:
-            todo.append(trailing)
-    return sorted(todo)
+        counts, _max_date = local_coverage_for_tile(tile_cells)
+    complete = _complete_years(counts, latest_date)
+    return sorted(y for y in years if y not in complete)
 
 
 def batches(years: list[int], batch_years: int) -> list[tuple[int, int]]:

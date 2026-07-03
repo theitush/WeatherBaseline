@@ -150,14 +150,17 @@ class R2Uploader:
         return sizes
 
     def read_coverage(self, key: str):
-        """Download one archive object; return (years covered, newest date).
+        """Download one archive object; return (per-year row counts, newest date).
 
-        Used by the producer's resume to disambiguate the small archives that size
-        alone can't classify (a tiny but COMPLETE cell vs. a genuinely partial one)
-        AND to tell a complete trailing year from one still lagging the store — so
-        a monthly rerun refetches only a genuinely-behind cell. Reads just the date
-        column out of the gzip, so the parse stays cheap. Newest date is None if
-        the archive is empty. Returns (set[int], datetime.date | None).
+        Used by the producer's resume to decide which years still need fetching.
+        Returns the number of daily rows present in EACH year — not just the set of
+        years — so resume can tell a COMPLETE year (~365/366 rows) from one that's
+        present but nearly empty: e.g. a lone stray 2025 row left by old code, which
+        a year-set check wrongly reads as "have 2025" and never refills. It also
+        still distinguishes a tiny-but-complete desert cell from a genuinely partial
+        one, and a caught-up trailing year from one lagging the store. Reads just
+        the date column out of the gzip, so the parse stays cheap. Returns
+        ({year: row_count}, datetime.date | None); ({}, None) if the archive is empty.
         """
         import gzip
         import io
@@ -168,8 +171,9 @@ class R2Uploader:
         with gzip.open(io.BytesIO(body), "rt") as fh:
             dates = pd.to_datetime(pd.read_csv(fh, usecols=["date"])["date"])
         if dates.empty:
-            return set(), None
-        return set(dates.dt.year.unique().tolist()), dates.max().date()
+            return {}, None
+        counts = {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
+        return counts, dates.max().date()
 
 
 def _iter_tier_files(data_dir: Path, tiers):
