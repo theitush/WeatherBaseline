@@ -305,9 +305,17 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
                                      np.where(pct_rank >= 0.9, "high", "mid"))
         df[f"dec1_{name}"] = np.where(pct_rank <= 0.01, "p01",
                                       np.where(pct_rank >= 0.99, "p99", "mid"))
+        # fdec ranks the FORECAST: known at prediction time, so conformal
+        # calibration may condition on it; dec/dec1 rank the truth and are
+        # evaluation-only labels.
+        fc_rank = df.groupby(["key", "season"])[f"hres_{col}"].rank(
+            method="average", pct=True)
+        df[f"fdec_{name}"] = np.where(fc_rank <= 0.1, "low",
+                                      np.where(fc_rank >= 0.9, "high", "mid"))
         df[f"bias_{name}"] = df[f"era5_{col}"] - df[f"hres_{col}"]
     log("features: seasonal phase, fc_version "
-        f"({df.fc_version.value_counts().to_dict()}), deciles, bias targets")
+        f"({df.fc_version.value_counts().to_dict()}), deciles (truth dec/dec1 "
+        "+ forecast fdec), bias targets")
     return df
 
 
