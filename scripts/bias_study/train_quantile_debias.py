@@ -83,7 +83,7 @@ HOLDOUT_EVERY = 5         # every Nth month-block -> test
 VAL_EVERY = 4             # every Nth REMAINING block -> validation (early stopping)
 EMBARGO_DAYS = 3          # train rows this close to a test/val block are dropped
 HRES_ARCHIVE_START = "2024-03-01"
-END_SLACK_DAYS = 21       # per-cell end may trail the cohort max by this much
+HRES_FLOOR_BUFFER_DAYS = 1  # extra day back off the archive floor, timezone safety
 PRECIP_TRACE_MM = 1       # match prod: <1mm counts as 0 (frontend tieredData.ts)
 
 # Open-Meteo `ecmwf_ifs` IFS cycle changeovers (categorical feature), as in the
@@ -244,6 +244,11 @@ def load_and_verify(static: pd.DataFrame, allow_partial: bool) -> pd.DataFrame:
     ranges = pd.DataFrame(
         [(k, *r) for k, frame, r in loaded if frame is not None],
         columns=["key", "arc_start", "arc_end", "hres_start", "hres_end"])
+    # HRES only needs to reach as far as the era5-land archive actually does —
+    # that's the real join limit, and it's ground truth (not a guess about the
+    # archive's monthly update cadence) since arc_end was just rebuilt above.
+    hres_floor = (pd.to_datetime(ranges.arc_end).min()
+                  - pd.Timedelta(days=HRES_FLOOR_BUFFER_DAYS))
     checks = [
         ("archive slice starts late", ranges.arc_start != HRES_ARCHIVE_START,
          "re-run pull_archive_slice.py --overwrite for these cells"),
@@ -253,9 +258,8 @@ def load_and_verify(static: pd.DataFrame, allow_partial: bool) -> pd.DataFrame:
          pd.to_datetime(ranges.arc_end)
          < pd.to_datetime(ranges.arc_end).max() - pd.Timedelta(days=14),
          "update the era5 mirror, then pull_archive_slice.py --local --overwrite"),
-        ("HRES stale (trails cohort)",
-         pd.to_datetime(ranges.hres_end)
-         < pd.to_datetime(ranges.hres_end).max() - pd.Timedelta(days=END_SLACK_DAYS),
+        (f"HRES stale (before archive floor {hres_floor.date()})",
+         pd.to_datetime(ranges.hres_end) < hres_floor,
          "python pull_hres_all.py --overwrite"),
     ]
     for problem, mask, fix in checks:
