@@ -96,6 +96,21 @@ def read_cells():
             yield row["name"], snap(float(row["lat"])), snap(float(row["lon"]))
 
 
+def local_src_candidates(slat: float, slon: float) -> list[Path]:
+    """Local archive filenames download_cells.py may have written for this
+    snapped cell. download_cells.py's archive_name() formats the RAW
+    (unsnapped) lat/lon straight from cells.csv, so a coordinate that snaps
+    to exactly 0.0 but was stored as -0.0 (small negative lon/lat near the
+    prime meridian/equator, e.g. Canary Wharf at 51.5,-0.0) keeps its sign in
+    the on-disk filename (archive_51.5_-0.0.csv.gz), while snap() here
+    normalizes it to 0.0 (Python's bare round() returns an int, which has no
+    negative zero). Try both signs on any axis that snapped to zero."""
+    lat_opts = ("0.0", "-0.0") if slat == 0 else (f"{slat:.1f}",)
+    lon_opts = ("0.0", "-0.0") if slon == 0 else (f"{slon:.1f}",)
+    return [LOCAL_ARCHIVE_DIR / f"archive_{la}_{lo}.csv.gz"
+            for la in lat_opts for lo in lon_opts]
+
+
 def trim_archive(body: bytes, start: str, end: str, full: bool) -> tuple[bytes, int]:
     """Return (gzipped csv bytes, kept row count) for the archive object body,
     keeping only rows whose date is within [start, end] (unless --full)."""
@@ -181,8 +196,9 @@ def main() -> int:
         if dest.exists() and not args.overwrite:
             return ("skip", name, key, 0)
         if args.local:
-            src = LOCAL_ARCHIVE_DIR / f"archive_{key}.csv.gz"
-            if not src.exists():
+            src = next((p for p in local_src_candidates(slat, slon) if p.exists()),
+                       None)
+            if src is None:
                 return ("nolocal", name, key, 0)  # not downloaded — expected, skip
             body = src.read_bytes()
         else:
