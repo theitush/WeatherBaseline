@@ -13,11 +13,16 @@ cell x var the model collapses to a smooth 2D surface  delta = f(hres_value, doy
 We sample that surface on a (doy x hres) grid and write it out.
 
 Per cell x var, for each grid point we predict all 7 quantiles, sort ascending
-(precip crosses), take indices 1/3/5 -> q05/q50/q95 *bias deltas*. The client adds
-the delta to the raw forecast value: corrected = clip(value + dmid, 0..). The 90%
-band uses the outer pair, WIDENED by one global CQR constant per var (part 10's
-recipe) baked in here at zero runtime cost. CQR never touches q50, so the point
-value is CQR-free.
+(precip crosses), and ship ALL SEVEN *bias deltas* — a 7-point predictive CDF the
+client can interpolate for exceedance claims ("p(top 10%) once ERA5-Land settles").
+The client adds a delta to the raw forecast value: corrected = clip(value + d, 0..).
+Each non-median head carries a per-level ONE-SIDED conformal shift baked in
+(cqr_per_level_validity.ipynb is the validity study: every calibrated tail lands
+within 0.35pp of nominal). The shifts are SIGNED — a negative one pulls in an
+over-shooting head — and independent, so a row can re-cross; it is re-isotonized
+around the PINNED median. CQR never touches q50, so the point value is CQR-free.
+Column names keep the shipped trio dlo/dmid/dhi (= q05/q50/q95) so the current
+ci.ts keeps parsing unchanged; d01/d10/d90/d99 are appended for the CDF client.
 
 GATING (locked 2026-07-04): read models/per_cell_{TAG}.csv and DROP cell x vars
 where the M3_base point correction demonstrably hurts — mean|err| goes UP by more
@@ -27,8 +32,8 @@ raw with no band). This is a bulk point-MAE gate; it does NOT address precip's
 worst-1% tail worsening (that's the deferred quantile-mapping follow-up).
 
 OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key):
-  debias_{lat}_{lon}.csv.gz   columns: var,doy,hres,dlo,dmid,dhi  (deltas, 2 dp)
-  ~4 x 53 x 13 ~= 2.7K rows ~= 10-20 KB/cell.
+  debias_{lat}_{lon}.csv.gz   columns: var,doy,hres,d01,dlo,d10,dmid,d90,dhi,d99
+  (deltas, 2 dp)  ~4 x 53 x 13 ~= 2.7K rows ~= 15-30 KB/cell.
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
@@ -65,8 +70,12 @@ N_HRES_ANCHORS = 15
 PRECIP_ANCHOR_QUANTILES = [0.0, 0.5, 0.75, 0.9, 0.95, 0.98, 0.99, 0.995, 1.0]
 N_PRECIP_LINEAR = 6
 
-NOM = 0.90            # band nominal coverage (part 10)
-Q05, Q50, Q95 = 1, 3, 5   # indices into the per-row SORTED 7-quantile vector
+QUANTILE_LEVELS = tqd.QUANTILES        # [.01, .05, .10, .50, .90, .95, .99]
+Q50 = QUANTILE_LEVELS.index(0.50)      # index into the per-row SORTED 7-vector
+# per-cell csv columns for the sorted heads, in level order. The middle trio
+# keeps the shipped names (dlo/dmid/dhi = q05/q50/q95) so the current ci.ts
+# keeps parsing unchanged; the four new heads extend it to a 7-point CDF.
+LEVEL_COLUMNS = ["d01", "dlo", "d10", "dmid", "d90", "dhi", "d99"]
 
 
 def log(msg: str) -> None:
@@ -82,10 +91,18 @@ def current_fc_version() -> str:
     return version
 
 
-def conformal_q(scores: np.ndarray) -> float:
-    """Part-10 conformal quantile: the CQR widening constant for one calib set."""
-    rank = min(int(np.ceil((len(scores) + 1) * NOM)), len(scores))
-    return float(np.sort(scores)[rank - 1])
+def per_level_shift(residuals: np.ndarray, level: float) -> float:
+    """One-sided split-conformal shift for one quantile head: the finite-sample
+    empirical level-quantile of y - q_hat. Upper heads round the rank UP
+    (coverage >= level), lower heads round DOWN (tail below stays <= level).
+    Shifts are SIGNED — never clip at zero."""
+    ordered = np.sort(residuals)
+    n = len(ordered)
+    if level > 0.5:
+        rank = min(int(np.ceil((n + 1) * level)), n)
+    else:
+        rank = max(int(np.floor((n + 1) * level)), 1)
+    return float(ordered[rank - 1])
 
 
 def gated_keys(model_tag: str, threshold: float) -> dict[str, set[str]]:
@@ -148,23 +165,41 @@ def build_grid(static: pd.DataFrame, anchors_by_key: dict[str, np.ndarray],
     return frame
 
 
+def pin_median_isotonic(preds: np.ndarray) -> np.ndarray:
+    """Restore per-row monotonicity WITHOUT moving the median: running max
+    upward from q50, running min downward. The independent per-level shifts
+    (and 2-dp rounding) can cross neighbouring heads; the client bilinear-
+    interpolates each column separately, and interpolating column-monotone
+    anchors stays monotone, so this keeps the served CDF valid everywhere."""
+    for j in range(Q50 + 1, preds.shape[1]):
+        np.maximum(preds[:, j], preds[:, j - 1], out=preds[:, j])
+    for j in range(Q50 - 1, -1, -1):
+        np.minimum(preds[:, j], preds[:, j + 1], out=preds[:, j])
+    return preds
+
+
 def predict_deltas(model: CatBoostRegressor, frame: pd.DataFrame,
-                   feature_cols: list[str], cqr_q: float):
-    """Sorted q05/q50/q95 bias deltas for every row, CQR baked into the band."""
+                   feature_cols: list[str], shifts: np.ndarray) -> np.ndarray:
+    """All 7 sorted bias-delta heads for every row, per-level shifts baked in,
+    re-isotonized around the pinned (CQR-free) median. Rounded to the shipped
+    2 dp HERE so the isotonic pass covers rounding-induced crossings too."""
     preds = np.sort(np.asarray(model.predict(frame[feature_cols])), axis=1)
-    return (preds[:, Q05] - cqr_q, preds[:, Q50], preds[:, Q95] + cqr_q)
+    return pin_median_isotonic(np.round(preds + shifts, 2))
 
 
-def compute_cqr(model, test, name, feature_cols):
-    """One global CQR widening constant Q for this var, conformal score
-    max(q05-y, y-q95). Part-10's recipe holds out half of test to EVALUATE
-    coverage; here nothing is evaluated, so calibrate on the full test split
-    (the fits never saw it) for a lower-variance Q."""
-    band = np.sort(np.asarray(model.predict(test[feature_cols])), axis=1)
-    lower, upper = band[:, Q05], band[:, Q95]
+def compute_level_shifts(model, test, name, feature_cols) -> np.ndarray:
+    """The six one-sided conformal shifts for this var (q50 stays 0 — the point
+    value ships CQR-free), aligned to QUANTILE_LEVELS. The old recipe held out
+    half of test to EVALUATE coverage; the evaluation now lives in
+    cqr_per_level_validity.ipynb, so calibrate on the full test split (the fits
+    never saw it) for the lowest-variance shifts."""
+    preds = np.sort(np.asarray(model.predict(test[feature_cols])), axis=1)
     y = test[f"bias_{name}"].to_numpy()
-    scores = np.maximum(lower - y, y - upper)
-    return conformal_q(scores)
+    shifts = np.zeros(len(QUANTILE_LEVELS))
+    for i, level in enumerate(QUANTILE_LEVELS):
+        if i != Q50:
+            shifts[i] = per_level_shift(y - preds[:, i], level)
+    return shifts
 
 
 def circular_interp(table: pd.DataFrame, hres_anchors: np.ndarray,
@@ -196,7 +231,7 @@ def circular_interp(table: pd.DataFrame, hres_anchors: np.ndarray,
 
 
 def self_check(model, static, anchors_by_key, tables_by_key, name, col,
-               feature_cols, cqr_q, fc_version, n_cells, rng):
+               feature_cols, shifts, fc_version, n_cells, rng):
     """Exact model prediction vs table interpolation at random OFF-grid points,
     for a handful of cells. Big errors here mean the grid is too coarse."""
     keys = list(tables_by_key)            # single-var cell tables for this var
@@ -204,7 +239,7 @@ def self_check(model, static, anchors_by_key, tables_by_key, name, col,
         return
     sample = rng.choice(keys, size=min(n_cells, len(keys)), replace=False)
     static_by_key = static.set_index("key")
-    errs = {"dmid": [], "dlo": [], "dhi": []}
+    errs = {level_col: [] for level_col in LEVEL_COLUMNS}
     for key in sample:
         anchors = anchors_by_key[key]
         table = tables_by_key[key]
@@ -218,16 +253,16 @@ def self_check(model, static, anchors_by_key, tables_by_key, name, col,
                 "elevation": geo.elevation, "hres_elevation": geo.hres_elevation,
                 "elev_diff_m": geo.elev_diff_m, "dist_to_hres_km": geo.dist_to_hres_km,
                 "lat": geo.lat, "lon": geo.lon, "fc_version": fc_version, "key": key}])
-            exact = np.sort(np.asarray(model.predict(feat[feature_cols])), axis=1)[0]
-            truth = {"dlo": exact[Q05] - cqr_q, "dmid": exact[Q50],
-                     "dhi": exact[Q95] + cqr_q}
+            truth = dict(zip(LEVEL_COLUMNS,
+                             predict_deltas(model, feat, feature_cols, shifts)[0]))
             for tcol in errs:
                 got = circular_interp(table, anchors, doy_q, hres_q, tcol)
                 errs[tcol].append(abs(got - truth[tcol]))
+    worst = max(errs, key=lambda c: np.max(errs[c]))
     stats = ", ".join(
-        f"{c} p99={np.quantile(v, 0.99):.3f} max={np.max(v):.3f}"
-        for c, v in errs.items())
-    log(f"  self-check {name} ({len(sample)} cells x 8 pts): {stats}")
+        f"{c} p99={np.quantile(v, 0.99):.3f}" for c, v in errs.items())
+    log(f"  self-check {name} ({len(sample)} cells x 8 pts): {stats} | "
+        f"worst max {worst}={np.max(errs[worst]):.3f}")
 
 
 def main() -> int:
@@ -274,8 +309,11 @@ def main() -> int:
 
         var_rows = df[df[f"bias_{name}"].notna()]
         test = var_rows[var_rows.role == "test"]
-        cqr_q = compute_cqr(model, test, name, feature_cols)
-        log(f"== {name}: CQR Q={cqr_q:.3f}, test {len(test):,} rows ==")
+        shifts = compute_level_shifts(model, test, name, feature_cols)
+        log(f"== {name}: shifts "
+            + " ".join(f"{LEVEL_COLUMNS[i]}={shifts[i]:+.3f}"
+                       for i in range(len(shifts)) if i != Q50)
+            + f", test {len(test):,} rows ==")
 
         # per-cell hres anchors from TRAINING forecast values
         kept = static[~static.key.isin(gates[name])]
@@ -287,12 +325,12 @@ def main() -> int:
         kept = kept[kept.key.isin(anchors_by_key)]   # a gated/absent cell has none
 
         grid = build_grid(kept, anchors_by_key, hcol, fc_version)
-        dlo, dmid, dhi = predict_deltas(model, grid, feature_cols, cqr_q)
+        deltas = predict_deltas(model, grid, feature_cols, shifts)
         table = pd.DataFrame({
             "var": name, "doy": grid.doy.to_numpy(np.int16),
             "hres": np.round(grid[hcol].to_numpy(), 2),
-            "dlo": np.round(dlo, 2), "dmid": np.round(dmid, 2),
-            "dhi": np.round(dhi, 2), "key": grid.key.to_numpy()})
+            **{level_col: deltas[:, i] for i, level_col in enumerate(LEVEL_COLUMNS)},
+            "key": grid.key.to_numpy()})
 
         tables_by_key = {}
         for key, cell_table in table.groupby("key", sort=False):
@@ -302,7 +340,7 @@ def main() -> int:
 
         if args.self_check_cells:
             self_check(model, kept, anchors_by_key, tables_by_key, name, hcol,
-                       feature_cols, cqr_q, fc_version, args.self_check_cells,
+                       feature_cols, shifts, fc_version, args.self_check_cells,
                        seed_rng)
         del model, grid, table
 
