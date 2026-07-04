@@ -164,20 +164,29 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       );
       setForecastUnavailable(!forecastFresh);
 
-      // Attach local CatBoost confidence-interval bands to model-output rows AND
-      // snap the row's value to the band median, in one place (dev-only; a no-op
-      // without the CI server). Mutates the timeline rows in place so the filtered
-      // slices below share the same objects — so the corrected value flows to
-      // EVERY downstream consumer (chart dots, the shaded percentile aggregates,
-      // record markers, the prose verdict, the spectrum card) straight off
-      // d[metric], with no per-chart special-casing. Best-effort: fetchBands
-      // never throws.
+      // Attach bias-correction bands to model-output rows AND snap the row's value
+      // to the bias-corrected median, in one place. Band + median come from the
+      // cell's static per-cell debias table on R2 (services/ci.ts) — LIVE in dev AND
+      // prod. This is NOT a dev-only no-op; it replaced the old local CatBoost CI
+      // server. Mutates the timeline rows in place so the filtered slices below share
+      // the same objects — the corrected value flows to EVERY downstream consumer
+      // (chart dots, the shaded percentile aggregates, record markers, the prose
+      // verdict, the spectrum card) straight off d[metric], with no per-chart
+      // special-casing. Best-effort: fetchBands never throws.
       //
-      // Forecast rows are model output for every metric. `recent` rows are model
-      // output ONLY for precip/wind — the recent seam pulls those two from the
-      // IFS historical-forecast API (era5_land lags), while recent temperature
-      // is settled reanalysis. So recent rows get precip/wind bands only; their
-      // (settled) temperature stays band-free and keeps its real value.
+      // WHICH ROWS GET CORRECTED — the model scale (IFS-HRES) differs from the
+      // archive/percentile scale (ERA5-Land), so anything HRES-derived MUST be
+      // debiased:
+      //   • forecast rows -> every metric is HRES model output -> correct all four.
+      //   • recent rows   -> precip AND wind ARE STILL FORECASTS here. The recent
+      //     seam pulls those two from the IFS historical-forecast API because
+      //     ERA5-Land lags the present frontier, so recent precip/wind carry the
+      //     SAME HRES bias as a forecast and MUST be corrected. Recent TEMPERATURE,
+      //     by contrast, is already settled ERA5-Land reanalysis (real, not a guess)
+      //     -> NO correction, NO snap, it keeps its real observed value.
+      // So RECENT_MODEL_METRICS is precip+wind ONLY. fetchBands is tier-agnostic (it
+      // returns a band for every value it is handed, temperature included); THIS
+      // filter is what enforces the recent-temperature exception.
       const RECENT_MODEL_METRICS: MetricKey[] = ['precipitation_sum', 'wind_speed_10m_max'];
       const bandRows = timeline.filter(
         (d) => d.data_type === 'forecast' || d.data_type === 'recent'

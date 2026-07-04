@@ -6,8 +6,8 @@ import type { MetricKey } from '../utils/config';
 /**
  * A bias-corrected 90% band for one metric on one day, in native units
  * (°C / mm / m·s⁻¹). `mid` is the q0.50 (bias-corrected best estimate); `lo`/`hi`
- * are q0.05/q0.95. Produced by the local CatBoost CI server (dev-only) for
- * forecast rows; absent on settled history.
+ * are q0.05/q0.95. Interpolated client-side from the cell's static R2 debias
+ * table (services/ci.ts) for forecast/recent rows; absent on settled history.
  */
 export interface MetricBand {
   lo: number;
@@ -18,9 +18,12 @@ export interface MetricBand {
 export interface WeatherDataPoint {
   date: Date;
   year: number;
-  // 'historical' = settled archive (ERA5-Land). 'recent' = real but live-model
-  // topped-up days near the present frontier (still real data, but not the
-  // settled long-run archive). 'forecast' = future model guess.
+  // 'historical' = settled archive (ERA5-Land reanalysis). 'recent' = days near the
+  // present frontier where temperature IS settled ERA5-Land, but precip & wind are
+  // STILL IFS-HRES forecast (ERA5-Land lags) — so recent precip/wind carry forecast
+  // bias and get debiased just like a forecast, while recent temperature does not
+  // (see AppContext / services/ci.ts). 'forecast' = future IFS-HRES output (all
+  // metrics), fully bias-corrected for display.
   data_type: 'historical' | 'recent' | 'forecast';
   max_temperature?: number;
   min_temperature?: number;

@@ -12,7 +12,7 @@ import { appendOwner } from './owner';
 // straight from R2, the same objects the local Worker writes. The empty-string
 // fallback is only for a misconfigured env (no VITE_DATA_BASE) and routes to a
 // relative /data path, which nothing serves anymore.
-const DATA_BASE = import.meta.env.VITE_DATA_BASE ?? '';
+export const DATA_BASE = import.meta.env.VITE_DATA_BASE ?? '';
 
 // Base origin for the Worker's /api/* control-plane routes (ensure-fresh, geo).
 // Empty in dev: the Vite proxy forwards /api → the local Worker
@@ -108,7 +108,7 @@ async function fetchTier(tier: Tier, lat: number, lon: number): Promise<RawRow[]
       return []; // network error on an optional tier — degrade gracefully
     }
     if (!res.ok) return [];
-    return parseCsv(await res.text());
+    return parseCsv<RawRow>(await res.text());
   })();
 
   if (tier === 'archive') {
@@ -119,7 +119,7 @@ async function fetchTier(tier: Tier, lat: number, lon: number): Promise<RawRow[]
   return p;
 }
 
-function parseCsv(text: string): RawRow[] {
+export function parseCsv<T = Record<string, string>>(text: string): T[] {
   const lines = text.trim().split('\n');
   if (lines.length <= 1) return [];
   const header = lines[0].split(',');
@@ -127,7 +127,7 @@ function parseCsv(text: string): RawRow[] {
     const cells = line.split(',');
     const row: Record<string, string> = {};
     header.forEach((col, i) => (row[col] = cells[i]));
-    return row as unknown as RawRow;
+    return row as unknown as T;
   });
 }
 
