@@ -40,6 +40,12 @@ from botocore.config import Config
 
 DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
+# Tiers this CLI can upload but that aren't part of the default era5-land set.
+# `debias/` holds the static M3_base bias-correction tables (one .csv.gz per
+# cell); it lives under scripts/bias_study/data/, not data/era5-land/, so you
+# upload it explicitly with `--dir .../bias_study/data --tiers debias`.
+EXTRA_TIERS = ("debias",)
+UPLOADABLE_TIERS = TIERS + EXTRA_TIERS
 
 # Cache-Control per tier, stored as object metadata so R2 serves it as the
 # origin header. The data domain (data.weatherbaseline.com) sits behind
@@ -55,10 +61,16 @@ TIERS = ("archive", "recent", "forecast")
 # `no-cache` -> the browser/edge may keep the (large) body but must revalidate it
 # via ETag on each use, so a freshly-extended archive is picked up immediately
 # while an unchanged one costs only a 304. Keep in sync with worker/src/cellStore.js.
+# The debias tier is unlike archive: those tables change ONLY on a manual regen
+# (an IFS cycle cutover or a cells.csv change), never on the monthly archive
+# top-up, so they're safe to cache hard. max-age=86400 lets the edge/browser
+# hold them for a day; purge the zone cache on the rare regen (same as archive
+# re-uploads). See make_debias_tables.py.
 CACHE_CONTROL = {
     "archive": "public, no-cache",
     "recent": "no-store",
     "forecast": "no-store",
+    "debias": "public, max-age=86400",
 }
 
 
@@ -195,8 +207,9 @@ def main() -> int:
         help="root containing archive/ recent/ forecast/ (default: data/era5-land)",
     )
     ap.add_argument(
-        "--tiers", nargs="+", default=list(TIERS), choices=TIERS,
-        help="which tiers to upload (default: all)",
+        "--tiers", nargs="+", default=list(TIERS), choices=UPLOADABLE_TIERS,
+        help="which tiers to upload (default: the era5-land tiers; 'debias' is "
+             "opt-in and lives under a different --dir)",
     )
     ap.add_argument("--bucket", default=None, help="override R2_BUCKET")
     ap.add_argument("--workers", type=int, default=16, help="parallel uploads")
