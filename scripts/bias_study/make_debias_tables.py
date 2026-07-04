@@ -1,0 +1,325 @@
+"""Bake the M3_base bias fits into static per-cell interpolation tables for R2.
+
+Step 1 of plans/im-thinking-to-ship-kind-bee.md. The site serves raw HRES-derived
+values for forecast/recent days while the archive (and all percentile math) is on
+the ERA5-Land scale; the `M3_base_{var}_{TAG}.cbm` fits correct that mismatch. The
+fits are ~1 GB total — never Worker-runnable — so instead of a live Python service
+we EVALUATE the existing fits on a small per-cell grid and let the client bilinear-
+interpolate. No retraining.
+
+Key insight: M3_base's only per-day inputs are the forecast value + the date
+(cos_doy/sin_doy, fc_version); every other feature is static per cell. So per
+cell x var the model collapses to a smooth 2D surface  delta = f(hres_value, doy).
+We sample that surface on a (doy x hres) grid and write it out.
+
+Per cell x var, for each grid point we predict all 7 quantiles, sort ascending
+(precip crosses), take indices 1/3/5 -> q05/q50/q95 *bias deltas*. The client adds
+the delta to the raw forecast value: corrected = clip(value + dmid, 0..). The 90%
+band uses the outer pair, WIDENED by one global CQR constant per var (part 10's
+recipe) baked in here at zero runtime cost. CQR never touches q50, so the point
+value is CQR-free.
+
+GATING (locked 2026-07-04): read models/per_cell_{TAG}.csv and DROP cell x vars
+where the M3_base point correction demonstrably hurts — mean|err| goes UP by more
+than --gate-threshold (default 0.1) vs raw. Applied to all four variables (uniform
+per-cell safety net; a dropped cell x var simply has no rows -> the client serves
+raw with no band). This is a bulk point-MAE gate; it does NOT address precip's
+worst-1% tail worsening (that's the deferred quantile-mapping follow-up).
+
+OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key):
+  debias_{lat}_{lon}.csv.gz   columns: var,doy,hres,dlo,dmid,dhi  (deltas, 2 dp)
+  ~4 x 53 x 13 ~= 2.7K rows ~= 10-20 KB/cell.
+
+REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
+
+Runs in scripts/era5_pipeline/.venv (needs the full archive-overlap + hres-forecast
+data the fits were trained on). Reuses train_quantile_debias.py for the data
+pipeline (preflight/load_and_verify/add_features/split/shrink) and feature layout.
+
+  cd scripts/bias_study && ../era5_pipeline/.venv/bin/python make_debias_tables.py
+Debug: --limit N (random cells) --allow-partial (warn+drop stale) --self-check-cells N
+"""
+from __future__ import annotations
+
+import argparse
+import gzip
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+import train_quantile_debias as tqd
+from catboost import CatBoostRegressor
+
+HERE = Path(__file__).resolve().parent
+
+# Grid resolution (plan Step 1.1). doy: 53 weekly anchors, 1..365, client wraps
+# circularly. hres: 13 anchors spanning each cell's TRAINING hres range — linear
+# for tmax/tmin/wind; quantile-spaced for precip since the mass sits at 0.
+DOY_ANCHORS = np.arange(1, 366, 7)                 # 1, 8, ..., 365  (53 points)
+N_HRES_ANCHORS = 15
+# precip mass sits at 0, so anchor densely near 0 (quantiles) but also union a
+# few linear points so no single hres gap (e.g. p99.5->max) is wide enough to
+# make bilinear interp blow up on a heavy-rain day.
+PRECIP_ANCHOR_QUANTILES = [0.0, 0.5, 0.75, 0.9, 0.95, 0.98, 0.99, 0.995, 1.0]
+N_PRECIP_LINEAR = 6
+
+NOM = 0.90            # band nominal coverage (part 10)
+Q05, Q50, Q95 = 1, 3, 5   # indices into the per-row SORTED 7-quantile vector
+
+
+def log(msg: str) -> None:
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def current_fc_version() -> str:
+    """The IFS cycle in force today — what forecast/recent days will carry."""
+    version = tqd.FC_BASE
+    for change_date, cycle in sorted(tqd.FC_CHANGES):   # ascending; latest wins
+        if pd.Timestamp.today() >= change_date:
+            version = cycle
+    return version
+
+
+def conformal_q(scores: np.ndarray) -> float:
+    """Part-10 conformal quantile: the CQR widening constant for one calib set."""
+    rank = min(int(np.ceil((len(scores) + 1) * NOM)), len(scores))
+    return float(np.sort(scores)[rank - 1])
+
+
+def gated_keys(model_tag: str, threshold: float) -> dict[str, set[str]]:
+    """Per var, the cell keys whose M3_base point correction hurts by > threshold
+    (mae_q50 - mae_raw > threshold). Those cell x vars are dropped from the tables."""
+    per_cell = pd.read_csv(tqd.MODELS / f"per_cell_{model_tag}.csv")
+    per_cell = per_cell[per_cell.variant == "M3_base"].copy()
+    per_cell["damage"] = per_cell.mae_q50 - per_cell.mae_raw
+    out = {}
+    for var in tqd.VARS:
+        name = var["name"]
+        hurt = per_cell[(per_cell["var"] == name) & (per_cell.damage > threshold)]
+        out[name] = set(hurt.key)
+        log(f"  gate {name}: {len(hurt)} / "
+            f"{int((per_cell['var'] == name).sum())} cells dropped "
+            f"(damage > {threshold})")
+    return out
+
+
+def hres_anchors_for(values: np.ndarray, is_precip: bool) -> np.ndarray:
+    """The hres grid anchors for one cell x var from its TRAINING forecast values."""
+    if is_precip:
+        anchors = np.concatenate([
+            np.quantile(values, PRECIP_ANCHOR_QUANTILES),
+            np.linspace(values.min(), values.max(), N_PRECIP_LINEAR)])
+        anchors = np.unique(anchors)
+    else:
+        anchors = np.linspace(values.min(), values.max(), N_HRES_ANCHORS)
+    anchors = np.unique(np.round(anchors, 2))
+    if len(anchors) < 2:            # constant-forecast cell: keep 2 so it can interp
+        anchors = np.array([anchors[0], anchors[0] + 0.01])
+    return anchors
+
+
+def build_grid(static: pd.DataFrame, anchors_by_key: dict[str, np.ndarray],
+               hres_name: str, fc_version: str):
+    """One stacked frame of every (cell, hres-anchor, doy-anchor) point for a var,
+    plus the aligned key/doy/hres columns for the output table."""
+    cos_anchor = np.cos(2 * np.pi * DOY_ANCHORS / 365.25)
+    sin_anchor = np.sin(2 * np.pi * DOY_ANCHORS / 365.25)
+    n_doy = len(DOY_ANCHORS)
+
+    cols = {c: [] for c in ("key", "doy", hres_name, "cos_doy", "sin_doy",
+                            "elevation", "hres_elevation", "elev_diff_m",
+                            "dist_to_hres_km", "lat", "lon")}
+    for cell in static.itertuples():
+        anchors = anchors_by_key[cell.key]
+        n = len(anchors) * n_doy
+        cols["key"].append(np.full(n, cell.key, dtype=object))
+        cols["doy"].append(np.tile(DOY_ANCHORS, len(anchors)))
+        cols[hres_name].append(np.repeat(anchors, n_doy))
+        cols["cos_doy"].append(np.tile(cos_anchor, len(anchors)))
+        cols["sin_doy"].append(np.tile(sin_anchor, len(anchors)))
+        for geo in ("elevation", "hres_elevation", "elev_diff_m",
+                    "dist_to_hres_km", "lat", "lon"):
+            cols[geo].append(np.full(n, getattr(cell, geo)))
+
+    frame = pd.DataFrame({c: np.concatenate(v) for c, v in cols.items()})
+    frame["fc_version"] = fc_version
+    return frame
+
+
+def predict_deltas(model: CatBoostRegressor, frame: pd.DataFrame,
+                   feature_cols: list[str], cqr_q: float):
+    """Sorted q05/q50/q95 bias deltas for every row, CQR baked into the band."""
+    preds = np.sort(np.asarray(model.predict(frame[feature_cols])), axis=1)
+    return (preds[:, Q05] - cqr_q, preds[:, Q50], preds[:, Q95] + cqr_q)
+
+
+def compute_cqr(model, test, name, feature_cols):
+    """One global CQR widening constant Q for this var, conformal score
+    max(q05-y, y-q95). Part-10's recipe holds out half of test to EVALUATE
+    coverage; here nothing is evaluated, so calibrate on the full test split
+    (the fits never saw it) for a lower-variance Q."""
+    band = np.sort(np.asarray(model.predict(test[feature_cols])), axis=1)
+    lower, upper = band[:, Q05], band[:, Q95]
+    y = test[f"bias_{name}"].to_numpy()
+    scores = np.maximum(lower - y, y - upper)
+    return conformal_q(scores)
+
+
+def circular_interp(table: pd.DataFrame, hres_anchors: np.ndarray,
+                    doy_query: float, hres_query: float, col: str) -> float:
+    """Bilinear lookup the client will mirror: circular-linear over the two
+    straddling doy anchors x linear over the two straddling hres anchors."""
+    hres_query = float(np.clip(hres_query, hres_anchors[0], hres_anchors[-1]))
+    hi = int(np.searchsorted(hres_anchors, hres_query))
+    lo = max(hi - 1, 0)
+    hi = min(hi, len(hres_anchors) - 1)
+    h0, h1 = hres_anchors[lo], hres_anchors[hi]
+    tw = 0.0 if h1 == h0 else (hres_query - h0) / (h1 - h0)
+
+    # straddling doy anchors on the 1..365 circle
+    below = DOY_ANCHORS[DOY_ANCHORS <= doy_query]
+    above = DOY_ANCHORS[DOY_ANCHORS >= doy_query]
+    d0 = below.max() if len(below) else DOY_ANCHORS.max()
+    d1 = above.min() if len(above) else DOY_ANCHORS.min()
+    span = (d1 - d0) % 365 or 1
+    dw = ((doy_query - d0) % 365) / span
+
+    def at(d, h):
+        row = table[(table.doy == d) & (np.isclose(table.hres, h))]
+        return float(row[col].iloc[0])
+
+    c00, c01 = at(d0, h0), at(d0, h1)
+    c10, c11 = at(d1, h0), at(d1, h1)
+    return (1 - dw) * ((1 - tw) * c00 + tw * c01) + dw * ((1 - tw) * c10 + tw * c11)
+
+
+def self_check(model, static, anchors_by_key, tables_by_key, name, col,
+               feature_cols, cqr_q, fc_version, n_cells, rng):
+    """Exact model prediction vs table interpolation at random OFF-grid points,
+    for a handful of cells. Big errors here mean the grid is too coarse."""
+    keys = list(tables_by_key)            # single-var cell tables for this var
+    if not keys:
+        return
+    sample = rng.choice(keys, size=min(n_cells, len(keys)), replace=False)
+    static_by_key = static.set_index("key")
+    errs = {"dmid": [], "dlo": [], "dhi": []}
+    for key in sample:
+        anchors = anchors_by_key[key]
+        table = tables_by_key[key]
+        geo = static_by_key.loc[key]
+        for _ in range(8):
+            doy_q = float(rng.integers(1, 366))
+            hres_q = float(rng.uniform(anchors[0], anchors[-1]))
+            feat = pd.DataFrame([{
+                col: hres_q, "cos_doy": np.cos(2 * np.pi * doy_q / 365.25),
+                "sin_doy": np.sin(2 * np.pi * doy_q / 365.25),
+                "elevation": geo.elevation, "hres_elevation": geo.hres_elevation,
+                "elev_diff_m": geo.elev_diff_m, "dist_to_hres_km": geo.dist_to_hres_km,
+                "lat": geo.lat, "lon": geo.lon, "fc_version": fc_version, "key": key}])
+            exact = np.sort(np.asarray(model.predict(feat[feature_cols])), axis=1)[0]
+            truth = {"dlo": exact[Q05] - cqr_q, "dmid": exact[Q50],
+                     "dhi": exact[Q95] + cqr_q}
+            for tcol in errs:
+                got = circular_interp(table, anchors, doy_q, hres_q, tcol)
+                errs[tcol].append(abs(got - truth[tcol]))
+    stats = ", ".join(
+        f"{c} p99={np.quantile(v, 0.99):.3f} max={np.max(v):.3f}"
+        for c, v in errs.items())
+    log(f"  self-check {name} ({len(sample)} cells x 8 pts): {stats}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out-dir", default=str(HERE / "data" / "debias"),
+                    help="local mirror dir for the per-cell tables")
+    ap.add_argument("--model-tag", default="qn8727_s0",
+                    help="TAG of the shipped fits + per_cell CSV to bake")
+    ap.add_argument("--gate-threshold", type=float, default=0.1,
+                    help="drop cell x vars where mae_q50 - mae_raw exceeds this")
+    ap.add_argument("--limit", type=int, help="random sample of N cells (debug)")
+    ap.add_argument("--allow-partial", action="store_true",
+                    help="DEBUG: warn+drop missing/stale cells instead of raising")
+    ap.add_argument("--self-check-cells", type=int, default=20,
+                    help="cells sampled for the interpolation self-check (0=off)")
+    args = ap.parse_args()
+
+    fc_version = current_fc_version()
+    log(f"IFS cycle pinned to fc_version={fc_version} "
+        "(regen at the next cutover — see tqd.FC_CHANGES)")
+
+    # --- data pipeline (reuse the trainer; NO archive refresh — bake exactly what
+    #     the fits saw) ---
+    static = tqd.preflight(args.limit, args.allow_partial)
+    df = tqd.load_and_verify(static, args.allow_partial)
+    df = tqd.add_features(df)
+    df = tqd.split(df)
+    df = tqd.shrink(df)
+    train = df[df.role == "train"]
+
+    gates = gated_keys(args.model_tag, args.gate_threshold)
+    seed_rng = np.random.default_rng(tqd.SEED)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    per_cell_tables: dict[str, list[pd.DataFrame]] = {k: [] for k in static.key}
+    for var in tqd.VARS:
+        name, is_precip = var["name"], var["name"] == "precip"
+        hcol = tqd.hres_col(name)               # e.g. 'hres_tmax_C' — the fc value
+        feature_cols = tqd.feature_cols(name, with_cell=True, with_cross=False)
+        model = CatBoostRegressor()
+        model.load_model(str(tqd.MODELS / f"M3_base_{name}_{args.model_tag}.cbm"))
+
+        var_rows = df[df[f"bias_{name}"].notna()]
+        test = var_rows[var_rows.role == "test"]
+        cqr_q = compute_cqr(model, test, name, feature_cols)
+        log(f"== {name}: CQR Q={cqr_q:.3f}, test {len(test):,} rows ==")
+
+        # per-cell hres anchors from TRAINING forecast values
+        kept = static[~static.key.isin(gates[name])]
+        train_var = train[train[f"bias_{name}"].notna()]
+        anchors_by_key = {
+            key: hres_anchors_for(values.to_numpy(), is_precip)
+            for key, values in train_var.groupby("key", observed=True)[hcol]
+            if key not in gates[name]}
+        kept = kept[kept.key.isin(anchors_by_key)]   # a gated/absent cell has none
+
+        grid = build_grid(kept, anchors_by_key, hcol, fc_version)
+        dlo, dmid, dhi = predict_deltas(model, grid, feature_cols, cqr_q)
+        table = pd.DataFrame({
+            "var": name, "doy": grid.doy.to_numpy(np.int16),
+            "hres": np.round(grid[hcol].to_numpy(), 2),
+            "dlo": np.round(dlo, 2), "dmid": np.round(dmid, 2),
+            "dhi": np.round(dhi, 2), "key": grid.key.to_numpy()})
+
+        tables_by_key = {}
+        for key, cell_table in table.groupby("key", sort=False):
+            cell_table = cell_table.drop(columns="key")
+            per_cell_tables[key].append(cell_table)
+            tables_by_key[key] = cell_table
+
+        if args.self_check_cells:
+            self_check(model, kept, anchors_by_key, tables_by_key, name, hcol,
+                       feature_cols, cqr_q, fc_version, args.self_check_cells,
+                       seed_rng)
+        del model, grid, table
+
+    # --- write one gzip per cell (all non-gated vars) ---
+    written = 0
+    for key, parts in per_cell_tables.items():
+        if not parts:                       # every var gated -> client serves raw
+            continue
+        cell_table = pd.concat(parts, ignore_index=True)
+        path = out_dir / f"debias_{key}.csv.gz"
+        with gzip.open(path, "wt", newline="") as f:
+            cell_table.to_csv(f, index=False, float_format="%.2f")
+        written += 1
+    log(f"wrote {written} per-cell tables -> {out_dir}  "
+        f"(upload step: r2_upload.py, key debias/<name>)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
