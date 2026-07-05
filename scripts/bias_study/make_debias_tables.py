@@ -24,14 +24,20 @@ around the PINNED median. CQR never touches q50, so the point value is CQR-free.
 Column names keep the shipped trio dlo/dmid/dhi (= q05/q50/q95) so the current
 ci.ts keeps parsing unchanged; d01/d10/d90/d99 are appended for the CDF client.
 
-GATING (locked 2026-07-04): read models/per_cell_{TAG}.csv and DROP cell x vars
-where the M3_base point correction demonstrably hurts — mean|err| goes UP by more
-than --gate-threshold (default 0.1) vs raw. Applied to all four variables (uniform
-per-cell safety net; a dropped cell x var simply has no rows -> the client serves
-raw with no band). This is a bulk point-MAE gate; it does NOT address precip's
-worst-1% tail worsening (that's the deferred quantile-mapping follow-up).
+GATING (locked 2026-07-04; gated cells given empirical bands 2026-07-05): read
+models/per_cell_{TAG}.csv. Cell x vars where the M3_base POINT correction hurts —
+mean|err| UP by more than --gate-threshold (default 0.1) vs raw — do NOT get the
+model surface. They instead get an EMPIRICAL band from the raw residual
+bias = ERA5-Land - HRES with the MEDIAN head pinned to 0 (the point stays raw; the
+gated model q50 is discarded): NON-precip a constant per-cell band; PRECIP a
+forecast-CONDITIONAL band (residual quantiles binned by forecast magnitude and
+POOLED across the gated precip cells) because a constant precip band collapses on
+heavy-rain days (~27% coverage at the top-1% forecast) while the conditional one
+holds ~90% across regimes. Same schema as the model tables, so the client applies
+every cell identically with NO gating logic. Validity: cqr_per_level_validity.ipynb.
 
-OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key):
+OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key) — now EVERY
+cell gets a file (model surface where trusted, empirical band where gated):
   debias_{lat}_{lon}.csv.gz   columns: var,doy,hres,d01,dlo,d10,dmid,d90,dhi,d99
   (deltas, 2 dp)  ~4 x 53 x 13 ~= 2.7K rows ~= 15-30 KB/cell.
 
@@ -76,6 +82,11 @@ Q50 = QUANTILE_LEVELS.index(0.50)      # index into the per-row SORTED 7-vector
 # keeps the shipped names (dlo/dmid/dhi = q05/q50/q95) so the current ci.ts
 # keeps parsing unchanged; the four new heads extend it to a 7-point CDF.
 LEVEL_COLUMNS = ["d01", "dlo", "d10", "dmid", "d90", "dhi", "d99"]
+
+# gated tables are doy-constant (the empirical fits do not condition on doy); two
+# straddling anchors are enough for the client's circular interp — with the delta
+# equal across both, the doy weight cancels exactly, so any pair works.
+GATED_DOY_ANCHORS = np.array([1, 183], dtype=np.int16)
 
 
 def log(msg: str) -> None:
@@ -200,6 +211,53 @@ def compute_level_shifts(model, test, name, feature_cols) -> np.ndarray:
         if i != Q50:
             shifts[i] = per_level_shift(y - preds[:, i], level)
     return shifts
+
+
+def gated_shift_vector(residuals: np.ndarray) -> np.ndarray:
+    """The 7 one-sided empirical shifts (the level-quantile of the raw residual
+    bias) for a gated cell, aligned to QUANTILE_LEVELS, with the MEDIAN head
+    pinned to 0 — the gated point stays RAW (its M3_base q50 was gated out). Band
+    location comes from the asymmetric tail shifts, not from moving the point."""
+    shifts = np.zeros(len(QUANTILE_LEVELS))
+    for i, level in enumerate(QUANTILE_LEVELS):
+        if i != Q50:
+            shifts[i] = per_level_shift(residuals, level)
+    return shifts
+
+
+def fit_precip_conditional(fit_precip: pd.DataFrame, hcol: str):
+    """Forecast-conditional precip band (cqr_per_level_validity.ipynb): residual
+    quantiles fit WITHIN forecast-magnitude bins, POOLED across all gated precip
+    cells so the heavy bins keep enough samples. Returns (edges, {bin: 7-vector}),
+    each vector's median head 0. A constant per-cell precip band collapses on
+    heavy-rain days (~27% coverage at the top-1% forecast); binning on the forecast
+    holds ~90% across regimes because the band width fans with the forecast."""
+    fc = fit_precip[hcol].to_numpy()
+    residual = fit_precip["bias_precip"].to_numpy()
+    wet = fc[fc >= tqd.PRECIP_TRACE_MM]
+    inner = np.quantile(wet, [0.20, 0.40, 0.60, 0.75, 0.87, 0.95])
+    inner = np.unique(inner[inner > tqd.PRECIP_TRACE_MM])
+    edges = np.concatenate([[-np.inf, float(tqd.PRECIP_TRACE_MM)], inner, [np.inf]])
+    which = np.clip(np.searchsorted(edges, fc, side="right") - 1, 0, len(edges) - 2)
+    bin_shifts = {}
+    for b in range(len(edges) - 1):
+        rows = residual[which == b]
+        bin_shifts[b] = gated_shift_vector(rows if len(rows) else residual)
+    return edges, bin_shifts
+
+
+def gated_cell_table(name: str, anchors: np.ndarray,
+                     deltas_by_anchor: np.ndarray) -> pd.DataFrame:
+    """A gated cell's var table in the SAME schema as the model tables: doy-constant
+    (two straddling anchors), one 7-delta row per hres anchor. The client bilinear-
+    interpolates it exactly like a model surface — no gating logic on that side."""
+    n_doy = len(GATED_DOY_ANCHORS)
+    tiled = np.repeat(deltas_by_anchor, n_doy, axis=0)      # (anchors*doy, 7)
+    return pd.DataFrame({
+        "var": name,
+        "doy": np.tile(GATED_DOY_ANCHORS, len(anchors)),
+        "hres": np.round(np.repeat(anchors, n_doy), 2),
+        **{col: tiled[:, i] for i, col in enumerate(LEVEL_COLUMNS)}})
 
 
 def circular_interp(table: pd.DataFrame, hres_anchors: np.ndarray,
@@ -344,10 +402,42 @@ def main() -> int:
                        seed_rng)
         del model, grid, table
 
-    # --- write one gzip per cell (all non-gated vars) ---
+        # --- gated cells: same schema, empirical band instead of the model surface
+        #     (non-precip constant, precip forecast-conditional; median head 0) ---
+        gated_fit = df[df.key.isin(gates[name]) & df[f"bias_{name}"].notna()
+                       & df.role.isin(("train", "test"))]
+        train_fc_by_key = {key: values.to_numpy() for key, values
+                           in train_var.groupby("key", observed=True)[hcol]}
+        if is_precip and len(gated_fit):
+            precip_edges, precip_bin_shifts = fit_precip_conditional(gated_fit, hcol)
+        gated_written = 0
+        for key, group in gated_fit.groupby("key", observed=True):
+            forecasts = train_fc_by_key.get(key)
+            if forecasts is None or len(forecasts) == 0:   # no train fc -> serve raw
+                continue
+            if is_precip:
+                anchors = hres_anchors_for(forecasts, True)
+                bins = np.clip(np.searchsorted(precip_edges, anchors, side="right") - 1,
+                               0, len(precip_edges) - 2)
+                deltas = pin_median_isotonic(
+                    np.round(np.array([precip_bin_shifts[b] for b in bins]), 2))
+            else:
+                anchors = np.unique(np.round([forecasts.min(), forecasts.max()], 2))
+                if len(anchors) < 2:                       # constant-forecast cell
+                    anchors = np.array([anchors[0], anchors[0] + 0.01])
+                shift = gated_shift_vector(group[f"bias_{name}"].to_numpy())
+                deltas = pin_median_isotonic(
+                    np.round(np.tile(shift, (len(anchors), 1)), 2))
+            per_cell_tables[key].append(gated_cell_table(name, anchors, deltas))
+            gated_written += 1
+        log(f"  gated {name}: {gated_written} empirical "
+            f"{'conditional' if is_precip else 'constant'} tables "
+            f"of {len(gates[name])} gated cells")
+
+    # --- write one gzip per cell (model surface + gated empirical bands) ---
     written = 0
     for key, parts in per_cell_tables.items():
-        if not parts:                       # every var gated -> client serves raw
+        if not parts:                       # no data at all -> client serves raw
             continue
         cell_table = pd.concat(parts, ignore_index=True)
         path = out_dir / f"debias_{key}.csv.gz"
