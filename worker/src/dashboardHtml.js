@@ -163,6 +163,10 @@ export const DASHBOARD_HTML = `<!doctype html>
     { k: 'time',    label: 'time',           cls: 'mono' },
     { k: 'visitor', label: 'visitor id',     cls: 'mono' },
     { k: 'kind',    label: 'kind',           cls: 'mono' },
+    { k: 'query',   label: 'searched',       cls: '' },
+    { k: 'matched', label: 'matched place',  cls: '' },
+    { k: 'served',  label: 'served cell',    cls: '' },
+    { k: 'dist_km', label: 'snap gap',       cls: 'num' },
     { k: 'human',   label: 'who',            cls: '' },
     { k: 'city',    label: 'from · city',    cls: '' },
     { k: 'country', label: 'from · country', cls: 'mono' },
@@ -473,6 +477,10 @@ export const DASHBOARD_HTML = `<!doctype html>
       if (!r.page) return '<span class="muted">·</span>';
       return '<a class="link" href="' + esc(SITE + r.page) + '" target="_blank" rel="noopener">' + esc(r.page) + '</a>';
     }
+    if (k === 'dist_km') {
+      if (r.dist_km == null || r.dist_km === '') return '<span class="muted">·</span>';
+      return esc(Number(r.dist_km).toFixed(1)) + ' km';
+    }
     var v = cellText(r, k);
     if (v == null || v === '') return '<span class="muted">·</span>';
     return esc(v);
@@ -552,9 +560,10 @@ export const DASHBOARD_HTML = `<!doctype html>
       });
     });
     $('thead').querySelectorAll('input[data-f]').forEach(function (el) {
-      el.addEventListener('input', function () {
-        // Store the raw text (parseFilter handles trimming/case); refresh both
-        // the chart and the table so the chart always mirrors what's shown.
+      // Apply on Enter only, not on every keystroke — filtering up to 50k
+      // rows on each keypress is noticeably slow.
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
         filters[el.getAttribute('data-f')] = el.value;
         refresh();
       });
@@ -604,6 +613,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   // ---- wiring ------------------------------------------------------------
+  // The <select> is a real form element, so on a plain page reload browsers
+  // often restore its previously-shown value even though this script always
+  // starts from range = 'all' — sync to whatever's actually selected before
+  // the first load, or the dropdown can show '24h' while all-time data loads.
+  range = $('range').value;
   $('refresh').addEventListener('click', load);
   $('range').addEventListener('change', function () { range = this.value; refresh(); });
   $('clearf').addEventListener('click', function () { filters = {}; renderHead(); refresh(); });

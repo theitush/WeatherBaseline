@@ -19,18 +19,24 @@ Design notes:
    connections under load, so keep the worker count modest; the per-step retry
    covers the occasional drop.
 
-3. RESUME. Before fetching, we compute the set of YEARS already present for each
-   tile and fetch only the missing ones — including interior gaps (a hole left by
-   an interrupted run), not just the tail. The source of truth is the local disk,
-   OR (with --upload-r2) the R2 bucket, since the VM's disk is ephemeral: a fresh
-   box has no local archives but R2 still holds what earlier runs produced. R2
-   coverage is read cheaply — one object listing gives every cell archive's size,
-   and a tile is taken as complete on size alone (only the few small/ambiguous
-   cells are downloaded and year-checked). A present year is skipped by default,
-   INCLUDING the current year — so a resume won't redownload 2026 just because
-   ERA5-Land is still appending to it. --refresh-latest re-fetches the trailing
-   year on purpose (to top up recent data / a new dataset version); --no-resume
-   forces a full refetch.
+3. RESUME + MONTHLY TOP-UP. Before fetching, we compute how COMPLETE each year
+   already is for each tile — its daily-ROW count, not merely whether the year is
+   present — and fetch only the years still short of a full year of days. That one
+   rule catches a wholly-absent year, an interior gap (a hole from an interrupted
+   run), AND a year that's present but nearly empty (e.g. a lone stray row old code
+   left behind — a bare year-set check wrongly treated that as "have"). The source
+   of truth is the local disk, OR (with --upload-r2) the R2 bucket, since the VM's
+   disk is ephemeral: a fresh box has no local archives but R2 still holds what
+   earlier runs produced. R2 coverage is read cheaply — one object listing gives
+   every cell archive's size, then one representative cell per tile is downloaded
+   and its per-year row counts checked.
+   A year is "complete" when a past year has ~365/366 rows and the trailing
+   (current) store year has caught up to the store's newest day. The trailing year
+   is thus re-fetched automatically whenever the tile lags the store (ERA5-Land
+   lags ~6 days and keeps appending): it reads as incomplete until it catches up.
+   That IS the monthly refresh — rerun the same command and every tile that's
+   fallen behind gets its last days merged in (idempotent merge-by-date), while
+   up-to-date tiles are skipped. No flag needed. --no-resume forces a full refetch.
 
 Usage:
   source .venv/bin/activate
@@ -41,12 +47,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import calendar
 import csv
+import os
 import threading
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -264,6 +272,20 @@ def open_store():
     return ds
 
 
+def store_latest_date(ds) -> date:
+    """The newest calendar date the store currently holds.
+
+    ERA5-Land lags the real date by ~6 days and keeps appending, so this creeps
+    forward between runs. Read once after opening the store; a tile whose archive
+    ends before this gets its trailing year topped up, one that reaches it is left
+    alone. The time coordinate is a small 1-D array, so reading its max is cheap.
+    """
+    import pandas as pd
+
+    time_name = "valid_time" if "valid_time" in ds.coords else "time"
+    return pd.Timestamp(ds[time_name].max().values).date()
+
+
 # --------------------------------------------------------------------------- #
 # Resume: which years does a tile already have?
 # --------------------------------------------------------------------------- #
@@ -284,19 +306,23 @@ class R2Resume:
         log(f"  R2 resume: {len(self.sizes)} archive object(s) already in "
             f"bucket '{uploader.bucket}'")
 
-    def years_present_for_tile(self, tile_cells: list[dict],
-                               want: set[int]) -> set[int]:
-        """Years from `want` that R2 already has for this whole tile.
+    def coverage_for_tile(
+        self, tile_cells: list[dict]
+    ) -> tuple[dict[int, int], date | None]:
+        """(per-year row counts R2 has, newest date) for this whole tile.
 
         A tile is written all-cells-together per span, so every cell in a tile
-        shares the same year coverage — so we inspect exactly ONE cell. We can't
-        infer completeness from file size (a cell missing only its last few years
-        is barely smaller than a complete one, and a tiny-but-complete desert cell
-        is smaller than a large partial one), so we read the cell's actual years.
-        We pick the SMALLEST present cell as the one to read — it's the cheapest
-        download and, since all cells share coverage, fully representative.
+        shares the same coverage — so we inspect exactly ONE cell. We can't infer
+        completeness from file size (a cell missing only a single recent year is
+        barely smaller than a complete one, and a tiny-but-complete desert cell is
+        smaller than a large partial one), so we read the cell's actual per-year row
+        counts. We pick the SMALLEST present cell as the one to read — it's the
+        cheapest download and, since all cells share coverage, representative. The
+        caller (missing_years) judges each year's counts against the store's newest
+        day, so a nearly-empty or lagging year is caught, not just a wholly-absent
+        one.
 
-        Any cell key missing -> nothing safely done; the whole tile is refetched.
+        Any cell key missing -> ({}, None): tile not safely done, refetch it.
         """
         smallest_key: str | None = None
         smallest_size = None
@@ -304,65 +330,117 @@ class R2Resume:
             key = f"archive/{archive_name(c['lat'], c['lon'])}"
             size = self.sizes.get(key)
             if size is None:
-                return set()  # a missing cell -> tile not safely done
+                return {}, None  # a missing cell -> tile not safely done
             if smallest_size is None or size < smallest_size:
                 smallest_size, smallest_key = size, key
         if smallest_key is None:
-            return set()
-        have = self.up.read_years(smallest_key)
-        return want & have  # only the wanted years this cell actually covers
+            return {}, None
+        return self.up.read_coverage(smallest_key)
 
 
-def years_present_for_tile(tile_cells: list[dict], want: set[int]) -> set[int]:
-    """Years (from `want`) already covered by EVERY cell on local disk.
+def local_coverage_for_tile(
+    tile_cells: list[dict],
+) -> tuple[dict[int, int], date | None]:
+    """(per-year row counts across the tile, newest date) on local disk.
 
-    A year counts for a cell only if its archive has a row in that year. We
-    intersect across the tile's cells so a year is "done" only when all cells have
-    it — a tile fetch writes all cells together, so a year missing from any cell
-    means that whole tile-year still needs fetching. Interior gaps (a year missing
-    in the middle, e.g. from an interrupted run) are caught too, because we look at
-    the actual set of years, not just the max date.
+    For each year we take the MIN row count across the tile's cells: a year is only
+    as complete as its least-covered cell, so a year fully present in some cells but
+    missing (or nearly empty) in another counts as incomplete for the tile and is
+    refetched. (A tile fetch writes all cells together, so coverage is normally
+    uniform; the min makes an interrupted, non-uniform tile self-heal.) The caller
+    (missing_years) judges completeness from these counts against the store's newest
+    day, so a wholly-absent year, an interior hole, AND a present-but-nearly-empty
+    year are all caught — not just the trailing tail. The newest date is the MIN of
+    the cells' max dates — the tile is only as caught-up as its least-complete cell.
+
+    Returns ({}, None) if any cell file is absent or empty.
     """
     import pandas as pd
 
-    per_cell_years: list[set[int]] = []
+    per_cell_counts: list[dict[int, int]] = []
+    max_dates: list[date] = []
     for c in tile_cells:
         path = OUT_DIR / archive_name(c["lat"], c["lon"])
         if not path.exists():
-            return set()  # a missing cell file means nothing is safely done
+            return {}, None  # a missing cell file means nothing is safely done
         # Only need the date column; parse years cheaply.
-        dates = pd.read_csv(path, usecols=["date"])["date"]
-        yrs = set(pd.to_datetime(dates).dt.year.unique().tolist())
-        per_cell_years.append(yrs)
-    return set.intersection(*per_cell_years) if per_cell_years else set()
+        dates = pd.to_datetime(pd.read_csv(path, usecols=["date"])["date"])
+        if dates.empty:
+            return {}, None
+        per_cell_counts.append(
+            {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
+        )
+        max_dates.append(dates.max().date())
+    if not per_cell_counts:
+        return {}, None
+    all_years = set().union(*(set(d) for d in per_cell_counts))
+    min_counts = {y: min(d.get(y, 0) for d in per_cell_counts) for y in all_years}
+    return min_counts, min(max_dates)
 
 
-def missing_years(tile_cells: list[dict], years: list[int], latest_year: int,
-                  resume: bool, refresh_latest: bool,
-                  r2_resume: "R2Resume | None") -> list[int]:
+def _complete_years(year_counts: dict[int, int], latest_date: date | None,
+                    tol: int = 5) -> set[int]:
+    """Years present AND essentially complete, given the store's newest day.
+
+    `year_counts` maps year -> daily-row count (see read_coverage /
+    local_coverage_for_tile). A year is "complete" when it holds close to a full
+    year of days:
+      - a PAST year (< the store's newest year): >= 365/366 rows (minus `tol` to
+        absorb the ±1-day slack from bucketing on the LOCAL solar day);
+      - the TRAILING/current store year: >= the store's day-of-year so far. It is
+        legitimately partial (ERA5-Land lags ~6 days), so we require only that the
+        cell caught up to the newest day the store holds, not a full year.
+    `tol` (days) both absorbs local-day boundary slack and keeps a just-fetched
+    trailing year from re-fetching every run. A year present but well short of its
+    expected days — a lone stray row, an interior hole, or a lagging tail — is NOT
+    complete, so missing_years puts it back in the fetch list.
+
+    latest_date None (couldn't read the store) -> fall back to presence (any row),
+    the old behaviour, so a store-read failure can't trigger a full refetch.
+    """
+    if latest_date is None:
+        return {int(y) for y, n in year_counts.items() if n > 0}
+    newest_year = latest_date.year
+    doy = latest_date.timetuple().tm_yday
+    complete: set[int] = set()
+    for y, n in year_counts.items():
+        if y < newest_year:
+            expected = 366 if calendar.isleap(int(y)) else 365
+        elif y == newest_year:
+            expected = doy
+        else:
+            continue  # beyond the store's newest year — nothing to have
+        if n >= expected - tol:
+            complete.add(int(y))
+    return complete
+
+
+def missing_years(tile_cells: list[dict], years: list[int], resume: bool,
+                  r2_resume: "R2Resume | None",
+                  latest_date: date | None) -> list[int]:
     """The subset of `years` still to fetch for this tile.
 
-    With resume off: fetch all requested years. With resume on: drop years already
-    present in every cell, using R2 as the source of truth when `r2_resume` is
-    given (the VM's disk is ephemeral) and the local disk otherwise.
+    Resume off: fetch all requested years. Resume on: keep only years that aren't
+    already COMPLETE in the tile (source of truth = R2 when `r2_resume` is given,
+    since the VM's disk is ephemeral, else the local disk).
 
-    By default an already-present year is skipped even if it's the latest year.
-    Pass `refresh_latest` to ALWAYS re-fetch the trailing year — ERA5-Land lags
-    ~6 days, so the last stored year is partial and a re-fetch tops it up (and
-    picks up a new dataset version). You want that only when refreshing recent
-    data, not on a plain resume of a long historical backfill.
+    Completeness is row-count based, not mere presence (see `_complete_years`): a
+    past year needs ~365/366 rows, the trailing (current) store year needs rows up
+    to the store's newest day. This catches three cases with one rule — a
+    wholly-absent year, an interior hole, AND a year that's present but nearly empty
+    (e.g. a lone stray 2025 row a year-set check would wrongly accept). Because the
+    trailing year reads as incomplete until it catches up to the store, ERA5-Land's
+    ~6-day lag makes a plain monthly rerun a top-up with no flag; once caught up,
+    nothing is re-fetched.
     """
     if not resume:
         return years
-    want = set(years)
     if r2_resume is not None:
-        have = r2_resume.years_present_for_tile(tile_cells, want)
+        counts, _max_date = r2_resume.coverage_for_tile(tile_cells)
     else:
-        have = years_present_for_tile(tile_cells, want)
-    return [
-        y for y in years
-        if y not in have or (refresh_latest and y >= latest_year)
-    ]
+        counts, _max_date = local_coverage_for_tile(tile_cells)
+    complete = _complete_years(counts, latest_date)
+    return sorted(y for y in years if y not in complete)
 
 
 def batches(years: list[int], batch_years: int) -> list[tuple[int, int]]:
@@ -613,9 +691,23 @@ def archive_name(lat: float, lon: float) -> str:
     return f"archive_{lat:.1f}_{lon:.1f}.csv.gz"
 
 
+def recent_name(lat: float, lon: float) -> str:
+    """v2 `recent` tier filename for a snapped 0.1deg cell centre — same lat/lon
+    formatting as archive_name, matching worker/src/cellStore.js's objectKey."""
+    return f"recent_{lat:.1f}_{lon:.1f}.csv.gz"
+
+
 # Writes share OUT_DIR across tile threads; serialise the read-merge-write so two
 # threads never clobber the same (or a freshly created) archive.
 _WRITE_LOCK = threading.Lock()
+
+# In --upload-r2 mode, R2 — not the local disk — is the source of truth: the local
+# disk may be stale (missing years R2 already has) or empty (a fresh box), and
+# merging a fetched span onto a stale local file then uploading would CLOBBER the
+# newer years R2 holds. So the FIRST write of each cell per run seeds its merge
+# base from R2; later spans merge onto the (now-correct) local file we just wrote.
+# This set records which cells have been seeded this run. Guarded by _WRITE_LOCK.
+_R2_SEEDED: set[tuple[float, float]] = set()
 
 
 class OverwriteLedger:
@@ -753,8 +845,80 @@ class OverwriteLedger:
                 log(f"overwrite: R2 ledger delete failed ({e})")
 
 
+def _read_archive_frame(source, *, compression="infer"):
+    """Read one gzip cell archive into a frame with `date` as datetime.date.
+
+    `source` is a local path (compression inferred from .gz) or a BytesIO of raw
+    gzip bytes (pass compression="gzip"). Raises the underlying read error if the
+    archive is truncated/corrupt — callers decide how to recover.
+    """
+    import pandas as pd
+
+    df = pd.read_csv(source, parse_dates=["date"], compression=compression)
+    df["date"] = df["date"].dt.date
+    return df
+
+
+def _read_r2_base(uploader, name: str):
+    """The cell's current R2 archive as a merge base — frame, or None if R2 has
+    no (readable) copy. A missing/unreadable R2 object is fine: whatever years it
+    lacks are exactly the years this run is fetching, so writing fresh loses
+    nothing. Best-effort: a transient R2 read error also yields None (write fresh).
+    """
+    import io
+
+    try:
+        body = uploader.get_bytes(f"archive/{name}")
+    except Exception as e:  # noqa: BLE001 - reseed is best-effort
+        log(f"  WARN R2 read failed for {name} ({e}); merging without an R2 base")
+        return None
+    if not body:
+        return None  # R2 has no copy yet — the fetch is producing the full history
+    try:
+        return _read_archive_frame(io.BytesIO(body), compression="gzip")
+    except (EOFError, OSError, ValueError) as e:
+        log(f"  WARN R2 archive {name} unreadable ({e.__class__.__name__}); "
+            "merging without an R2 base")
+        return None
+
+
+def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
+    """The frame to merge a freshly-fetched span onto (None ⇒ write fresh).
+
+    - --overwrite (`fresh`): None — rebuild the cell from scratch, dropping stale
+      rows the recompute no longer produces.
+    - Upload mode, first touch of this cell this run: seed from R2, the source of
+      truth. The local disk is deliberately IGNORED here — it may be stale or
+      empty, and every year it could contribute is one the fetch is reproducing
+      anyway. One R2 GET per cell per run (not per span).
+    - Later span this run, or a local (--no-upload) run: merge onto the local file
+      — freshly R2-seeded this run, or the self-consistent base for a no-upload
+      run whose resume itself reads local coverage. A corrupt local file (should
+      not happen now writes are atomic) reseeds from R2 when an uploader exists.
+    """
+    if fresh:
+        return None
+    if uploader is not None and (lat, lon) not in _R2_SEEDED:
+        _R2_SEEDED.add((lat, lon))
+        return _read_r2_base(uploader, path.name)
+    if not path.exists():
+        return None
+    try:
+        return _read_archive_frame(path)
+    except (EOFError, OSError, ValueError) as e:
+        detail = "no R2 uploader — writing fresh from current span only"
+        base = None
+        if uploader is not None:
+            base = _read_r2_base(uploader, path.name)
+            detail = ("reseeded merge base from R2" if base is not None
+                      else "no readable R2 copy — writing fresh")
+        log(f"  WARN corrupt local archive {path.name} "
+            f"({e.__class__.__name__}); {detail}")
+        return base
+
+
 def write_archive(lat: float, lon: float, frame, *, ledger=None,
-                  span=None) -> Path:
+                  span=None, uploader=None) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
     Merge-by-date makes re-running an overlapping span idempotent: existing dates
@@ -763,6 +927,11 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     (so a recompute drops stale rows the new run no longer produces); subsequent
     span-writes for that cell merge as usual. `span` (s, e) records completion so
     a crashed run can resume past it.
+
+    Merge base = R2, the source of truth (see `_merge_base`): in upload mode the
+    local disk is treated as scratch, so a stale or empty box can't clobber R2 on
+    upload, and a truncated local archive can't crash the tile. The write itself is
+    atomic (temp file + os.replace) so a killed run never leaves a truncated file.
     """
     import pandas as pd
 
@@ -770,17 +939,20 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / archive_name(lat, lon)
         fresh = ledger is not None and not ledger.is_replaced(lat, lon)
-        if path.exists() and not fresh:
-            old = pd.read_csv(path, parse_dates=["date"])
-            old["date"] = old["date"].dt.date
+        base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader)
+        if base is not None:
             merged = (
-                pd.concat([old, frame])
+                pd.concat([base, frame])
                 .drop_duplicates(subset="date", keep="last")
                 .sort_values("date")
             )
         else:
             merged = frame.sort_values("date")
-        merged.to_csv(path, index=False, compression="gzip")
+        # Atomic write: never leave a half-written .csv.gz that the next merge
+        # (or the frontend) can't read if this process is killed mid-write.
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        merged.to_csv(tmp, index=False, compression="gzip")
+        os.replace(tmp, path)
         if ledger is not None:
             if fresh:
                 ledger.mark_replaced(lat, lon)
@@ -789,8 +961,8 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     return path
 
 
-def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
-             var_workers, resume, refresh_latest, r2_resume=None,
+def run_tile(ds, tile_id, tile_cells, years, batch_years,
+             var_workers, resume, latest_date=None, r2_resume=None,
              uploader=None, ledger=None) -> int:
     """Fetch all missing year-spans for one tile; return archives written.
 
@@ -800,6 +972,14 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
     `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
     disk is ephemeral) instead of the local archives. `ledger` (--overwrite)
     rebuilds every year from scratch and resumes via its own (cell, span) index.
+
+    When a written span reaches the store's newest year (`latest_date.year`) — a
+    fresh backfill catching up, or the automatic trailing-year top-up — the cell's
+    `recent/` object in R2 is deleted: the archive now covers the days recent was
+    holding, and the frontend already prefers archive over recent on a shared
+    date, so leftover recent rows are dead weight (stale IFS-sourced precip/wind
+    nobody reads anymore). Ensure-fresh lazily rebuilds only the real remaining
+    gap on the cell's next visit.
     """
     if ledger is not None:
         # Overwrite mode recomputes ALL requested years; year-resume is bypassed
@@ -807,8 +987,7 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
         # from the ledger's per-(cell, span) record.
         todo = list(years)
     else:
-        todo = missing_years(tile_cells, years, latest_year, resume,
-                             refresh_latest, r2_resume)
+        todo = missing_years(tile_cells, years, resume, r2_resume, latest_date)
     if not todo:
         log(f"tile {tile_id}: nothing missing — already complete, skipping")
         return 0
@@ -835,9 +1014,15 @@ def run_tile(ds, tile_id, tile_cells, years, latest_year, batch_years,
         for (lat, lon), frame in frames.items():
             if ledger is not None and ledger.span_done(lat, lon, s, e):
                 continue  # already landed before a crash
-            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e))
+            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e),
+                                  uploader=uploader)
             if uploader is not None:
                 uploader.upload_file(path, f"archive/{path.name}")
+                # This span reaches the store's newest year, so the archive now
+                # covers the days the `recent` tier was holding — drop the dead
+                # recent object (ensure-fresh rebuilds the real remaining gap).
+                if latest_date is not None and e >= latest_date.year:
+                    uploader.delete_object(f"recent/{recent_name(lat, lon)}")
             written += 1
         span = f"{s}" if s == e else f"{s}-{e}"
         log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives"
@@ -862,12 +1047,6 @@ def main() -> int:
                     "drops connections under load, so keep this small")
     ap.add_argument("--no-resume", action="store_true",
                     help="refetch everything, ignoring existing archives")
-    ap.add_argument("--refresh-latest", action="store_true",
-                    help="on resume, ALWAYS re-fetch the trailing year even if "
-                    "present — ERA5-Land lags ~6 days so the last stored year is "
-                    "partial. Off by default: a present year is skipped, so a "
-                    "resume won't redownload the current year. Use this when you "
-                    "want to top up recent data (e.g. a new dataset version).")
     ap.add_argument("--upload-r2", action="store_true",
                     help="push each archive to R2 as it's written (needs "
                     "R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in env, "
@@ -886,7 +1065,6 @@ def main() -> int:
     if args.year is not None:
         args.start_year = args.end_year = args.year
     years = list(range(args.start_year, args.end_year + 1))
-    latest_year = args.end_year
     # --overwrite recomputes from scratch, so every requested year must be
     # refetched — a resume that skipped present years would leave them stale.
     # It carries its own crash-resume via the ledger instead.
@@ -945,9 +1123,8 @@ def main() -> int:
         print("  resume: OFF (full refetch)")
     else:
         src = "R2 (ephemeral-disk-safe)" if r2_resume is not None else "local disk"
-        latest = ("re-fetch latest year" if args.refresh_latest
-                  else f"skip {latest_year} if present")
-        print(f"  resume: on, source={src}, {latest}")
+        print(f"  resume: on, source={src}; trailing year auto-topped-up "
+              "when behind the store")
     print(f"  out   : {OUT_DIR}")
     if uploader is not None:
         print(f"  upload: R2 bucket '{uploader.bucket}' (archive/ keys), "
@@ -972,13 +1149,22 @@ def main() -> int:
         print(f"!! variables not in store: {missing}; have {list(ds.data_vars)}")
         return 1
 
+    # The store's newest day serves two automatic decisions, so read it once up
+    # front: (1) on a resume, any tile whose archive ends before this gets its
+    # trailing year re-fetched (merge-by-date), while caught-up tiles are skipped;
+    # (2) whenever a written span reaches this year, the cell's now-dead `recent`
+    # object is dropped. Cheap — the time axis is a small 1-D coordinate.
+    latest_date = store_latest_date(ds)
+    log(f"store latest date: {latest_date} (ERA5-Land lag) — on resume, tiles "
+        "ending before this get their trailing year topped up")
+
     total_written = 0
     if args.parallel_tiles > 1:
         with ThreadPoolExecutor(max_workers=args.parallel_tiles) as ex:
             futs = {
-                ex.submit(run_tile, ds, t, c, years, latest_year,
-                          args.batch_years, args.var_workers, resume,
-                          args.refresh_latest, r2_resume, uploader, ledger): t
+                ex.submit(run_tile, ds, t, c, years, args.batch_years,
+                          args.var_workers, resume, latest_date, r2_resume,
+                          uploader, ledger): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -986,9 +1172,9 @@ def main() -> int:
     else:
         for tile_id, tile_cells in tiles.items():
             total_written += run_tile(
-                ds, tile_id, tile_cells, years, latest_year,
-                args.batch_years, args.var_workers, resume,
-                args.refresh_latest, r2_resume, uploader, ledger)
+                ds, tile_id, tile_cells, years, args.batch_years,
+                args.var_workers, resume, latest_date, r2_resume,
+                uploader, ledger)
 
     # Clean finish: drop the resume ledger so the NEXT overwrite run starts fresh
     # rather than treating this run's completed spans as already-done.

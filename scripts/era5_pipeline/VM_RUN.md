@@ -105,10 +105,13 @@ how the Worker/`tieredData.ts` read it). Creds are checked up front: a missing
 R2_* var exits before the pull starts. Omit the flag to write archives to local
 disk only.
 
-The job is resumable: it reads existing **local** archives and fetches only
-missing years (including interior gaps), always re-fetching the trailing year. If
-the VM reboots or you Ctrl-C, just rerun the same command — already-uploaded
-archives are simply overwritten (idempotent), no separate sync needed.
+The job is resumable: it reads existing **local** archives (or R2, with
+`--upload-r2`) and fetches only missing years (including interior gaps),
+re-fetching the trailing year **only when it's behind the store's newest day** —
+that's the automatic monthly top-up, no flag needed (the old `--refresh-latest`
+is gone). A caught-up tile is skipped. If the VM reboots or you Ctrl-C, just
+rerun the same command — already-uploaded archives are simply overwritten
+(idempotent), no separate sync needed.
 
 > If `data/era5-land/archive/` was wiped but R2 still has the data, the resume
 > check (which reads *local* disk) will refetch everything. Keep the local dir

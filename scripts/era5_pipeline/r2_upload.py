@@ -40,16 +40,37 @@ from botocore.config import Config
 
 DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
+# Tiers this CLI can upload but that aren't part of the default era5-land set.
+# `debias/` holds the static M3_base bias-correction tables (one .csv.gz per
+# cell); it lives under scripts/bias_study/data/, not data/era5-land/, so you
+# upload it explicitly with `--dir .../bias_study/data --tiers debias`.
+EXTRA_TIERS = ("debias",)
+UPLOADABLE_TIERS = TIERS + EXTRA_TIERS
 
 # Cache-Control per tier, stored as object metadata so R2 serves it as the
 # origin header. The data domain (data.weatherbaseline.com) sits behind
-# Cloudflare's cache and .gz is default-cacheable, so volatile tiers must say
-# no-store or the edge/browser would serve them stale after a refresh; archive
-# is settled and gets a day. Keep in sync with worker/src/cellStore.js.
+# Cloudflare's cache and .gz is default-cacheable, so without an explicit header
+# the edge/browser would serve stale copies after a refresh.
+#
+# recent/forecast are rewritten constantly -> no-store. archive USED to get a
+# fixed day (max-age=86400), but the trailing-year top-up now rewrites the
+# archive's tail on a monthly rerun AND deletes the cell's `recent` object once
+# the archive reaches past it (see run_tile). That makes the archive the SOLE
+# source for those newly-covered days: a client still holding yesterday's shorter
+# archive finds no recent to fall back on and shows a gap. So archive is
+# `no-cache` -> the browser/edge may keep the (large) body but must revalidate it
+# via ETag on each use, so a freshly-extended archive is picked up immediately
+# while an unchanged one costs only a 304. Keep in sync with worker/src/cellStore.js.
+# The debias tier is unlike archive: those tables change ONLY on a manual regen
+# (an IFS cycle cutover or a cells.csv change), never on the monthly archive
+# top-up, so they're safe to cache hard. max-age=86400 lets the edge/browser
+# hold them for a day; purge the zone cache on the rare regen (same as archive
+# re-uploads). See make_debias_tables.py.
 CACHE_CONTROL = {
-    "archive": "public, max-age=86400",
+    "archive": "public, no-cache",
     "recent": "no-store",
     "forecast": "no-store",
+    "debias": "public, max-age=86400",
 }
 
 
@@ -140,12 +161,18 @@ class R2Uploader:
                 sizes[obj["Key"]] = obj["Size"]
         return sizes
 
-    def read_years(self, key: str) -> set[int]:
-        """Download one archive object and return the set of years it covers.
+    def read_coverage(self, key: str):
+        """Download one archive object; return (per-year row counts, newest date).
 
-        Only used to disambiguate the small archives that size alone can't classify
-        (a tiny but COMPLETE cell vs. a genuinely partial one). Reads just the date
-        column out of the gzip, so the parse stays cheap.
+        Used by the producer's resume to decide which years still need fetching.
+        Returns the number of daily rows present in EACH year — not just the set of
+        years — so resume can tell a COMPLETE year (~365/366 rows) from one that's
+        present but nearly empty: e.g. a lone stray 2025 row left by old code, which
+        a year-set check wrongly reads as "have 2025" and never refills. It also
+        still distinguishes a tiny-but-complete desert cell from a genuinely partial
+        one, and a caught-up trailing year from one lagging the store. Reads just
+        the date column out of the gzip, so the parse stays cheap. Returns
+        ({year: row_count}, datetime.date | None); ({}, None) if the archive is empty.
         """
         import gzip
         import io
@@ -154,8 +181,11 @@ class R2Uploader:
 
         body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
         with gzip.open(io.BytesIO(body), "rt") as fh:
-            dates = pd.read_csv(fh, usecols=["date"])["date"]
-        return set(pd.to_datetime(dates).dt.year.unique().tolist())
+            dates = pd.to_datetime(pd.read_csv(fh, usecols=["date"])["date"])
+        if dates.empty:
+            return {}, None
+        counts = {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
+        return counts, dates.max().date()
 
 
 def _iter_tier_files(data_dir: Path, tiers):
@@ -177,8 +207,9 @@ def main() -> int:
         help="root containing archive/ recent/ forecast/ (default: data/era5-land)",
     )
     ap.add_argument(
-        "--tiers", nargs="+", default=list(TIERS), choices=TIERS,
-        help="which tiers to upload (default: all)",
+        "--tiers", nargs="+", default=list(TIERS), choices=UPLOADABLE_TIERS,
+        help="which tiers to upload (default: the era5-land tiers; 'debias' is "
+             "opt-in and lives under a different --dir)",
     )
     ap.add_argument("--bucket", default=None, help="override R2_BUCKET")
     ap.add_argument("--workers", type=int, default=16, help="parallel uploads")

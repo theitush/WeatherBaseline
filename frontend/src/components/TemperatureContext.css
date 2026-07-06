@@ -139,12 +139,35 @@
   border: 1px solid #111;
 }
 
-.record-scale-marker-value {
+/* Value + unit + uncertainty stack, in one row floated above the tick. */
+.record-scale-marker-readout {
   position: absolute;
   top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.record-scale-marker-value {
   font-size: 42px;
   font-weight: 700;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  -webkit-text-stroke: 2px #111;
+  text-stroke: 2px #111;
+  paint-order: stroke fill;
+}
+
+/* The one unit label (°C/°F, mm, km/h) right after the value — ~20% smaller than
+   the headline value, same colour and outline (colour set inline to the marker colour). */
+.record-scale-marker-ci-unit {
+  font-size: 32px;
+  font-weight: 700;
+  align-self: center;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
   -webkit-text-stroke: 2px #111;

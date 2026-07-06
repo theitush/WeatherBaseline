@@ -1,18 +1,44 @@
 // Type definitions for the application
 
 export type { MetricKey } from '../utils/config';
+import type { MetricKey } from '../utils/config';
+
+/**
+ * A bias-corrected 9-quantile CDF for one metric on one day, in native units
+ * (°C / mm / m·s⁻¹): q0.01, q0.05 (`lo`), q0.10, q0.25, q0.50 (`mid` — the
+ * bias-corrected best estimate), q0.75, q0.90, q0.95 (`hi`), q0.99. Seven levels
+ * come from the cell's static R2 debias table; q0.25/q0.75 are NOT trained heads —
+ * services/ci.ts interpolates them (probit) from the corrected q0.10/q0.50/q0.90.
+ * Present on forecast/recent rows; absent on settled history.
+ */
+export interface MetricBand {
+  q01: number;
+  lo: number;
+  q10: number;
+  q25: number; // interpolated client-side (probit), not a trained head — see services/ci.ts
+  mid: number;
+  q75: number; // interpolated client-side (probit), not a trained head — see services/ci.ts
+  q90: number;
+  hi: number;
+  q99: number;
+}
 
 export interface WeatherDataPoint {
   date: Date;
   year: number;
-  // 'historical' = settled archive (ERA5-Land). 'recent' = real but live-model
-  // topped-up days near the present frontier (still real data, but not the
-  // settled long-run archive). 'forecast' = future model guess.
+  // 'historical' = settled archive (ERA5-Land reanalysis). 'recent' = days near the
+  // present frontier where temperature IS settled ERA5-Land, but precip & wind are
+  // STILL IFS-HRES forecast (ERA5-Land lags) — so recent precip/wind carry forecast
+  // bias and get debiased just like a forecast, while recent temperature does not
+  // (see AppContext / services/ci.ts). 'forecast' = future IFS-HRES output (all
+  // metrics), fully bias-corrected for display.
   data_type: 'historical' | 'recent' | 'forecast';
   max_temperature?: number;
   min_temperature?: number;
   precipitation_sum?: number;
   wind_speed_10m_max?: number;
+  // Forecast-uncertainty band per metric (forecast rows only).
+  band?: Partial<Record<MetricKey, MetricBand>>;
 }
 
 export interface YearlyAggregate {

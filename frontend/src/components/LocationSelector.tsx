@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { searchCities } from '../services/api';
 import { loadCells, snapToNearestCell, type SnappedCell } from '../services/cellIndex';
+import { logSearchSelect } from '../services/tieredData';
 import type { GeocodeResult } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { formatDistance } from '../utils/units';
@@ -47,6 +48,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchTimeout = useRef<number | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
+  // The raw text that produced the currently-shown suggestions — captured so
+  // selectSuggestion can log what was actually typed, not the cell name it
+  // gets overwritten with on pick.
+  const lastQueryRef = useRef('');
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -81,6 +86,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         loadCells(),
       ]);
       if (controller.signal.aborted) return; // superseded by a newer keystroke
+      lastQueryRef.current = value;
       // Several geocoder hits can snap to the SAME cell (e.g. two "Paris" results
       // landing on one grid point), which would show duplicate rows. De-dupe by
       // the snapped cell's coords, keeping the closest hit for each cell. Results
@@ -119,7 +125,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   const selectSuggestion = (suggestion: Suggestion) => {
-    const { snapped } = suggestion;
+    const { place, snapped } = suggestion;
 
     // The chosen identity is the CELL, not the typed place: show the cell's own
     // name so people know exactly which data point they're looking at, and emit
@@ -128,6 +134,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     setShowSuggestions(false);
     setSuggestions([]);
     setSelectedIndex(-1);
+
+    logSearchSelect({
+      query: lastQueryRef.current,
+      matched: place.display_name,
+      servedName: snapped.cell.name,
+      distanceKm: snapped.distanceKm,
+    });
 
     onChange({
       name: snapped.cell.name,

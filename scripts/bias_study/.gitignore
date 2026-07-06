@@ -6,3 +6,12 @@ data/hres-forecast/
 # Raw CDS ERA5-Land geopotential GRIB (~13 MB) — regenerable; the derived
 # cell_elevation.csv (small) IS tracked instead.
 data/geo.grib
+
+# Trained model cache (2+ GB after the full-grid VM run) — synced from the box
+# or refit via train_quantile_debias.py, never tracked.
+models/
+catboost_info/
+
+# Full-grid archive-overlap slices — local mirror, rebuildable with
+# pull_archive_slice.py (R2) or rsync from the training box.
+data/archive-overlap/

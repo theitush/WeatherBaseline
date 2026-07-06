@@ -76,6 +76,13 @@
   max-width: calc(100vw - 16px);
 }
 
+/* The 90% CI line under a forecast value — dimmed so it reads as detail, not as
+   the headline number sitting at the band median above it. */
+.chart-tooltip .tt-ci {
+  opacity: 0.7;
+  font-size: 11px;
+}
+
 /* On a narrow phone a nowrap tooltip can be wider than the screen and spill off
    the edge; let it wrap so it always fits within the clamped box. */
 @media (max-width: 640px) {

@@ -296,6 +296,8 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--no-photon", action="store_true",
                     help="skip Photon reverse-geocode fallback; label sparse cells by coords")
+    ap.add_argument("--no-dedupe", action="store_true",
+                    help="skip the sub-district pass that makes same-metro names unique")
     args = ap.parse_args()
 
     download_gazetteer()
@@ -386,6 +388,16 @@ def main() -> int:
                 r["name"] = with_country(rev[0], rev[1])
             else:
                 r["name"] = f"{cell_lats[i]:.1f}, {cell_lons[i]:.1f}"
+
+    # Final pass: a 0.1deg grid slices a dense metro into many cells that all
+    # resolve to the same city+region, so ~3k cells would otherwise share a name
+    # with a neighbour. Refine each duplicate to its sub-district (Nominatim, cached)
+    # with a deterministic bearing/coord backstop, so every cell ends up unique.
+    if not args.no_dedupe:
+        from disambiguate_dupes import disambiguate
+        print("  dedupe: refining same-metro duplicate names ...", file=sys.stderr)
+        for i, _old, new in disambiguate(rows):
+            rows[i]["name"] = new
 
     if "name" not in fieldnames:
         fieldnames.append("name")

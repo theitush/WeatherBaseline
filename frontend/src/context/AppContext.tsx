@@ -4,6 +4,7 @@ import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
 import { geolocateByIp, parseDate, addDays } from '../services/api';
 import { loadCellTimeline, getCellHasArchive, logMetricView } from '../services/tieredData';
+import { fetchBands } from '../services/ci';
 import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
@@ -162,6 +163,72 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         viewUrl
       );
       setForecastUnavailable(!forecastFresh);
+
+      // Attach bias-correction bands to model-output rows AND snap the row's value
+      // to the bias-corrected median, in one place. Band + median come from the
+      // cell's static per-cell debias table on R2 (services/ci.ts) — LIVE in dev AND
+      // prod. This is NOT a dev-only no-op; it replaced the old local CatBoost CI
+      // server. Mutates the timeline rows in place so the filtered slices below share
+      // the same objects — the corrected value flows to EVERY downstream consumer
+      // (chart dots, the shaded percentile aggregates, record markers, the prose
+      // verdict, the spectrum card) straight off d[metric], with no per-chart
+      // special-casing. Best-effort: fetchBands never throws.
+      //
+      // WHICH ROWS GET CORRECTED — the model scale (IFS-HRES) differs from the
+      // archive/percentile scale (ERA5-Land), so anything HRES-derived MUST be
+      // debiased:
+      //   • forecast rows -> every metric is HRES model output -> correct all four.
+      //   • recent rows   -> precip AND wind ARE STILL FORECASTS here. The recent
+      //     seam pulls those two from the IFS historical-forecast API because
+      //     ERA5-Land lags the present frontier, so recent precip/wind carry the
+      //     SAME HRES bias as a forecast and MUST be corrected. Recent TEMPERATURE,
+      //     by contrast, is already settled ERA5-Land reanalysis (real, not a guess)
+      //     -> NO correction, NO snap, it keeps its real observed value.
+      // So RECENT_MODEL_METRICS is precip+wind ONLY. fetchBands is tier-agnostic (it
+      // returns a band for every value it is handed, temperature included); THIS
+      // filter is what enforces the recent-temperature exception.
+      const RECENT_MODEL_METRICS: MetricKey[] = ['precipitation_sum', 'wind_speed_10m_max'];
+      const bandRows = timeline.filter(
+        (d) => d.data_type === 'forecast' || d.data_type === 'recent'
+      );
+      if (bandRows.length > 0) {
+        // Local calendar day (rows were parsed as local midnight) — matches the
+        // CSV date and the model's day-of-year features.
+        const isoLocal = (dt: Date) =>
+          `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+            dt.getDate()
+          ).padStart(2, '0')}`;
+        const bands = await fetchBands(
+          location.lat,
+          location.lon,
+          bandRows.map((d) => ({
+            date: isoLocal(d.date),
+            max_temperature: d.max_temperature,
+            min_temperature: d.min_temperature,
+            precipitation_sum: d.precipitation_sum,
+            wind_speed_10m_max: d.wind_speed_10m_max,
+          }))
+        );
+        for (const d of bandRows) {
+          const b = bands[isoLocal(d.date)];
+          if (!b) continue;
+          // Which metrics are model output for THIS row: every metric a forecast
+          // row carries a band for; precip/wind only for a recent row (recent
+          // temperature is settled era5_land — not a guess, so no band, no snap).
+          const applicable =
+            d.data_type === 'recent'
+              ? RECENT_MODEL_METRICS
+              : (Object.keys(b) as MetricKey[]);
+          const band: NonNullable<WeatherDataPoint['band']> = {};
+          for (const m of applicable) {
+            const mb = b[m];
+            if (!mb) continue;
+            band[m] = mb;
+            d[m] = mb.mid; // snap the value to the bias-corrected median (q0.50)
+          }
+          if (Object.keys(band).length > 0) d.band = band;
+        }
+      }
 
       // Seasonal slice for charts: filter the full timeline to ±seasonalWindowDays.
       const targetDt = parseDate(currentDate);
