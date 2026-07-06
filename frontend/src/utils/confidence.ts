@@ -1,8 +1,9 @@
 // confidence — turns a forecast row's own 9-quantile band (services/ci.ts: 7
 // CQR-calibrated heads + q0.25/q0.75 interpolated) into a confidence qualifier
 // for the top card: a word
-// ("maybe"/"probably"/"likely"/"very likely") prefixed to the verdict AND a
-// matching "(Pr>50%/90%/95%/~99%)" suffix on the rarity line. The probability is
+// ("maybe"/"probably"/"likely"/"very likely"/"almost certainly") prefixed to
+// the verdict AND a matching "(Pr>50%/75%/90%/95%/~99%)" suffix on the rarity
+// line. The probability is
 // a real CQR exceedance probability: given the historical rarity threshold a
 // verdict tier is claiming (e.g. "under 10% hottest"), we ask how likely the
 // settled value is to actually land on the correct side of it, using the row's
@@ -133,32 +134,40 @@ export function valueAtTailFraction(
   return sorted[idx];
 }
 
-export type ConfidenceWord = 'maybe' | 'probably' | 'likely' | 'very likely';
+export type ConfidenceWord =
+  | 'maybe'
+  | 'probably'
+  | 'likely'
+  | 'very likely'
+  | 'almost certainly';
 
 /**
  * The word prefixed to the top-card verdict — paired 1:1 with confidenceSuffix's
- * (Pr>50%/90%/95%/~99%) buckets so the headline word and the bottom-line number
- * always agree: <90% maybe, 90-95% probably, 95-99% likely, >=99% very likely.
+ * (Pr>50%/75%/90%/95%/~99%) buckets so the headline word and the bottom-line
+ * number always agree: <75% maybe, 75-90% probably, 90-95% likely, 95-99% very
+ * likely, >=99% almost certainly.
  */
 export function confidenceWord(p: number): ConfidenceWord {
-  if (p < 0.9) return 'maybe';
-  if (p < 0.95) return 'probably';
-  if (p < 0.99) return 'likely';
-  return 'very likely';
+  if (p < 0.75) return 'maybe';
+  if (p < 0.9) return 'probably';
+  if (p < 0.95) return 'likely';
+  if (p < 0.99) return 'very likely';
+  return 'almost certainly';
 }
 
 /**
- * " (Pr~99%)" / " (Pr>95%)" / " (Pr>90%)" / " (Pr>50%)" suffix for the
- * bottom-line rarity text — states the tier's exceedance confidence as a coarse
- * bucket, matching confidenceWord's breakpoints. The " (Pr>50%)" floor covers
- * everything below 90%: for the one-sided tail tiers p >= 0.5 by construction
- * (the tier fires because the band's own mid already sits on the claimed side of
- * the cutoff), so this reads as an honest "more likely than not" rather than a
- * hard number a wide forecast band can't support.
+ * " (Pr~99%)" / " (Pr>95%)" / " (Pr>90%)" / " (Pr>75%)" / " (Pr>50%)" suffix for
+ * the bottom-line rarity text — states the tier's exceedance confidence as a
+ * coarse bucket, matching confidenceWord's breakpoints. The " (Pr>50%)" floor
+ * covers everything below 75%: for the one-sided tail tiers p >= 0.5 by
+ * construction (the tier fires because the band's own mid already sits on the
+ * claimed side of the cutoff), so this reads as an honest "more likely than
+ * not" rather than a hard number a wide forecast band can't support.
  */
 export function confidenceSuffix(p: number): string {
   if (p >= 0.99) return ' (Pr~99%)';
   if (p >= 0.95) return ' (Pr>95%)';
   if (p >= 0.9) return ' (Pr>90%)';
+  if (p >= 0.75) return ' (Pr>75%)';
   return ' (Pr>50%)';
 }

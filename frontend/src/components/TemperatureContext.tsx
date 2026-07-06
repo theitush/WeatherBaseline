@@ -233,8 +233,9 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   // percentages above become coarse buckets ("under 5%/10%/20%") — a forecast's
   // own uncertainty makes a precise decimal misleading — and a NEW mid-tier
   // splits the old 5%→20% gap into 5%/10%/20%. Those rows also get a confidence
-  // qualifier — a maybe/probably/likely/very likely word prefixed to the verdict
-  // AND a matching "(Pr>50%/90%/95%/~99%)" suffix on the rarity line — both a
+  // qualifier — a maybe/probably/likely/very likely/almost certainly word
+  // prefixed to the verdict AND a matching "(Pr>50%/75%/90%/95%/~99%)" suffix
+  // on the rarity line — both a
   // real CQR exceedance probability, computed from the row's own 9-quantile band
   // against the historical threshold VALUE this tier is claiming (see
   // utils/confidence). Historical rows (and recent-tier temperature, which has
