@@ -177,31 +177,35 @@ def disambiguate(rows: list[dict], *, limit: int = 0, fetch: bool = True,
         if sub:
             new_name[i] = f"{sub}, {rows[i]['name']}"
 
-    # --- Step 3: backstop -- break any residual collisions deterministically. ---
-    # Re-group the (refined) duplicate cells by their new label; for any label still
-    # shared, keep the most-populous cell bare and disambiguate the rest by bearing
-    # from the group centroid, falling back to exact coords if a bearing repeats.
+    # --- Step 3: guarantee GLOBAL uniqueness (deterministic backstop). ---
+    # Refinement can collide a cell with a DIFFERENT, already-unique cell -- a
+    # "Tashkent" cell refining to "Sergeli, Tashkent" that another cell already
+    # owns -- so we dedupe each refined label against ALL names in the file, not
+    # just within the duplicate groups. Names of untouched cells are reserved;
+    # within any colliding set the most-populous cell keeps the clean label and
+    # the rest get a compass bearing from the group centroid, falling back to exact
+    # coords if a bearing repeats.
+    changing = set(dup_idx)
+    taken = {rows[i]["name"] for i in range(len(rows)) if i not in changing}
     refined_groups: dict[str, list[int]] = defaultdict(list)
     for i in dup_idx:
         refined_groups[new_name[i]].append(i)
     backstopped = 0
     for label, idxs in refined_groups.items():
-        if len(idxs) < 2:
-            continue
         clat = sum(float(rows[i]["lat"]) for i in idxs) / len(idxs)
         clon = sum(float(rows[i]["lon"]) for i in idxs) / len(idxs)
-        keep = max(idxs, key=lambda i: int(rows[i]["population"] or 0))
-        used = {label}
+        idxs.sort(key=lambda i: int(rows[i]["population"] or 0), reverse=True)
         for i in idxs:
-            if i == keep:
-                continue
             lat, lon = float(rows[i]["lat"]), float(rows[i]["lon"])
-            cand = f"{label} ({bearing(clat, clon, lat, lon)})"
-            if cand in used:
+            cand = label
+            if cand in taken:
+                cand = f"{label} ({bearing(clat, clon, lat, lon)})"
+            if cand in taken:
                 cand = f"{label} ({lat:.1f}, {lon:.1f})"
+            if cand != label:
+                backstopped += 1
             new_name[i] = cand
-            used.add(cand)
-            backstopped += 1
+            taken.add(cand)
 
     changed = [(i, rows[i]["name"], new_name[i]) for i in dup_idx
                if new_name[i] != rows[i]["name"]]
