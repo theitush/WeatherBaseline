@@ -416,49 +416,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const p = tierTwoSided
           ? probabilityBetween(points, loT, hiT)
           : probabilityOneSided(points, oneT, isHighSide);
-        // Diagnostic: the ONE-SIDED confidence against the climatology median —
-        // "how sure the day lands on the settled side (drier/wetter than most)".
-        // For mild days this is the number that matches the directional wording,
-        // unlike the two-sided in-band mass `p`.
-        const climMedian = valueAtTailFraction(tierPool, 0.5, false);
-        const pDir = probabilityOneSided(points, climMedian, isHighSide);
-        // TEMP-DEBUG — full confidence calculation, one line per render.
-        console.debug('[CONFDBG]', JSON.stringify({
-          metric: currentMetric, date: currentDate,
-          tier: tierTwoSided ? 'mild(2sided)'
-            : allTimeRank >= 1 && allTimeRank <= 10 ? 'alltime'
-            : rank <= 3 ? 'top3'
-            : singleTail <= 0.05 ? 'extreme'
-            : singleTail <= 0.1 ? 'mid' : 'notable',
-          isHighSide, singleTail: +singleTail.toFixed(3),
-          // tierCutoff is the tail FRACTION; cutoffVals are the resolved pool
-          // VALUE(s) at that fraction — i.e. exactly what `p` integrates against.
-          tierCutoff,
-          cutoffVals: tierTwoSided
-            ? { frac: tierCutoff, lo: +loT.toFixed(2), hi: +hiT.toFixed(2) }
-            : { frac: tierCutoff, thr: +oneT.toFixed(2) },
-          n,
-          // forecast band, display units, as (cumProb -> value)
-          band: points.map((pt) => `${pt.p}:${pt.v.toFixed(2)}`).join('  '),
-          // climatology pool percentiles for the same window
-          pool: {
-            p05: +valueAtTailFraction(tierPool, 0.05, false).toFixed(2),
-            p20: +valueAtTailFraction(tierPool, 0.2, false).toFixed(2),
-            p40: +valueAtTailFraction(tierPool, 0.4, false).toFixed(2),
-            p50: +climMedian.toFixed(2),
-            p60: +valueAtTailFraction(tierPool, 0.4, true).toFixed(2),
-            p80: +valueAtTailFraction(tierPool, 0.2, true).toFixed(2),
-            p95: +valueAtTailFraction(tierPool, 0.05, true).toFixed(2),
-          },
-          // p = forecast probability mass inside the tier's value range
-          calc: tierTwoSided
-            ? { kind: 'mass in [lo,hi]', lo: +loT.toFixed(2), hi: +hiT.toFixed(2) }
-            : { kind: isHighSide ? 'mass >= thr' : 'mass <= thr', thr: +oneT.toFixed(2) },
-          p: +p.toFixed(3), word: confidenceWord(p), suffix: confidenceSuffix(p).trim(),
-          // pDir = one-sided P(actual on the claimed side of the climatology
-          // median). For mild directional wording this is the honest number.
-          pDir: +pDir.toFixed(3), wordDir: confidenceWord(pDir),
-        }));
         // Same p drives both: the word prefixed to the verdict (top) and the
         // (Pr>…%) bucket appended to the rarity line (bottom), so the headline
         // qualifier and the number never disagree.
