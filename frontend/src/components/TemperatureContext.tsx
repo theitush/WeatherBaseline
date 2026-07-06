@@ -84,7 +84,7 @@ const METRIC_COMPARATIVE: Record<MetricKey, { high: string; low: string }> = {
 // Softeners for the mild "a ___ ___ than most" line.
 const MILD_HEDGE = ['bit', 'tad', 'touch', 'smidge', 'hair'];
 
-// Dead-center (45–55%) bottom line — no direction is meaningful, so just
+// Dead-center (40–60%) bottom line — no direction is meaningful, so just
 // lampoon the averageness. The top verdict still draws from VERDICT_MILD.
 const DEAD_CENTER_LINE = [
   'Uniquely unique',
@@ -100,7 +100,7 @@ const VERDICT_TOP3 = ['Crazy!!!', 'Off the charts!', 'One for the history books!
 // Reserved for a top-1/2/3 value across the WHOLE record (not just its ±N-day
 // window) — the rarest thing the page can show, so the lines go big.
 const VERDICT_ALLTIME = ['Practically unheard of!', 'A page in the record books.', 'Legendary!'];
-const VERDICT_EXTREME = ['Extreme!', 'Seriously extreme.', 'Pretty wild.'];
+const VERDICT_EXTREME = ['Quite unusual.', 'Remarkable.', 'Pretty wild.', 'Pretty rare.'];
 const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.'];
 const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
 
@@ -372,30 +372,28 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         verdict = pick(VERDICT_NOTABLE, seed);
         tierCutoff = 0.2;
       } else {
-        // Mild — no rarity number here. A two-tailed % near the middle never
-        // matched the histogram's single-tailed bracket and read as confusing.
-        // Instead describe the position softly: dead-center days get a mocked
-        // "perfectly average" verdict; off-center-but-mild days get a hedged
-        // "a bit warmer than most", naming today's actual side.
+        // Mild — the middle 60% (p20–p80). Describe the position softly and score
+        // the confidence against the band the WORDING actually claims (the same
+        // "grade the region you assert" rule the tail tiers use):
+        //   - dead-center (p40–p60): "averagely average" is non-directional, so a
+        //       TWO-SIDED band [p40, p60].
+        //   - off-center: "a bit drier/wetter than most" is a DIRECTIONAL claim,
+        //       so ONE-SIDED against the climatology median (p50) on today's side.
         const pctile = windowRank.rankLow / n; // 0..1, where today sits in the pack
-        const isDeadCenter = pctile >= 0.45 && pctile <= 0.55;
+        const isDeadCenter = pctile >= 0.4 && pctile <= 0.6;
         if (isDeadCenter) {
           extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for ${nounP}${since}.`;
+          tierCutoff = 0.4;   // two-sided [p40, p60]
+          tierTwoSided = true;
         } else {
           const cmp = METRIC_COMPARATIVE[currentMetric];
           const word = isHighSide ? cmp.high : cmp.low;
           const hedge = pick(MILD_HEDGE, seed);
           extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
+          tierCutoff = 0.5;   // one-sided vs the median, today's side
+          tierTwoSided = false;
         }
         verdict = pick(VERDICT_MILD, seed);
-        // Confidence for "average" asks the robust question "how likely is this
-        // NOT an extreme outlier?" — i.e. how much of the forecast lands inside
-        // climatology's p05–p95. The old middle-60% (p20–p80) bracket was often
-        // NARROWER than the forecast band itself (and collapsed to zero width in
-        // dry/degenerate climatologies like a 0mm July), which pinned every mild
-        // day at "maybe". p05–p95 is a target the forecast can actually clear.
-        tierCutoff = 0.05;
-        tierTwoSided = true;
       }
 
       // Confidence qualifier — forecast/recent-model rows only (same `band`
@@ -407,15 +405,23 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // the rarity line. Skipped on a too-small pool — not enough signal.
       if (band && n >= 5) {
         const points = bandQuantilePoints(band, currentMetric, system);
-        // Two-sided (mild) integrates the forecast mass inside [p05,p95]; the
-        // tail tiers integrate the mass beyond a single cutoff. Same primitive
-        // (probInInterval) so a degenerate/tight climatology can't zero it out.
+        // Two-sided (dead-center mild) integrates the forecast mass inside the
+        // claimed band [p40,p60]; every other tier — the tails AND off-center
+        // mild — integrates the mass on one side of a single cutoff. Same
+        // primitive (probInInterval) so a degenerate/tight climatology can't
+        // zero it out.
         const loT = valueAtTailFraction(tierPool, tierCutoff, false);
         const hiT = valueAtTailFraction(tierPool, tierCutoff, true);
         const oneT = valueAtTailFraction(tierPool, tierCutoff, isHighSide);
         const p = tierTwoSided
           ? probabilityBetween(points, loT, hiT)
           : probabilityOneSided(points, oneT, isHighSide);
+        // Diagnostic: the ONE-SIDED confidence against the climatology median —
+        // "how sure the day lands on the settled side (drier/wetter than most)".
+        // For mild days this is the number that matches the directional wording,
+        // unlike the two-sided in-band mass `p`.
+        const climMedian = valueAtTailFraction(tierPool, 0.5, false);
+        const pDir = probabilityOneSided(points, climMedian, isHighSide);
         // TEMP-DEBUG — full confidence calculation, one line per render.
         console.debug('[CONFDBG]', JSON.stringify({
           metric: currentMetric, date: currentDate,
@@ -424,14 +430,23 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
             : rank <= 3 ? 'top3'
             : singleTail <= 0.05 ? 'extreme'
             : singleTail <= 0.1 ? 'mid' : 'notable',
-          isHighSide, singleTail: +singleTail.toFixed(3), tierCutoff, n,
+          isHighSide, singleTail: +singleTail.toFixed(3),
+          // tierCutoff is the tail FRACTION; cutoffVals are the resolved pool
+          // VALUE(s) at that fraction — i.e. exactly what `p` integrates against.
+          tierCutoff,
+          cutoffVals: tierTwoSided
+            ? { frac: tierCutoff, lo: +loT.toFixed(2), hi: +hiT.toFixed(2) }
+            : { frac: tierCutoff, thr: +oneT.toFixed(2) },
+          n,
           // forecast band, display units, as (cumProb -> value)
           band: points.map((pt) => `${pt.p}:${pt.v.toFixed(2)}`).join('  '),
           // climatology pool percentiles for the same window
           pool: {
             p05: +valueAtTailFraction(tierPool, 0.05, false).toFixed(2),
             p20: +valueAtTailFraction(tierPool, 0.2, false).toFixed(2),
-            p50: +valueAtTailFraction(tierPool, 0.5, false).toFixed(2),
+            p40: +valueAtTailFraction(tierPool, 0.4, false).toFixed(2),
+            p50: +climMedian.toFixed(2),
+            p60: +valueAtTailFraction(tierPool, 0.4, true).toFixed(2),
             p80: +valueAtTailFraction(tierPool, 0.2, true).toFixed(2),
             p95: +valueAtTailFraction(tierPool, 0.05, true).toFixed(2),
           },
@@ -440,12 +455,15 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
             ? { kind: 'mass in [lo,hi]', lo: +loT.toFixed(2), hi: +hiT.toFixed(2) }
             : { kind: isHighSide ? 'mass >= thr' : 'mass <= thr', thr: +oneT.toFixed(2) },
           p: +p.toFixed(3), word: confidenceWord(p), suffix: confidenceSuffix(p).trim(),
+          // pDir = one-sided P(actual on the claimed side of the climatology
+          // median). For mild directional wording this is the honest number.
+          pDir: +pDir.toFixed(3), wordDir: confidenceWord(pDir),
         }));
         // Same p drives both: the word prefixed to the verdict (top) and the
         // (Pr>…%) bucket appended to the rarity line (bottom), so the headline
         // qualifier and the number never disagree.
         const word = confidenceWord(p);
-        verdict = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${verdict}`;
+        verdict = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${verdict.charAt(0).toLowerCase()}${verdict.slice(1)}`;
         if (extremeLine) extremeLine = `${extremeLine}${confidenceSuffix(p)}`;
       }
     }
