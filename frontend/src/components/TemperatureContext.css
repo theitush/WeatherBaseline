@@ -162,30 +162,6 @@
   paint-order: stroke fill;
 }
 
-/* The two ~30%-size deltas: +x (q0.95 side) over −y (q0.05 side). Each is
-   coloured by the gradient at its own band endpoint, set inline. */
-.record-scale-marker-ci {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.12;
-  /* Breathing room around the deltas, mirroring the headline value's spacing. */
-  margin: 0 4px;
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-
-.record-scale-marker-ci .ci-delta {
-  white-space: nowrap;
-  padding: 0 1px;
-  /* Same dark outline the headline value carries, scaled down for the small size. */
-  -webkit-text-stroke: 1px #111;
-  text-stroke: 1px #111;
-  paint-order: stroke fill;
-}
-
 /* The one unit label (°C/°F, mm, km/h) right after the value — ~20% smaller than
    the headline value, same colour and outline (colour set inline to the marker colour). */
 .record-scale-marker-ci-unit {
