@@ -4,6 +4,8 @@ import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { comparablePool } from '../utils/dataProcessor';
+import { bandQuantilePoints, valueAtTailFraction } from '../utils/confidence';
+import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
@@ -16,6 +18,9 @@ interface HistogramChartProps {
   currentMetric: MetricKey;
   currentDate: string;
   fullData: WeatherDataPoint[];
+  // Full daily record (every day, all years) — the all-time pool the top card's
+  // verdict tier uses, so the forecast's single reference line matches the card.
+  yearTimeline: WeatherDataPoint[];
   orientation?: Orientation;
   width?: number;
   height?: number;
@@ -26,11 +31,76 @@ interface HistogramChartProps {
 const MARGIN_H = { top: 20, right: 100, bottom: 40, left: 15 };
 const MARGIN_V = { top: 20, right: 20, bottom: 10, left: 55 };
 
+/** Value at cumulative probability `u` on the piecewise-linear CDF through the
+ *  ascending (p, v) quantile points — the inverse CDF, clamped to the ends. */
+function invCdf(points: { p: number; v: number }[], u: number): number {
+  const n = points.length;
+  if (u <= points[0].p) return points[0].v;
+  if (u >= points[n - 1].p) return points[n - 1].v;
+  for (let i = 0; i < n - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (u >= a.p && u <= b.p) {
+      return b.p === a.p ? a.v : a.v + ((u - a.p) / (b.p - a.p)) * (b.v - a.v);
+    }
+  }
+  return points[n - 1].v;
+}
+
+/**
+ * A smooth predictive-density curve for a forecast's own 9-point CDF: draw
+ * pseudo-samples by inverse-transform sampling (evenly spaced in probability
+ * over [p01, p99], so their empirical density mirrors the forecast), then
+ * Gaussian-KDE them. Returns {t, d} points over the support, padded by ~1
+ * bandwidth so the curve tapers toward 0 at the tails — the caller scales `d`
+ * onto the count axis. Empty when the band is degenerate (all quantiles equal,
+ * e.g. a bone-dry precip forecast) where a curve would be a zero-width spike.
+ */
+function forecastDensityCurve(
+  points: { p: number; v: number }[]
+): { t: number; d: number }[] {
+  const N = 300;
+  const M = 90;
+  const samples: number[] = [];
+  const pLo = points[0].p;
+  const pHi = points[points.length - 1].p;
+  for (let i = 0; i < N; i++) {
+    samples.push(invCdf(points, pLo + (pHi - pLo) * ((i + 0.5) / N)));
+  }
+  samples.sort((a, b) => a - b);
+  const lo = samples[0];
+  const hi = samples[N - 1];
+  if (hi - lo < 1e-9) return []; // no spread — nothing to draw as a curve
+
+  const sd = d3.deviation(samples) ?? 0;
+  const iqr = (d3.quantile(samples, 0.75) as number) - (d3.quantile(samples, 0.25) as number);
+  const spread = Math.min(sd || Infinity, iqr / 1.349 || Infinity);
+  const sigma = Number.isFinite(spread) ? spread : sd || (hi - lo) / 4;
+  const bw = Math.max(0.9 * sigma * Math.pow(N, -0.2), (hi - lo) / 60);
+
+  const gLo = lo - 1.2 * bw;
+  const gHi = hi + 1.2 * bw;
+  const inv2h2 = 1 / (2 * bw * bw);
+  const norm = 1 / (N * bw * Math.sqrt(2 * Math.PI));
+  const out: { t: number; d: number }[] = [];
+  for (let j = 0; j <= M; j++) {
+    const t = gLo + ((gHi - gLo) * j) / M;
+    let s = 0;
+    for (let k = 0; k < N; k++) {
+      const z = t - samples[k];
+      s += Math.exp(-z * z * inv2h2);
+    }
+    out.push({ t, d: s * norm });
+  }
+  return out;
+}
+
 const HistogramChart: React.FC<HistogramChartProps> = ({
   filteredData,
   currentMetric,
   currentDate,
   fullData,
+  yearTimeline,
   orientation = 'horizontal',
   width: propWidth,
   height: propHeight,
@@ -225,54 +295,61 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .text('Count');
     }
 
-    // Current date temperature line + brackets
-    const targetDate = new Date(currentDate + 'T12:00:00');
-    const currentDateData = fullData.filter(
-      (d) =>
-        d.date.getFullYear() === targetDate.getFullYear() &&
-        d.date.getMonth() === targetDate.getMonth() &&
-        d.date.getDate() === targetDate.getDate() &&
-        d[currentMetric] !== undefined
-    );
-
-    if (currentDateData.length > 0) {
-      const currentTemp = convert(
-        currentDateData[0][currentMetric] as number,
-        currentMetric,
-        system
-      );
-
-      // Line is perpendicular to the temp axis.
-      const tempLine = g.append('line')
-        .attr('class', 'current-temp-line')
-        .attr('stroke', 'var(--text-h)')
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '4,3');
-
+    // A line perpendicular to the temp axis at temp `t` (display units) — the
+    // straight target line (history) and the forecast reference line share it.
+    const perpLine = (t: number) => {
+      const el = g.append('line');
       if (isVertical) {
-        tempLine
-          .attr('x1', tempScale(currentTemp)).attr('x2', tempScale(currentTemp))
-          .attr('y1', 0).attr('y2', height);
+        el.attr('x1', tempScale(t)).attr('x2', tempScale(t)).attr('y1', 0).attr('y2', height);
       } else {
-        tempLine
-          .attr('x1', 0).attr('x2', width)
-          .attr('y1', tempScale(currentTemp)).attr('y2', tempScale(currentTemp));
+        el.attr('x1', 0).attr('x2', width).attr('y1', tempScale(t)).attr('y2', tempScale(t));
+      }
+      return el;
+    };
+
+    // Historical climatology pool (display units) for the bracket %s and the
+    // forecast reference line. EXCLUDES look-ahead forecast rows so a future
+    // target's own forecast days can't inflate the counts (that's what made the
+    // two brackets sum to >100%); on a settled past target there are none, so
+    // this is the old pool unchanged.
+    const histRowsNative = comparablePool(filteredData, currentDate)
+      .filter((d) => d.data_type !== 'forecast')
+      .map((d) => d[currentMetric])
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const histValues = histRowsNative.map((v) => convert(v, currentMetric, system));
+
+    // The two tails pivoting on `pivot` (display units). By default each is
+    // labelled with the % of the HISTORICAL pool it holds: inclusive above
+    // ("this hot or hotter"), strictly below — so they partition the pool and
+    // sum to exactly 100%. ONE implementation, called with the settled target
+    // value on history and with the verdict's reference line on forecasts.
+    //
+    // `exact` overrides the labels with the verdict tier's canonical percentage
+    // (5/10/20/50) instead of the day-fraction: on a forecast the reference line
+    // is snapped to a data point, so counting days at/above it lands 1–3% off
+    // the cutoff the top card actually compares to. When set, the verdict side
+    // reads exactly `exact.pct` and the other side reads its complement.
+    const fmtPct = (p: number) => (Number.isInteger(p) ? p.toFixed(0) : p.toFixed(1)) + '%';
+    const drawBrackets = (
+      pivot: number,
+      exact?: { pct: number; isHighSide: boolean }
+    ) => {
+      const total = histValues.length;
+      if (total === 0) return;
+      let pctHigher: string;
+      let pctLower: string;
+      if (exact) {
+        pctHigher = fmtPct(exact.isHighSide ? exact.pct : 100 - exact.pct);
+        pctLower = fmtPct(exact.isHighSide ? 100 - exact.pct : exact.pct);
+      } else {
+        pctHigher = fmtPct((histValues.filter((v) => v >= pivot).length / total) * 100);
+        pctLower = fmtPct((histValues.filter((v) => v < pivot).length / total) * 100);
       }
 
-      // INCLUSIVE on both sides ("this hot or hotter" / "this cold or colder"),
-      // so each bracket is the honest tail that includes today and its ties —
-      // matching the prose verdict's inclusive single tail. With ties the two
-      // figures sum to >100 (the overlap is the days equal to today); that's
-      // intended, since each side legitimately counts the boundary day.
-      const total = values.length;
-      const pctHigher = ((values.filter((v) => v >= currentTemp).length / total) * 100).toFixed(1);
-      const pctLower = ((values.filter((v) => v <= currentTemp).length / total) * 100).toFixed(1);
-
       if (!isVertical) {
-        // Brackets to the right of bars, paired with the horizontal current-temp line.
         const rightX = width + 8;
         const bw = 14;
-        const yMid = tempScale(currentTemp);
+        const yMid = tempScale(pivot);
         const yTop = 10;
         const yBottom = height - 10;
 
@@ -296,7 +373,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctHigher + '%');
+          .text(pctHigher);
 
         g.append('path')
           .attr(
@@ -318,17 +395,15 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctLower + '%');
+          .text(pctLower);
       } else {
-        // Vertical mode: brackets above the bars, paired with the vertical current-temp line.
-        // Lower temps are to the LEFT of the line, higher temps to the RIGHT.
+        // Vertical mode: brackets above the bars. Lower temps LEFT, higher RIGHT.
         const topY = -8;
         const bw = 14;
-        const xMid = tempScale(currentTemp);
+        const xMid = tempScale(pivot);
         const xLeft = 10;
         const xRight = width - 10;
 
-        // Left bracket (lower%)
         g.append('path')
           .attr(
             'd',
@@ -348,9 +423,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctLower + '%');
+          .text(pctLower);
 
-        // Right bracket (higher%)
         g.append('path')
           .attr(
             'd',
@@ -370,14 +444,120 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctHigher + '%');
+          .text(pctHigher);
+      }
+    };
+
+    // Target-day overlay.
+    //   • FORECAST (a band is present): draw the forecast's own predictive
+    //     density — a KDE of its 9-point CDF, half-height, spanning only its
+    //     support — PLUS a single faint reference line at the exact climatology
+    //     value the top card's verdict tier compares to (resolveForecastMarker
+    //     is THE shared tier resolver the card runs off too), with the brackets
+    //     pivoting on that line.
+    //   • HISTORY (no band): the original straight "this is today" dashed line at
+    //     the settled value, with the brackets pivoting on it.
+    const targetDate = new Date(currentDate + 'T12:00:00');
+    const currentRow = fullData.find(
+      (d) =>
+        d.date.getFullYear() === targetDate.getFullYear() &&
+        d.date.getMonth() === targetDate.getMonth() &&
+        d.date.getDate() === targetDate.getDate() &&
+        d[currentMetric] !== undefined
+    );
+
+    if (currentRow) {
+      const [domLo2, domHi2] = tempScale.domain() as [number, number];
+      const band = currentRow.band?.[currentMetric];
+
+      if (band) {
+        // Forecast KDE (skipped only for a degenerate zero-spread band).
+        const density = forecastDensityCurve(
+          bandQuantilePoints(band, currentMetric, system)
+        ).filter((pt) => pt.t >= domLo2 && pt.t <= domHi2);
+        if (density.length >= 2) {
+          // Peak → HALF the count axis so the curve reads as an overlay, not a
+          // competing bar; it tapers to ~0 at the support ends.
+          const maxD = d3.max(density, (pt) => pt.d) as number;
+          const kdeLen = d3
+            .scaleLinear()
+            .domain([0, maxD])
+            .range([0, (isVertical ? height : width) / 2]);
+          const line = d3.line<{ t: number; d: number }>().curve(d3.curveBasis);
+          if (isVertical) {
+            line.x((pt) => tempScale(pt.t)).y((pt) => height - kdeLen(pt.d));
+          } else {
+            line.x((pt) => kdeLen(pt.d)).y((pt) => tempScale(pt.t));
+          }
+          g.append('path')
+            .attr('class', 'forecast-kde')
+            .attr('fill', 'none')
+            .attr('stroke', 'var(--text-h)')
+            .attr('stroke-width', 2)
+            .attr('stroke-dasharray', '4,3')
+            .attr('d', line(density))
+            .style('opacity', 0)
+            .transition()
+            .duration(500)
+            .style('opacity', 1);
+        }
+
+        // The verdict's reference line: same tier the top card fires (native,
+        // unit-agnostic), then the tier's cutoff value read off the matching pool
+        // in DISPLAY units. Runs off the SAME historical pool as the brackets.
+        // Dead-centre mild has no side, so it pins to the median.
+        const allHistNative = comparablePool(yearTimeline, currentDate)
+          .filter((d) => d.data_type !== 'forecast')
+          .map((d) => d[currentMetric])
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+        const marker = resolveForecastMarker(band.mid, histRowsNative, allHistNative, true);
+        if (marker) {
+          const poolConv = (marker.tierUsesAllTime ? allHistNative : histRowsNative).map((v) =>
+            convert(v, currentMetric, system)
+          );
+          const refValue =
+            marker.tier === 'mildDead'
+              ? d3.median(histValues) ?? convert(band.mid, currentMetric, system)
+              : valueAtTailFraction(poolConv, marker.tierCutoff, marker.isHighSide);
+          perpLine(refValue)
+            .attr('class', 'forecast-ref-line')
+            .attr('stroke', 'var(--text-tertiary)')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '4,3')
+            .style('opacity', 0.4);
+          // Label the verdict side with the tier's canonical % (5/10/20/50) — the
+          // exact figure the top card compares to — not the ref line's snapped
+          // day-fraction. Both mild tiers pin to the median → a clean 50/50.
+          // All-time has no canonical %, so it keeps the honest day-fraction.
+          const exactPct =
+            marker.tier === 'alltime'
+              ? undefined
+              : marker.tier === 'mildDead' || marker.tier === 'mildOff'
+                ? 50
+                : marker.tierCutoff * 100;
+          drawBrackets(
+            refValue,
+            exactPct === undefined
+              ? undefined
+              : { pct: exactPct, isHighSide: marker.isHighSide }
+          );
+        }
+      } else {
+        // Settled history: straight dashed line at the target value + brackets.
+        const currentTemp = convert(currentRow[currentMetric] as number, currentMetric, system);
+        perpLine(currentTemp)
+          .attr('class', 'current-temp-line')
+          .attr('stroke', 'var(--text-h)')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '4,3');
+        drawBrackets(currentTemp);
       }
     }
 
     // Legend is rendered as an HTML element above the charts for both
     // mobile and desktop (see App.tsx).
 
-  }, [filteredData, currentMetric, currentDate, fullData, width, height, isVertical, system]);
+  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system]);
 
   return (
     <div className="histogram-chart-wrapper">

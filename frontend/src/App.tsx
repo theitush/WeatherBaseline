@@ -265,6 +265,7 @@ const AppContent: React.FC = () => {
                         currentMetric={currentMetric}
                         currentDate={currentDate}
                         fullData={fullData}
+                        yearTimeline={yearTimeline}
                         orientation="vertical"
                         width={mobileWidth}
                         height={115}
@@ -294,6 +295,7 @@ const AppContent: React.FC = () => {
                         currentMetric={currentMetric}
                         currentDate={currentDate}
                         fullData={fullData}
+                        yearTimeline={yearTimeline}
                       />
                     </>
                   )}

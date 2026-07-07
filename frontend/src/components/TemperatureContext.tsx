@@ -309,6 +309,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       let tierCutoff = 0.2;
       let tierPool = values;
       let tierTwoSided = false;
+      // The predicate after "…this day will be ___" in the forecast bottom line
+      // (e.g. "in the top 10% hottest days within ±3 days of Jul 12th"). null only
+      // for all-time, which isn't a ±window claim and keeps its own special line.
+      let forecastPredicate: string | null = null;
 
       if (allTimeRank >= 1 && allTimeRank <= 10) {
         // Among the rarest the page shows: a top-10 value across the WHOLE record.
@@ -337,6 +341,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // #1 still gets the exclusive phrase + bigger confetti; #2/#3 the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
         tierCutoff = 0.05;
+        forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
       } else if (singleTail <= 0.05) {
         // Extreme.
         if (bucketed) {
@@ -349,12 +354,14 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         }
         verdict = pick(VERDICT_EXTREME, seed);
         tierCutoff = 0.05;
+        forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
       } else if (bucketed && singleTail <= 0.1) {
         // NEW mid-tier, forecast/recent-model rows only — splits the old
         // 5%→20% gap so "under 10%" reads distinctly from "under 20%".
         extremeLine = `Under 10% of ${nounP}${since} were this ${adj}!`;
         verdict = pick(VERDICT_EXTREME, seed);
         tierCutoff = 0.1;
+        forecastPredicate = `in the top 10% ${sup} ${nounP}${since}`;
       } else if (singleTail <= 0.2) {
         // Notable — cumulative ("or hotter"). Drop the comparative when nothing
         // can be more extreme (a 0mm day can't be "drier").
@@ -371,6 +378,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         }
         verdict = pick(VERDICT_NOTABLE, seed);
         tierCutoff = 0.2;
+        forecastPredicate = `in the top 20% ${sup} ${nounP}${since}`;
       } else {
         // Mild — the middle 60% (p20–p80). Describe the position softly and score
         // the confidence against the band the WORDING actually claims (the same
@@ -382,7 +390,11 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const pctile = windowRank.rankLow / n; // 0..1, where today sits in the pack
         const isDeadCenter = pctile >= 0.4 && pctile <= 0.6;
         if (isDeadCenter) {
-          extremeLine = `${pick(DEAD_CENTER_LINE, seed)} for ${nounP}${since}.`;
+          const deadPhrase = pick(DEAD_CENTER_LINE, seed);
+          extremeLine = `${deadPhrase} for ${nounP}${since}.`;
+          // Forecast form keeps the same playful phrase, lower-cased into the
+          // sentence: "…this day will be averagely average compared to days…".
+          forecastPredicate = `${deadPhrase.toLowerCase()} compared to ${nounP}${since}`;
           tierCutoff = 0.4;   // two-sided [p40, p60]
           tierTwoSided = true;
         } else {
@@ -390,6 +402,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           const word = isHighSide ? cmp.high : cmp.low;
           const hedge = pick(MILD_HEDGE, seed);
           extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
+          // Off-centre but still middle-of-the-pack: "…will be quite average…".
+          forecastPredicate = `quite average compared to ${nounP}${since}`;
           tierCutoff = 0.5;   // one-sided vs the median, today's side
           tierTwoSided = false;
         }
@@ -416,12 +430,22 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const p = tierTwoSided
           ? probabilityBetween(points, loT, hiT)
           : probabilityOneSided(points, oneT, isHighSide);
-        // Same p drives both: the word prefixed to the verdict (top) and the
-        // (Pr>…%) bucket appended to the rarity line (bottom), so the headline
-        // qualifier and the number never disagree.
+        // p prefixes the verdict word (top). It also drives the bottom line: on any
+        // ±window tier (forecastPredicate set) that whole line becomes the plain-
+        // English statement of p — "~C% chance this day will be <predicate>" — since
+        // p IS exactly the chance the forecast falls in the region the predicate
+        // claims. Only all-time keeps its own line + the coarse (Pr>…%) bucket.
         const word = confidenceWord(p);
         verdict = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${verdict.charAt(0).toLowerCase()}${verdict.slice(1)}`;
-        if (extremeLine) extremeLine = `${extremeLine}${confidenceSuffix(p)}`;
+        if (forecastPredicate !== null) {
+          // Round to the nearest 5% (and cap at 95, never "~100%") — the "~"
+          // already says approximate, and a wide forecast band can't support a
+          // to-the-point figure.
+          const chance = Math.min(95, Math.round(p * 20) * 5);
+          extremeLine = `There's a ~${chance}% chance that this ${noun} will be ${forecastPredicate}.`;
+        } else if (extremeLine) {
+          extremeLine = `${extremeLine}${confidenceSuffix(p)}`;
+        }
       }
     }
   }
