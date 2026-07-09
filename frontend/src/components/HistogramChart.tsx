@@ -4,7 +4,12 @@ import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { comparablePool } from '../utils/dataProcessor';
-import { bandQuantilePoints, valueAtTailFraction } from '../utils/confidence';
+import {
+  bandQuantilePoints,
+  valueAtTailFraction,
+  probabilityOneSided,
+  probabilityBetween,
+} from '../utils/confidence';
 import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
@@ -123,6 +128,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+
+    // Unique per redraw so the confidence-shade clipPath id can't collide with
+    // the sibling chart instance (horizontal + vertical share the document).
+    const uid = Math.random().toString(36).slice(2, 8);
 
     const g = svg
       .append('g')
@@ -471,10 +480,37 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       const band = currentRow.band?.[currentMetric];
 
       if (band) {
+        // The forecast's own 9-point predictive CDF (display units) — the source
+        // for the KDE overlay, the confidence shade, and the CQR exceedance test.
+        const bandPoints = bandQuantilePoints(band, currentMetric, system);
         // Forecast KDE (skipped only for a degenerate zero-spread band).
-        const density = forecastDensityCurve(
-          bandQuantilePoints(band, currentMetric, system)
-        ).filter((pt) => pt.t >= domLo2 && pt.t <= domHi2);
+        const density = forecastDensityCurve(bandPoints).filter(
+          (pt) => pt.t >= domLo2 && pt.t <= domHi2
+        );
+
+        // The verdict tier + its climatology reference value: same tier the top
+        // card fires (native, unit-agnostic), then the tier's cutoff value read
+        // off the matching pool in DISPLAY units. Runs off the SAME historical
+        // pool as the brackets. Dead-centre mild has no side, so it pins to the
+        // median; every other tier's refValue is the one-sided threshold its
+        // confidence test checks against (= the confidence-shade edge below).
+        const allHistNative = comparablePool(yearTimeline, currentDate)
+          .filter((d) => d.data_type !== 'forecast')
+          .map((d) => d[currentMetric])
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+        const marker = resolveForecastMarker(band.mid, histRowsNative, allHistNative, true);
+        const poolConv = marker
+          ? (marker.tierUsesAllTime ? allHistNative : histRowsNative).map((v) =>
+              convert(v, currentMetric, system)
+            )
+          : [];
+        const refValue =
+          marker == null
+            ? 0
+            : marker.tier === 'mildDead'
+              ? d3.median(histValues) ?? convert(band.mid, currentMetric, system)
+              : valueAtTailFraction(poolConv, marker.tierCutoff, marker.isHighSide);
+
         if (density.length >= 2) {
           // Peak → HALF the count axis so the curve reads as an overlay, not a
           // competing bar; it tapers to ~0 at the support ends.
@@ -483,6 +519,136 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             .scaleLinear()
             .domain([0, maxD])
             .range([0, (isVertical ? height : width) / 2]);
+
+          // Confidence shade: fill the slice of the forecast density that lands in
+          // the region the verdict claims, and print that region's probability —
+          // the SAME CQR exceedance the card's bottom line states ("~80% chance
+          // this day will be …"). One-sided tiers shade the tail past refValue;
+          // dead-centre mild shades the two-sided [p40,p60] band around the median.
+          // Skipped on a thin pool, matching the prose's n≥5 gate.
+          if (marker && histValues.length >= 5) {
+            const loT = valueAtTailFraction(poolConv, marker.tierCutoff, false);
+            const hiT = valueAtTailFraction(poolConv, marker.tierCutoff, true);
+            const p = marker.tierTwoSided
+              ? probabilityBetween(bandPoints, loT, hiT)
+              : probabilityOneSided(bandPoints, refValue, marker.isHighSide);
+
+            // Region bounds on the temp axis (display units), clamped to the drawn
+            // support so the clip rect never spills past the curve.
+            let regLo: number;
+            let regHi: number;
+            if (marker.tierTwoSided) {
+              regLo = loT;
+              regHi = hiT;
+            } else if (marker.isHighSide) {
+              regLo = refValue;
+              regHi = domHi2;
+            } else {
+              regLo = domLo2;
+              regHi = refValue;
+            }
+            regLo = Math.max(domLo2, Math.min(domHi2, regLo));
+            regHi = Math.max(domLo2, Math.min(domHi2, regHi));
+
+            // Clip the full-support fill to the region — a rect in g-local coords,
+            // so the fill edge lands exactly on the reference line's pixel.
+            const clipId = `conf-shade-${uid}`;
+            const hatchId = `conf-hatch-${uid}`;
+            const defs = svg.append('defs');
+            // Diagonal-hatch fill in the KDE-line ink so the claimed region reads
+            // as a textured overlay, denser than a flat wash but not a solid block.
+            defs
+              .append('pattern')
+              .attr('id', hatchId)
+              .attr('patternUnits', 'userSpaceOnUse')
+              .attr('width', 6)
+              .attr('height', 6)
+              .attr('patternTransform', 'rotate(45)')
+              .append('line')
+              .attr('x1', 0)
+              .attr('y1', 0)
+              .attr('x2', 0)
+              .attr('y2', 6)
+              .attr('stroke', 'var(--text-h)')
+              .attr('stroke-width', 1.4)
+              .attr('stroke-opacity', 0.5);
+            const clipRect = defs.append('clipPath').attr('id', clipId).append('rect');
+            if (isVertical) {
+              clipRect
+                .attr('x', tempScale(regLo))
+                .attr('width', Math.max(0, tempScale(regHi) - tempScale(regLo)))
+                .attr('y', 0)
+                .attr('height', height);
+            } else {
+              clipRect
+                .attr('x', 0)
+                .attr('width', width)
+                .attr('y', tempScale(regHi))
+                .attr('height', Math.max(0, tempScale(regLo) - tempScale(regHi)));
+            }
+
+            const area = d3.area<{ t: number; d: number }>().curve(d3.curveBasis);
+            if (isVertical) {
+              area
+                .x((pt) => tempScale(pt.t))
+                .y0(height)
+                .y1((pt) => height - kdeLen(pt.d));
+            } else {
+              area
+                .y((pt) => tempScale(pt.t))
+                .x0(0)
+                .x1((pt) => kdeLen(pt.d));
+            }
+            g.append('path')
+              .attr('class', 'forecast-conf-shade')
+              .attr('clip-path', `url(#${clipId})`)
+              .attr('fill', `url(#${hatchId})`)
+              .attr('d', area(density) as string)
+              .style('opacity', 0)
+              .transition()
+              .duration(500)
+              .style('opacity', 1);
+
+            // Label the shaded lobe with its probability, at the GEOMETRIC middle
+            // of the visibly-shaded extent: trim the near-zero density tail (the
+            // KDE's padded shoulder), then take the midpoint of what's left so the
+            // number sits in the heart of the hatch rather than out on the taper.
+            // Inked in the hatch's own muted tone (KDE ink at the stripes' opacity),
+            // with a thin KDE-ink outline so it stays legible over its own stripes.
+            // Rounded to 5% / capped at 95% to match the card.
+            const regionPts = density.filter((pt) => pt.t >= regLo && pt.t <= regHi);
+            if (regionPts.length) {
+              const maxRegD = d3.max(regionPts, (pt) => pt.d) as number;
+              const solid = regionPts.filter((pt) => pt.d >= 0.08 * maxRegD);
+              const tMin = d3.min(solid, (pt) => pt.t) as number;
+              const tMax = d3.max(solid, (pt) => pt.t) as number;
+              const cT = (tMin + tMax) / 2;
+              const centre = solid.reduce((a, b) =>
+                Math.abs(b.t - cT) < Math.abs(a.t - cT) ? b : a
+              );
+              const chance = Math.min(95, Math.round(p * 20) * 5);
+              g.append('text')
+                .attr('class', 'forecast-conf-label')
+                .attr('x', isVertical ? tempScale(centre.t) : kdeLen(centre.d) / 2)
+                .attr('y', isVertical ? height - kdeLen(centre.d) / 2 : tempScale(centre.t))
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'middle')
+                .style('font-size', '12px')
+                .style('fill', 'var(--text-h)')
+                .style('fill-opacity', 0.7)
+                .style('paint-order', 'stroke')
+                .style('stroke', 'var(--text-h)')
+                .style('stroke-width', '0.2px')
+                .style('stroke-linejoin', 'round')
+                .style('opacity', 0)
+                .text(`~${chance}%`)
+                .transition()
+                .duration(500)
+                .style('opacity', 1);
+            }
+          }
+
+          // The KDE curve itself, on top of the shade.
           const line = d3.line<{ t: number; d: number }>().curve(d3.curveBasis);
           if (isVertical) {
             line.x((pt) => tempScale(pt.t)).y((pt) => height - kdeLen(pt.d));
@@ -502,23 +668,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             .style('opacity', 1);
         }
 
-        // The verdict's reference line: same tier the top card fires (native,
-        // unit-agnostic), then the tier's cutoff value read off the matching pool
-        // in DISPLAY units. Runs off the SAME historical pool as the brackets.
-        // Dead-centre mild has no side, so it pins to the median.
-        const allHistNative = comparablePool(yearTimeline, currentDate)
-          .filter((d) => d.data_type !== 'forecast')
-          .map((d) => d[currentMetric])
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-        const marker = resolveForecastMarker(band.mid, histRowsNative, allHistNative, true);
         if (marker) {
-          const poolConv = (marker.tierUsesAllTime ? allHistNative : histRowsNative).map((v) =>
-            convert(v, currentMetric, system)
-          );
-          const refValue =
-            marker.tier === 'mildDead'
-              ? d3.median(histValues) ?? convert(band.mid, currentMetric, system)
-              : valueAtTailFraction(poolConv, marker.tierCutoff, marker.isHighSide);
           perpLine(refValue)
             .attr('class', 'forecast-ref-line')
             .attr('stroke', 'var(--text-tertiary)')
