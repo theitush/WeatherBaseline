@@ -96,28 +96,25 @@ const MAX_BINS = 50;
  *   metric:   1 / 2 / 5 / 10 mm
  *   imperial: 0.05 / 0.1 / 0.25 / 0.5 / 1 in
  *
- * Wind keeps a fixed width:
- *   2 km/h / 1 mph
+ * Wind is adaptive too (same rule), floored so narrow-range places still get a
+ * full spread of bars rather than the ~4 a fixed 2 km/h width produced:
+ *   metric:   1 / 2 / 5 / 10 km/h
+ *   imperial: 0.5 / 1 / 2 / 5 mph
  */
 export function binWidth(metric: MetricKey, system: UnitSystem, span = 0): number {
-  if (isTemp(metric)) {
-    const ladder = system === 'imperial' ? [1, 2, 5, 10] : [0.5, 1, 2, 5];
-    for (const w of ladder) {
-      if (span <= 0 || span / w <= MAX_BINS) return w;
-    }
-    return ladder[ladder.length - 1];
+  const ladders: Partial<Record<MetricKey, [number[], number[]]>> = {
+    // [metric ladder, imperial ladder]
+    precipitation_sum: [[1, 2, 5, 10], [0.05, 0.1, 0.25, 0.5, 1]],
+    wind_speed_10m_max: [[1, 2, 5, 10], [0.5, 1, 2, 5]],
+  };
+  const ladder = isTemp(metric)
+    ? (system === 'imperial' ? [1, 2, 5, 10] : [0.5, 1, 2, 5])
+    : ladders[metric]?.[system === 'imperial' ? 1 : 0];
+  if (!ladder) return 0.5;
+  for (const w of ladder) {
+    if (span <= 0 || span / w <= MAX_BINS) return w;
   }
-  if (metric === 'precipitation_sum') {
-    const ladder = system === 'imperial'
-      ? [0.05, 0.1, 0.25, 0.5, 1]
-      : [1, 2, 5, 10];
-    for (const w of ladder) {
-      if (span <= 0 || span / w <= MAX_BINS) return w;
-    }
-    return ladder[ladder.length - 1];
-  }
-  if (metric === 'wind_speed_10m_max') return system === 'imperial' ? 1.0 : 2.0;
-  return 0.5;
+  return ladder[ladder.length - 1];
 }
 
 /**
