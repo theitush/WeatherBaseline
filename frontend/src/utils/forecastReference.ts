@@ -112,15 +112,14 @@ export function resolveForecastMarker(
     tierCutoff = 0.2;
   } else {
     // Middle 60% (p20–80). rankLow/n is where today sits in the pack (0..1).
+    // The confidence for BOTH mild sub-tiers is the forecast's chance of landing
+    // in the normal middle — a two-sided [p20, p80] band — so they share one
+    // cutoff. Only the displayed value + flavour wording differ (dead-centre pins
+    // to the median, off-centre to p30/p70).
     const pctile = wr.rankLow / n;
-    if (pctile >= 0.4 && pctile <= 0.6) {
-      tier = 'mildDead';
-      tierCutoff = 0.4; // two-sided [p40, p60]
-      tierTwoSided = true;
-    } else {
-      tier = 'mildOff';
-      tierCutoff = 0.5; // one-sided vs the median (confidence)
-    }
+    tier = pctile >= 0.4 && pctile <= 0.6 ? 'mildDead' : 'mildOff';
+    tierCutoff = 0.2; // two-sided [p20, p80] — the middle 60%
+    tierTwoSided = true;
   }
 
   // The displayed value. Tail tiers show the threshold their test checks against;

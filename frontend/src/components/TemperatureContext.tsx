@@ -380,13 +380,11 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         tierCutoff = 0.2;
         forecastPredicate = `in the top 20% ${sup} ${nounP}${since}`;
       } else {
-        // Mild — the middle 60% (p20–p80). Describe the position softly and score
-        // the confidence against the band the WORDING actually claims (the same
-        // "grade the region you assert" rule the tail tiers use):
-        //   - dead-center (p40–p60): "averagely average" is non-directional, so a
-        //       TWO-SIDED band [p40, p60].
-        //   - off-center: "a bit drier/wetter than most" is a DIRECTIONAL claim,
-        //       so ONE-SIDED against the climatology median (p50) on today's side.
+        // Mild — the middle 60% (p20–p80). Describe the position softly. The
+        // confidence for BOTH sub-cases is the forecast's chance of landing in the
+        // normal middle: a TWO-SIDED [p20, p80] band (the same "grade the region
+        // you assert" rule the tail tiers use). Dead-centre and off-centre differ
+        // only in flavour wording, not in the number.
         const pctile = windowRank.rankLow / n; // 0..1, where today sits in the pack
         const isDeadCenter = pctile >= 0.4 && pctile <= 0.6;
         if (isDeadCenter) {
@@ -395,8 +393,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           // Forecast form keeps the same playful phrase, lower-cased into the
           // sentence: "…this day will be averagely average compared to days…".
           forecastPredicate = `${deadPhrase.toLowerCase()} compared to ${nounP}${since}`;
-          tierCutoff = 0.4;   // two-sided [p40, p60]
-          tierTwoSided = true;
         } else {
           const cmp = METRIC_COMPARATIVE[currentMetric];
           const word = isHighSide ? cmp.high : cmp.low;
@@ -404,9 +400,9 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
           // Off-centre but still middle-of-the-pack: "…will be quite average…".
           forecastPredicate = `quite average compared to ${nounP}${since}`;
-          tierCutoff = 0.5;   // one-sided vs the median, today's side
-          tierTwoSided = false;
         }
+        tierCutoff = 0.2;   // two-sided [p20, p80] — the middle 60%
+        tierTwoSided = true;
         verdict = pick(VERDICT_MILD, seed);
       }
 

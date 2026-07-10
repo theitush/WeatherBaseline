@@ -327,133 +327,159 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     const histValues = histRowsNative.map((v) => convert(v, currentMetric, system));
 
-    // The two tails pivoting on `pivot` (display units). By default each is
-    // labelled with the % of the HISTORICAL pool it holds: inclusive above
-    // ("this hot or hotter"), strictly below — so they partition the pool and
-    // sum to exactly 100%. ONE implementation, called with the settled target
-    // value on history and with the verdict's reference line on forecasts.
-    //
-    // `exact` overrides the labels with the verdict tier's canonical percentage
-    // (5/10/20/50) instead of the day-fraction: on a forecast the reference line
-    // is snapped to a data point, so counting days at/above it lands 1–3% off
-    // the cutoff the top card actually compares to. When set, the verdict side
-    // reads exactly `exact.pct` and the other side reads its complement.
+    // Percentage labels for a pivot partition (display units): the share of the
+    // HISTORICAL pool strictly below vs. at-or-above `pivot`, so the two slices
+    // sum to exactly 100%. `exact` overrides with the verdict tier's canonical
+    // percentage (5/10/20) instead of the day-fraction — on a forecast the
+    // reference line is snapped to a data point, so counting days at/above it
+    // lands 1–3% off the cutoff the top card actually compares to. The brackets
+    // themselves are drawn by drawSpanPartition below.
     const fmtPct = (p: number) => (Number.isInteger(p) ? p.toFixed(0) : p.toFixed(1)) + '%';
-    const drawBrackets = (
+    const pivotLabels = (
       pivot: number,
       exact?: { pct: number; isHighSide: boolean }
-    ) => {
-      const total = histValues.length;
-      if (total === 0) return;
-      let pctHigher: string;
-      let pctLower: string;
+    ): { lower: string; higher: string } => {
       if (exact) {
-        pctHigher = fmtPct(exact.isHighSide ? exact.pct : 100 - exact.pct);
-        pctLower = fmtPct(exact.isHighSide ? 100 - exact.pct : exact.pct);
-      } else {
-        pctHigher = fmtPct((histValues.filter((v) => v >= pivot).length / total) * 100);
-        pctLower = fmtPct((histValues.filter((v) => v < pivot).length / total) * 100);
+        return {
+          lower: fmtPct(exact.isHighSide ? 100 - exact.pct : exact.pct),
+          higher: fmtPct(exact.isHighSide ? exact.pct : 100 - exact.pct),
+        };
       }
+      const total = histValues.length;
+      if (total === 0) return { lower: fmtPct(0), higher: fmtPct(0) };
+      return {
+        lower: fmtPct((histValues.filter((v) => v < pivot).length / total) * 100),
+        higher: fmtPct((histValues.filter((v) => v >= pivot).length / total) * 100),
+      };
+    };
 
+    // One curly-brace bracket spanning temps [lo, hi], drawn to the side of the
+    // temp axis and labelled at its middle. Ends are clamped a few px inside the
+    // plot so the outermost brackets don't hug a corner, and a span shorter than
+    // MIN_SPAN is skipped — that's what collapses a degenerate tail (e.g. rain's
+    // p20 sitting on the 0 floor) from three brackets down to two. The cap radius
+    // shrinks with the span so short tail brackets stay clean.
+    const BRACKET_W = 14;
+    const BRACKET_INSET = 8;
+    const MIN_SPAN = 14;
+    const clampSpan = (v: number, max: number) =>
+      Math.max(BRACKET_INSET, Math.min(max - BRACKET_INSET, v));
+    const drawSpanBracket = (lo: number, hi: number, label: string) => {
       if (!isVertical) {
         const rightX = width + 8;
-        const bw = 14;
-        const yMid = tempScale(pivot);
-        const yTop = 10;
-        const yBottom = height - 10;
-
+        const yHi = clampSpan(tempScale(hi), height); // higher temp → smaller y
+        const yLo = clampSpan(tempScale(lo), height);
+        const span = yLo - yHi;
+        if (span < MIN_SPAN) return;
+        const cap = Math.min(8, span / 4);
+        const yMid = (yHi + yLo) / 2;
         g.append('path')
           .attr(
             'd',
-            `M ${rightX} ${yTop}
-             L ${rightX + bw * 0.5} ${yTop}
-             Q ${rightX + bw * 0.8} ${yTop + 10} ${rightX + bw * 0.5} ${yTop + 18}
-             L ${rightX + bw * 0.5} ${yMid - 20}
-             Q ${rightX + bw * 0.8} ${yMid - 10} ${rightX + bw * 0.5} ${yMid - 4}`
+            `M ${rightX} ${yHi}
+             Q ${rightX + BRACKET_W * 0.5} ${yHi} ${rightX + BRACKET_W * 0.5} ${yHi + cap}
+             L ${rightX + BRACKET_W * 0.5} ${yMid - cap}
+             Q ${rightX + BRACKET_W * 0.5} ${yMid} ${rightX + BRACKET_W} ${yMid}
+             Q ${rightX + BRACKET_W * 0.5} ${yMid} ${rightX + BRACKET_W * 0.5} ${yMid + cap}
+             L ${rightX + BRACKET_W * 0.5} ${yLo - cap}
+             Q ${rightX + BRACKET_W * 0.5} ${yLo} ${rightX} ${yLo}`
           )
           .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
-
         g.append('text')
-          .attr('x', rightX + bw + 6)
-          .attr('y', (yTop + yMid) / 2)
+          .attr('x', rightX + BRACKET_W + 6)
+          .attr('y', yMid)
           .attr('dy', '0.35em')
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctHigher);
-
-        g.append('path')
-          .attr(
-            'd',
-            `M ${rightX + bw * 0.5} ${yMid + 4}
-             Q ${rightX + bw * 0.8} ${yMid + 10} ${rightX + bw * 0.5} ${yMid + 20}
-             L ${rightX + bw * 0.5} ${yBottom - 18}
-             Q ${rightX + bw * 0.8} ${yBottom - 10} ${rightX + bw * 0.5} ${yBottom}
-             L ${rightX} ${yBottom}`
-          )
-          .attr('stroke', 'var(--text-tertiary)')
-          .attr('stroke-width', 1.5)
-          .attr('fill', 'none');
-
-        g.append('text')
-          .attr('x', rightX + bw + 6)
-          .attr('y', (yMid + yBottom) / 2)
-          .attr('dy', '0.35em')
-          .attr('text-anchor', 'start')
-          .style('font-size', '12px')
-          .style('fill', 'var(--chart-label)')
-          .text(pctLower);
+          .text(label);
       } else {
-        // Vertical mode: brackets above the bars. Lower temps LEFT, higher RIGHT.
         const topY = -8;
-        const bw = 14;
-        const xMid = tempScale(pivot);
-        const xLeft = 10;
-        const xRight = width - 10;
-
+        const xLo = clampSpan(tempScale(lo), width);
+        const xHi = clampSpan(tempScale(hi), width);
+        const span = xHi - xLo;
+        if (span < MIN_SPAN) return;
+        const cap = Math.min(8, span / 4);
+        const xMid = (xLo + xHi) / 2;
         g.append('path')
           .attr(
             'd',
-            `M ${xLeft} ${topY}
-             L ${xLeft} ${topY - bw * 0.5}
-             Q ${xLeft + 10} ${topY - bw * 0.8} ${xLeft + 18} ${topY - bw * 0.5}
-             L ${xMid - 20} ${topY - bw * 0.5}
-             Q ${xMid - 10} ${topY - bw * 0.8} ${xMid - 4} ${topY - bw * 0.5}`
+            `M ${xLo} ${topY}
+             Q ${xLo} ${topY - BRACKET_W * 0.5} ${xLo + cap} ${topY - BRACKET_W * 0.5}
+             L ${xMid - cap} ${topY - BRACKET_W * 0.5}
+             Q ${xMid} ${topY - BRACKET_W * 0.5} ${xMid} ${topY - BRACKET_W}
+             Q ${xMid} ${topY - BRACKET_W * 0.5} ${xMid + cap} ${topY - BRACKET_W * 0.5}
+             L ${xHi - cap} ${topY - BRACKET_W * 0.5}
+             Q ${xHi} ${topY - BRACKET_W * 0.5} ${xHi} ${topY}`
           )
           .attr('stroke', 'var(--text-tertiary)')
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
-
         g.append('text')
-          .attr('x', (xLeft + xMid) / 2)
-          .attr('y', topY - bw - 4)
+          .attr('x', xMid)
+          .attr('y', topY - BRACKET_W - 4)
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
           .style('fill', 'var(--chart-label)')
-          .text(pctLower);
+          .text(label);
+      }
+    };
 
-        g.append('path')
-          .attr(
-            'd',
-            `M ${xMid + 4} ${topY - bw * 0.5}
-             Q ${xMid + 10} ${topY - bw * 0.8} ${xMid + 20} ${topY - bw * 0.5}
-             L ${xRight - 18} ${topY - bw * 0.5}
-             Q ${xRight - 10} ${topY - bw * 0.8} ${xRight} ${topY - bw * 0.5}
-             L ${xRight} ${topY}`
-          )
-          .attr('stroke', 'var(--text-tertiary)')
-          .attr('stroke-width', 1.5)
-          .attr('fill', 'none');
+    // Partition the temp axis at the interior `pivots` (ascending) and draw one
+    // span bracket per resulting slice, low→high, labelled by `segLabels`
+    // (pivots.length + 1 of them). Slices too short to render are dropped by
+    // drawSpanBracket, so a pivot on the axis floor yields fewer brackets.
+    const drawSpanPartition = (pivots: number[], segLabels: string[]) => {
+      const [dLo, dHi] = tempScale.domain() as [number, number];
+      const bounds = [dLo, ...pivots, dHi];
+      segLabels.forEach((label, i) => drawSpanBracket(bounds[i], bounds[i + 1], label));
+    };
 
-        g.append('text')
-          .attr('x', (xMid + xRight) / 2)
-          .attr('y', topY - bw - 4)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '12px')
-          .style('fill', 'var(--chart-label)')
-          .text(pctHigher);
+    // Like drawSpanPartition, but LABELS each slice by the pool's ACTUAL day-share
+    // rather than a fixed number, and MERGES any slice too thin to draw into the
+    // next one. This is what a partition whose pivots are climatology percentiles
+    // needs: when a rain day's p20 (and maybe p80) sit on the 0 floor, the empty
+    // bottom slice folds away and its share rolls into the neighbour, so the
+    // visible brackets always sum to 100% — e.g. 80% / 20% (p20 at 0) or a single
+    // 100% (near-always-dry) instead of a mislabeled 60%/20% or lone 20%.
+    const drawSharePartition = (pivots: number[]) => {
+      const [dLo, dHi] = tempScale.domain() as [number, number];
+      const axisMax = isVertical ? width : height;
+      const axisPx = (v: number) => clampSpan(tempScale(v), axisMax);
+      const bounds = [dLo, ...pivots, dHi];
+      // Keep a boundary only if it's ≥ MIN_SPAN pixels past the last kept cut, so
+      // every surviving slice is actually drawable.
+      const cuts = [bounds[0]];
+      for (let i = 1; i < bounds.length - 1; i++) {
+        if (Math.abs(axisPx(bounds[i]) - axisPx(cuts[cuts.length - 1])) >= MIN_SPAN) {
+          cuts.push(bounds[i]);
+        }
+      }
+      cuts.push(bounds[bounds.length - 1]);
+      // If the final slice is thin, fold it back by dropping the penultimate cut.
+      if (
+        cuts.length >= 3 &&
+        Math.abs(axisPx(cuts[cuts.length - 1]) - axisPx(cuts[cuts.length - 2])) < MIN_SPAN
+      ) {
+        cuts.splice(cuts.length - 2, 1);
+      }
+      const total = histValues.length;
+      // Draw each slice, forcing the running total to exactly 100 (last gets the
+      // remainder) so rounding can't make the labels miss 100.
+      let acc = 0;
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const isLast = i === cuts.length - 2;
+        const pct = isLast
+          ? 100 - acc
+          : total
+            ? Math.round(
+                (histValues.filter((v) => v >= cuts[i] && v < cuts[i + 1]).length / total) * 100
+              )
+            : 0;
+        acc += pct;
+        drawSpanBracket(cuts[i], cuts[i + 1], `${pct}%`);
       }
     };
 
@@ -491,9 +517,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         // The verdict tier + its climatology reference value: same tier the top
         // card fires (native, unit-agnostic), then the tier's cutoff value read
         // off the matching pool in DISPLAY units. Runs off the SAME historical
-        // pool as the brackets. Dead-centre mild has no side, so it pins to the
-        // median; every other tier's refValue is the one-sided threshold its
-        // confidence test checks against (= the confidence-shade edge below).
+        // pool as the brackets. For one-sided (tail) tiers refValue is the
+        // threshold the confidence test checks against (= the confidence-shade
+        // edge below); mild tiers are two-sided and use loT/hiT instead, so
+        // refValue is unused there.
         const allHistNative = comparablePool(yearTimeline, currentDate)
           .filter((d) => d.data_type !== 'forecast')
           .map((d) => d[currentMetric])
@@ -507,9 +534,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         const refValue =
           marker == null
             ? 0
-            : marker.tier === 'mildDead'
-              ? d3.median(histValues) ?? convert(band.mid, currentMetric, system)
-              : valueAtTailFraction(poolConv, marker.tierCutoff, marker.isHighSide);
+            : valueAtTailFraction(poolConv, marker.tierCutoff, marker.isHighSide);
 
         if (density.length >= 2) {
           // Peak → HALF the count axis so the curve reads as an overlay, not a
@@ -524,7 +549,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           // the region the verdict claims, and print that region's probability —
           // the SAME CQR exceedance the card's bottom line states ("~80% chance
           // this day will be …"). One-sided tiers shade the tail past refValue;
-          // dead-centre mild shades the two-sided [p40,p60] band around the median.
+          // mild tiers shade the two-sided [p20,p80] middle-60% band.
           // Skipped on a thin pool, matching the prose's n≥5 gate.
           if (marker && histValues.length >= 5) {
             const loT = valueAtTailFraction(poolConv, marker.tierCutoff, false);
@@ -668,39 +693,56 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             .style('opacity', 1);
         }
 
-        if (marker) {
+        if (marker && marker.tierTwoSided) {
+          // Middle 60% (mild): show the whole climatology partition the verdict is
+          // graded against — faint lines at p20 & p80, and span brackets for all
+          // three slices (bottom 20% / middle 60% / top 20%) so the labels sum to
+          // 100%. A tail that collapses onto the axis floor (e.g. rain's p20 at 0)
+          // drops out, leaving two. The forecast's OWN chance of landing in the
+          // middle is the ~X% shade label drawn above.
+          const loT = valueAtTailFraction(poolConv, marker.tierCutoff, false);
+          const hiT = valueAtTailFraction(poolConv, marker.tierCutoff, true);
+          for (const t of [loT, hiT]) {
+            // Skip a boundary line pinned to the axis floor/ceiling (e.g. rain's
+            // p20 at 0) — it would just trace the baseline. drawSharePartition
+            // folds that slice away too, so the labels still sum to 100%.
+            if (t <= domLo2 || t >= domHi2) continue;
+            perpLine(t)
+              .attr('class', 'forecast-ref-line')
+              .attr('stroke', 'var(--text-tertiary)')
+              .attr('stroke-width', 1)
+              .attr('stroke-dasharray', '4,3')
+              .style('opacity', 0.4);
+          }
+          drawSharePartition([loT, hiT]);
+        } else if (marker) {
           perpLine(refValue)
             .attr('class', 'forecast-ref-line')
             .attr('stroke', 'var(--text-tertiary)')
             .attr('stroke-width', 1)
             .attr('stroke-dasharray', '4,3')
             .style('opacity', 0.4);
-          // Label the verdict side with the tier's canonical % (5/10/20/50) — the
-          // exact figure the top card compares to — not the ref line's snapped
-          // day-fraction. Both mild tiers pin to the median → a clean 50/50.
-          // All-time has no canonical %, so it keeps the honest day-fraction.
-          const exactPct =
+          // Partition at the reference line. Label the verdict side with the
+          // tier's canonical % (5/10/20) — the exact figure the top card compares
+          // to, not the ref line's snapped day-fraction. All-time has no canonical
+          // %, so it keeps the honest day-fraction.
+          const exact =
             marker.tier === 'alltime'
               ? undefined
-              : marker.tier === 'mildDead' || marker.tier === 'mildOff'
-                ? 50
-                : marker.tierCutoff * 100;
-          drawBrackets(
-            refValue,
-            exactPct === undefined
-              ? undefined
-              : { pct: exactPct, isHighSide: marker.isHighSide }
-          );
+              : { pct: marker.tierCutoff * 100, isHighSide: marker.isHighSide };
+          const { lower, higher } = pivotLabels(refValue, exact);
+          drawSpanPartition([refValue], [lower, higher]);
         }
       } else {
-        // Settled history: straight dashed line at the target value + brackets.
+        // Settled history: straight dashed "this is today" line + the climatology
+        // partition (share of days below vs. at-or-above it) in span brackets.
         const currentTemp = convert(currentRow[currentMetric] as number, currentMetric, system);
         perpLine(currentTemp)
           .attr('class', 'current-temp-line')
           .attr('stroke', 'var(--text-h)')
           .attr('stroke-width', 2)
           .attr('stroke-dasharray', '4,3');
-        drawBrackets(currentTemp);
+        drawSharePartition([currentTemp]);
       }
     }
 
