@@ -390,17 +390,17 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         if (isDeadCenter) {
           const deadPhrase = pick(DEAD_CENTER_LINE, seed);
           extremeLine = `${deadPhrase} for ${nounP}${since}.`;
-          // Forecast form keeps the same playful phrase, lower-cased into the
-          // sentence: "…this day will be averagely average compared to days…".
-          forecastPredicate = `${deadPhrase.toLowerCase()} compared to ${nounP}${since}`;
         } else {
           const cmp = METRIC_COMPARATIVE[currentMetric];
           const word = isHighSide ? cmp.high : cmp.low;
           const hedge = pick(MILD_HEDGE, seed);
           extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
-          // Off-centre but still middle-of-the-pack: "…will be quite average…".
-          forecastPredicate = `quite average compared to ${nounP}${since}`;
         }
+        // Forecast form states the tier plainly against the same [p20, p80] band
+        // the confidence is graded on and the histogram brackets: "…this day will
+        // be within the middle 60% of days…". (The playful lines above are the
+        // historical, non-forecast wording; the flavour split doesn't carry over.)
+        forecastPredicate = `within the middle 60% of ${nounP}${since}`;
         tierCutoff = 0.2;   // two-sided [p20, p80] — the middle 60%
         tierTwoSided = true;
         verdict = pick(VERDICT_MILD, seed);

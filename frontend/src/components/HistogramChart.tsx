@@ -356,21 +356,24 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // One curly-brace bracket spanning temps [lo, hi], drawn to the side of the
     // temp axis and labelled at its middle. Ends are clamped a few px inside the
     // plot so the outermost brackets don't hug a corner, and a span shorter than
-    // MIN_SPAN is skipped — that's what collapses a degenerate tail (e.g. rain's
+    // `minSpan` is skipped — that's what collapses a degenerate tail (e.g. rain's
     // p20 sitting on the 0 floor) from three brackets down to two. The cap radius
-    // shrinks with the span so short tail brackets stay clean.
+    // shrinks with the span so short tail brackets stay clean. `minSpan` is
+    // relaxable per-call: the lone middle-60% bracket passes a smaller floor so a
+    // right-skewed precip band ([0, a few mm] against a storm-stretched axis) still
+    // renders instead of vanishing.
     const BRACKET_W = 14;
     const BRACKET_INSET = 8;
     const MIN_SPAN = 14;
     const clampSpan = (v: number, max: number) =>
       Math.max(BRACKET_INSET, Math.min(max - BRACKET_INSET, v));
-    const drawSpanBracket = (lo: number, hi: number, label: string) => {
+    const drawSpanBracket = (lo: number, hi: number, label: string, minSpan = MIN_SPAN) => {
       if (!isVertical) {
         const rightX = width + 8;
         const yHi = clampSpan(tempScale(hi), height); // higher temp → smaller y
         const yLo = clampSpan(tempScale(lo), height);
         const span = yLo - yHi;
-        if (span < MIN_SPAN) return;
+        if (span < minSpan) return;
         const cap = Math.min(8, span / 4);
         const yMid = (yHi + yLo) / 2;
         g.append('path')
@@ -400,7 +403,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         const xLo = clampSpan(tempScale(lo), width);
         const xHi = clampSpan(tempScale(hi), width);
         const span = xHi - xLo;
-        if (span < MIN_SPAN) return;
+        if (span < minSpan) return;
         const cap = Math.min(8, span / 4);
         const xMid = (xLo + xHi) / 2;
         g.append('path')
@@ -694,18 +697,18 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         }
 
         if (marker && marker.tierTwoSided) {
-          // Middle 60% (mild): show the whole climatology partition the verdict is
-          // graded against — faint lines at p20 & p80, and span brackets for all
-          // three slices (bottom 20% / middle 60% / top 20%) so the labels sum to
-          // 100%. A tail that collapses onto the axis floor (e.g. rain's p20 at 0)
-          // drops out, leaving two. The forecast's OWN chance of landing in the
-          // middle is the ~X% shade label drawn above.
+          // Middle 60% (mild): the verdict is graded against the [p20, p80] band,
+          // so mark JUST that band — faint lines at p20 & p80 and a single span
+          // bracket over the middle, labelled a fixed "60%". We deliberately don't
+          // draw the bottom/top-20% brackets or count the exact enclosed day-share:
+          // the band is 60% by construction, and snapping loT/hiT to data points
+          // would make a counted label read 59%/62% instead. The forecast's OWN
+          // chance of landing in the middle is the ~X% shade label drawn above.
           const loT = valueAtTailFraction(poolConv, marker.tierCutoff, false);
           const hiT = valueAtTailFraction(poolConv, marker.tierCutoff, true);
           for (const t of [loT, hiT]) {
             // Skip a boundary line pinned to the axis floor/ceiling (e.g. rain's
-            // p20 at 0) — it would just trace the baseline. drawSharePartition
-            // folds that slice away too, so the labels still sum to 100%.
+            // p20 at 0) — it would just trace the baseline.
             if (t <= domLo2 || t >= domHi2) continue;
             perpLine(t)
               .attr('class', 'forecast-ref-line')
@@ -714,7 +717,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
               .attr('stroke-dasharray', '4,3')
               .style('opacity', 0.4);
           }
-          drawSharePartition([loT, hiT]);
+          // Relaxed minSpan so a floor-hugging precip band (p20 at 0mm, p80 a few
+          // mm, against an axis stretched to storm days) still renders its bracket
+          // instead of being skipped for being too short.
+          drawSpanBracket(loT, hiT, '60%', 6);
         } else if (marker) {
           perpLine(refValue)
             .attr('class', 'forecast-ref-line')
