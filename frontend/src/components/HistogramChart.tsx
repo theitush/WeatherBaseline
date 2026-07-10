@@ -354,19 +354,34 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     };
 
     // One curly-brace bracket spanning temps [lo, hi], drawn to the side of the
-    // temp axis and labelled at its middle. Ends are clamped a few px inside the
-    // plot so the outermost brackets don't hug a corner, and a span shorter than
-    // `minSpan` is skipped — that's what collapses a degenerate tail (e.g. rain's
-    // p20 sitting on the 0 floor) from three brackets down to two. The cap radius
-    // shrinks with the span so short tail brackets stay clean. `minSpan` is
-    // relaxable per-call: the lone middle-60% bracket passes a smaller floor so a
-    // right-skewed precip band ([0, a few mm] against a storm-stretched axis) still
-    // renders instead of vanishing.
+    // temp axis and labelled at its middle. Ends are clamped to the DATA extent
+    // (first/last non-empty bin) plus a few px, NOT the padded axis edge, so the
+    // outermost brackets reach the last bars instead of hugging the plot corner.
+    // A span shorter than `minSpan` is skipped — that's what collapses a
+    // degenerate tail (e.g. rain's p20 sitting on the 0 floor) from three brackets
+    // down to two. The cap radius shrinks with the span so short tail brackets
+    // stay clean. `minSpan` is relaxable per-call: the lone middle-60% bracket
+    // passes a smaller floor so a right-skewed precip band ([0, a few mm] against
+    // a storm-stretched axis) still renders instead of vanishing.
     const BRACKET_W = 14;
-    const BRACKET_INSET = 8;
+    const EDGE_PAD = 4;
     const MIN_SPAN = 14;
+    // Pixel span actually covered by bars (first→last non-empty bin edge). Clamp
+    // bracket ends to this ± EDGE_PAD so they land on the data, not the axis
+    // padding. For precip the common 0-floor bin runs to the very edge, so the low
+    // end correctly clamps flush against it.
+    const nonEmptyBins = bins.filter((d) => d.length > 0);
+    const dataLoT = nonEmptyBins.length ? nonEmptyBins[0].x0! : domainLo;
+    const dataHiT = nonEmptyBins.length
+      ? nonEmptyBins[nonEmptyBins.length - 1].x1!
+      : domainHi;
+    const dataPxLo = Math.min(tempScale(dataLoT), tempScale(dataHiT));
+    const dataPxHi = Math.max(tempScale(dataLoT), tempScale(dataHiT));
     const clampSpan = (v: number, max: number) =>
-      Math.max(BRACKET_INSET, Math.min(max - BRACKET_INSET, v));
+      Math.max(
+        Math.max(0, dataPxLo - EDGE_PAD),
+        Math.min(Math.min(max, dataPxHi + EDGE_PAD), v)
+      );
     const drawSpanBracket = (lo: number, hi: number, label: string, minSpan = MIN_SPAN) => {
       if (!isVertical) {
         const rightX = width + 8;
