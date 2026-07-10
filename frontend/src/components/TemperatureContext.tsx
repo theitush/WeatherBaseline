@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey, MetricBand } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, unitLabelBare, valueDecimals } from '../utils/units';
-import { comparablePool, findRecords, rankValue } from '../utils/dataProcessor';
+import { comparablePool, findRecords } from '../utils/dataProcessor';
+import { resolveForecastMarker } from '../utils/forecastReference';
 import {
   bandQuantilePoints,
   probabilityOneSided,
@@ -245,38 +246,39 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let rank = 0; // 1-based rank on the day's side; 0 when undeterminable.
   let allTimeRank = 0; // rank across the ENTIRE record (every day, all years); 0 = N/A.
   {
-    // Compare in CONVERTED (display-unit) space, exactly as the histogram does,
-    // so the prose rarity and the histogram bracket agree to the decimal.
-    const cur = convert(displayTemp, currentMetric, system);
-    const values = valid.map((d) => convert(d[currentMetric] as number, currentMetric, system));
-    const n = values.length;
-    // Window rank via the shared rankValue() — INCLUSIVE tails + shared-worst
-    // "competition" rank (ties share the LAST position of their group, so a 0mm
-    // day tied with 300 others ranks ~300th, not 1st and never fires confetti).
-    // 'auto' picks the rarer side. THE one ranking implementation; the histogram
-    // brackets and chart star derive from the same pool/logic.
-    const windowRank = rankValue(cur, values, 'auto');
-    const isHighSide = windowRank.isHighSide;
-    const singleTail = windowRank.singleTail;
-    let allVals: number[] = [];
-    if (n > 0) {
-      rank = isHighSide ? windowRank.rankHigh : windowRank.rankLow;
-      // All-time rank: same logic, but against EVERY day of the whole record (not
-      // just the ±N-day window). A top-1..10 here means the value is, e.g., among
-      // the hottest days this cell has ever seen on ANY date — far rarer than
-      // topping its calendar neighbours, so it earns louder prose + 5× confetti.
-      // Force the same side (isHighSide) so "hottest/coldest" agrees with the
-      // window verdict.
-      {
-        allVals = comparablePool(yearTimeline, currentDate)
-          .map((d) => d[currentMetric])
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
-          .map((v) => convert(v, currentMetric, system));
-        if (allVals.length > 0) {
-          const allTime = rankValue(cur, allVals, isHighSide ? 'high' : 'low');
-          allTimeRank = isHighSide ? allTime.rankHigh : allTime.rankLow;
-        }
-      }
+    // Tier + rarity run off the SAME climatology pool the histogram brackets use:
+    // comparablePool at/before the target with FORECAST ROWS EXCLUDED — the target's
+    // own forecast row plus recent reanalysis-quality rows. Including them (as this
+    // card used to) ranks the value against near-copies of itself and lands it a tier
+    // MILDER than the histogram, which excludes them — the "card says top 20% / chart
+    // says top 10%" bug. resolveForecastMarker is THE shared tier resolver
+    // (utils/forecastReference) the histogram calls too, so the card headline and the
+    // bracket can no longer disagree about which tier fired. Ranking is unit-agnostic,
+    // so the marker runs on NATIVE pools; display-unit copies below feed only the
+    // confidence cutoff VALUES.
+    const isForecastRow = (d: WeatherDataPoint) => d.data_type === 'forecast';
+    const windowNative = valid
+      .filter((d) => !isForecastRow(d))
+      .map((d) => d[currentMetric] as number);
+    const allTimeNative = comparablePool(yearTimeline, currentDate)
+      .filter((d) => !isForecastRow(d))
+      .map((d) => d[currentMetric])
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const bucketed = !!band;
+    const marker = resolveForecastMarker(displayTemp, windowNative, allTimeNative, bucketed);
+    if (marker) {
+      const { tier, isHighSide, singleTail } = marker;
+      rank = marker.rank;
+      allTimeRank = marker.allTimeRank;
+      const n = windowNative.length;
+      // Display-unit copies of those SAME pools — only the confidence cutoff VALUES
+      // (valueAtTailFraction) below need display units; the tier decision above is
+      // rank-based and unit-agnostic. tierPool tracks the tier's own pool.
+      const values = windowNative.map((v) => convert(v, currentMetric, system));
+      const allVals = allTimeNative.map((v) => convert(v, currentMetric, system));
+      const tierPool = marker.tierUsesAllTime ? allVals : values;
+      const tierCutoff = marker.tierCutoff;
+      const tierTwoSided = marker.tierTwoSided;
       // Name the actual comparison pool: every day within a ±seasonalWindowDays
       // calendar window of the target date, across all years back to 1950. Spell
       // out the window and date ("within ±N days of June 6th") rather than the
@@ -299,22 +301,14 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
       const seed = `${currentMetric}:${displayTemp}:${rank}`;
 
-      // Forecast/recent-model rows get bucketed rarity text; historical rows
-      // (and recent-tier temperature, which has no band) keep the exact
-      // percentage wording, unchanged from before this refactor.
-      const bucketed = !!band;
-
-      // The tail-fraction cutoff + pool that defined whichever tier fires below,
-      // used (band-present rows only) to compute the confidence qualifier.
-      let tierCutoff = 0.2;
-      let tierPool = values;
-      let tierTwoSided = false;
       // The predicate after "…this day will be ___" in the forecast bottom line
       // (e.g. "in the top 10% hottest days within ±3 days of Jul 12th"). null only
       // for all-time, which isn't a ±window claim and keeps its own special line.
+      // The TIER is resolveForecastMarker's call now (shared with the histogram);
+      // this switch only picks the wording + verdict bank for whichever tier fired.
       let forecastPredicate: string | null = null;
 
-      if (allTimeRank >= 1 && allTimeRank <= 10) {
+      if (tier === 'alltime') {
         // Among the rarest the page shows: a top-10 value across the WHOLE record.
         // We deliberately DON'T name the exact slot — ERA5-Land on a 0.1° grid
         // can't credibly resolve #1 vs #2 vs … #10; those gaps sit inside the noise.
@@ -325,9 +319,7 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // SCOPE, not rarity: "any day of any year" vs the seasonal "this season."
         extremeLine = `One of the ${sup} ${nounP} EVER recorded!!!`;
         verdict = pick(VERDICT_ALLTIME, seed);
-        tierCutoff = 10 / Math.max(1, allVals.length);
-        tierPool = allVals;
-      } else if (rank <= 3) {
+      } else if (tier === 'top3') {
         // Top-3 within its ±window. Same rationale — no exact ordinal; "one of the
         // hottest near this date" backed by the seasonal rarity % (bucketed on
         // forecast rows, exact on historical), which IS robust.
@@ -340,10 +332,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         }
         // #1 still gets the exclusive phrase + bigger confetti; #2/#3 the party bank.
         verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP3, seed);
-        tierCutoff = 0.05;
         forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
-      } else if (singleTail <= 0.05) {
-        // Extreme.
+      } else if (tier === 'extreme') {
         if (bucketed) {
           extremeLine = `Under 5% of ${nounP}${since} were this ${adj}!`;
         } else {
@@ -353,16 +343,14 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           extremeLine = `Only ${shown}% of ${nounP}${since} were this ${adj}!`;
         }
         verdict = pick(VERDICT_EXTREME, seed);
-        tierCutoff = 0.05;
         forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
-      } else if (bucketed && singleTail <= 0.1) {
-        // NEW mid-tier, forecast/recent-model rows only — splits the old
-        // 5%→20% gap so "under 10%" reads distinctly from "under 20%".
+      } else if (tier === 'mid') {
+        // Mid-tier, forecast/recent-model rows only — splits the old 5%→20% gap so
+        // "under 10%" reads distinctly from "under 20%".
         extremeLine = `Under 10% of ${nounP}${since} were this ${adj}!`;
         verdict = pick(VERDICT_EXTREME, seed);
-        tierCutoff = 0.1;
         forecastPredicate = `in the top 10% ${sup} ${nounP}${since}`;
-      } else if (singleTail <= 0.2) {
+      } else if (tier === 'notable') {
         // Notable — cumulative ("or hotter"). Drop the comparative when nothing
         // can be more extreme (a 0mm day can't be "drier").
         const atFloor = displayTemp === 0 && !isHighSide;
@@ -377,17 +365,13 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
             : `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj} or ${comp}.`;
         }
         verdict = pick(VERDICT_NOTABLE, seed);
-        tierCutoff = 0.2;
         forecastPredicate = `in the top 20% ${sup} ${nounP}${since}`;
       } else {
-        // Mild — the middle 60% (p20–p80). Describe the position softly. The
-        // confidence for BOTH sub-cases is the forecast's chance of landing in the
-        // normal middle: a TWO-SIDED [p20, p80] band (the same "grade the region
-        // you assert" rule the tail tiers use). Dead-centre and off-centre differ
-        // only in flavour wording, not in the number.
-        const pctile = windowRank.rankLow / n; // 0..1, where today sits in the pack
-        const isDeadCenter = pctile >= 0.4 && pctile <= 0.6;
-        if (isDeadCenter) {
+        // Mild — the middle 60% (p20–p80). resolveForecastMarker split it into
+        // 'mildDead' (dead-centre p40–60) vs 'mildOff' (off-centre); both are graded
+        // against the same two-sided [p20,p80] band (marker.tierTwoSided), differing
+        // only in flavour wording.
+        if (tier === 'mildDead') {
           const deadPhrase = pick(DEAD_CENTER_LINE, seed);
           extremeLine = `${deadPhrase} for ${nounP}${since}.`;
         } else {
@@ -401,8 +385,6 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // be within the middle 60% of days…". (The playful lines above are the
         // historical, non-forecast wording; the flavour split doesn't carry over.)
         forecastPredicate = `within the middle 60% of ${nounP}${since}`;
-        tierCutoff = 0.2;   // two-sided [p20, p80] — the middle 60%
-        tierTwoSided = true;
         verdict = pick(VERDICT_MILD, seed);
       }
 
