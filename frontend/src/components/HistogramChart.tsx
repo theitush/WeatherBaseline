@@ -227,6 +227,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const unit = unitLabel(currentMetric, system);
 
+    // Full-strength metric hue — used to ink the span brackets and their % labels
+    // so they read as part of the metric's family rather than neutral grey chrome.
+    const metricColor = CONFIG.metricColors[currentMetric]?.base ?? 'var(--chart-label)';
+
     // Bin edges land on the BIN grid; one decimal can't tell imperial precip's
     // 0.05-in edges apart (0.05 and 0.10 both round to "0.1").
     const dp = BIN < 0.1 ? 2 : 1;
@@ -424,7 +428,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              L ${rightX + BRACKET_W * 0.5} ${yLo - cap}
              Q ${rightX + BRACKET_W * 0.5} ${yLo} ${rightX} ${yLo}`
           )
-          .attr('stroke', 'var(--text-tertiary)')
+          .attr('stroke', metricColor)
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
         g.append('text')
@@ -433,7 +437,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('dy', '0.35em')
           .attr('text-anchor', 'start')
           .style('font-size', '12px')
-          .style('fill', 'var(--chart-label)')
+          .style('fill', metricColor)
           .text(label);
       } else {
         const topY = -8;
@@ -454,7 +458,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
              L ${xHi - cap} ${topY - BRACKET_W * 0.5}
              Q ${xHi} ${topY - BRACKET_W * 0.5} ${xHi} ${topY}`
           )
-          .attr('stroke', 'var(--text-tertiary)')
+          .attr('stroke', metricColor)
           .attr('stroke-width', 1.5)
           .attr('fill', 'none');
         g.append('text')
@@ -462,7 +466,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('y', topY - BRACKET_W - 4)
           .attr('text-anchor', 'middle')
           .style('font-size', '12px')
-          .style('fill', 'var(--chart-label)')
+          .style('fill', metricColor)
           .text(label);
       }
       return true;
@@ -690,12 +694,13 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
               .duration(500)
               .style('opacity', 1);
 
-            // Label the shaded lobe with its probability, at the GEOMETRIC middle
-            // of the visibly-shaded extent: trim the near-zero density tail (the
-            // KDE's padded shoulder), then take the midpoint of what's left so the
-            // number sits in the heart of the hatch rather than out on the taper.
-            // Inked in the hatch's own muted tone (KDE ink at the stripes' opacity),
-            // with a thin KDE-ink outline so it stays legible over its own stripes.
+            // Label the shaded lobe with its probability, sitting on the OUTSIDE of
+            // the KDE curve (the empty side, away from the hatched fill) right next
+            // to the shaded region rather than buried inside the hatch. Anchor it at
+            // the GEOMETRIC middle of the visibly-shaded extent: trim the near-zero
+            // density tail (the KDE's padded shoulder), take the midpoint of what's
+            // left, then step just past the curve at that point. Inked to match the
+            // hatch exactly — KDE ink at the stripes' own opacity, no outline.
             // Rounded to 5% / capped at 95% to match the card.
             const regionPts = density.filter((pt) => pt.t >= regLo && pt.t <= regHi);
             if (regionPts.length) {
@@ -708,19 +713,18 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
                 Math.abs(b.t - cT) < Math.abs(a.t - cT) ? b : a
               );
               const chance = Math.min(95, Math.round(p * 20) * 5);
+              // Nudge past the curve, on the far side from the axis-anchored fill.
+              // Enough clearance that the glyphs don't graze the dashed KDE line.
+              const PAD = 20;
               g.append('text')
                 .attr('class', 'forecast-conf-label')
-                .attr('x', isVertical ? tempScale(centre.t) : kdeLen(centre.d) / 2)
-                .attr('y', isVertical ? height - kdeLen(centre.d) / 2 : tempScale(centre.t))
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'middle')
+                .attr('x', isVertical ? tempScale(centre.t) : kdeLen(centre.d) + PAD)
+                .attr('y', isVertical ? height - kdeLen(centre.d) - PAD : tempScale(centre.t))
+                .attr('dy', isVertical ? '0' : '0.35em')
+                .attr('text-anchor', isVertical ? 'middle' : 'start')
                 .style('font-size', '12px')
                 .style('fill', 'var(--text-h)')
-                .style('fill-opacity', 0.7)
-                .style('paint-order', 'stroke')
-                .style('stroke', 'var(--text-h)')
-                .style('stroke-width', '0.2px')
-                .style('stroke-linejoin', 'round')
+                .style('fill-opacity', 0.5)
                 .style('opacity', 0)
                 .text(`~${chance}%`)
                 .transition()
