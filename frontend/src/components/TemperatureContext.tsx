@@ -429,12 +429,16 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // Degenerate middle band — p20 == p80 (a bone-dry precip window where nearly
         // every comparable day is 0mm). "…within the middle 60%…" is meaningless when
         // the band is a single point, so restate it against the majority the day
-        // actually resembles: "…like 99% of days…", the share of comparable days
-        // sitting at that same value (matches the histogram's dry bracket).
+        // actually resembles: "…like 99% of days…". The share is COMPUTED (never
+        // hardcoded) on the SAME pool the histogram's dry bracket counts — the
+        // comparable climatology days with forecast rows excluded — so the card
+        // number and the bracket always agree.
         if (tierTwoSided && Math.abs(hiT - loT) < 1e-6) {
-          const share = Math.round(
-            (tierPool.filter((v) => v <= loT + 1e-9).length / tierPool.length) * 100
-          );
+          const climatology = valid.filter((d) => d.data_type !== 'forecast');
+          const atValue = climatology.filter(
+            (d) => convert(d[currentMetric] as number, currentMetric, system) <= loT + 1e-9
+          ).length;
+          const share = Math.round((atValue / Math.max(1, climatology.length)) * 100);
           forecastPredicate = `like ${share}% of ${nounP}${since}`;
         }
         // p prefixes the verdict word (top). It also drives the bottom line: on any
