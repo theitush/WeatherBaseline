@@ -58,11 +58,18 @@ function invCdf(points: { p: number; v: number }[], u: number): number {
  * over [p01, p99], so their empirical density mirrors the forecast), then
  * Gaussian-KDE them. Returns {t, d} points over the support, padded by ~1
  * bandwidth so the curve tapers toward 0 at the tails — the caller scales `d`
- * onto the count axis. Empty when the band is degenerate (all quantiles equal,
- * e.g. a bone-dry precip forecast) where a curve would be a zero-width spike.
+ * onto the count axis.
+ *
+ * `axisSpan` (the padded value-axis width, display units) is used only to floor
+ * the bandwidth of a DEGENERATE band — all quantiles equal (e.g. a bone-dry
+ * precip forecast whose every quantile trace-clamps to 0mm). That's a genuine
+ * point mass, so there's no spread to smooth; rather than draw nothing we emit a
+ * narrow spike centred on the value, which at the 0mm floor clips to a half-spike
+ * piled on the axis — the honest "≈certainly 0mm" shape.
  */
 function forecastDensityCurve(
-  points: { p: number; v: number }[]
+  points: { p: number; v: number }[],
+  axisSpan: number
 ): { t: number; d: number }[] {
   const N = 300;
   const M = 90;
@@ -75,7 +82,22 @@ function forecastDensityCurve(
   samples.sort((a, b) => a - b);
   const lo = samples[0];
   const hi = samples[N - 1];
-  if (hi - lo < 1e-9) return []; // no spread — nothing to draw as a curve
+  if (hi - lo < 1e-9) {
+    // Point mass: emit a narrow Gaussian spike centred on the value. `d` is
+    // rescaled to the count axis by the caller, so the absolute height is
+    // irrelevant — only the shape matters. bw is a small slice of the axis so
+    // the spike stays visibly narrow at any zoom.
+    const bw = Math.max(axisSpan / 28, 1e-6);
+    const gLo = lo - 4 * bw;
+    const gHi = lo + 4 * bw;
+    const out: { t: number; d: number }[] = [];
+    for (let j = 0; j <= M; j++) {
+      const t = gLo + ((gHi - gLo) * j) / M;
+      const z = (t - lo) / bw;
+      out.push({ t, d: Math.exp(-0.5 * z * z) });
+    }
+    return out;
+  }
 
   const sd = d3.deviation(samples) ?? 0;
   const iqr = (d3.quantile(samples, 0.75) as number) - (d3.quantile(samples, 0.25) as number);
@@ -388,7 +410,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         const yHi = clampSpan(tempScale(hi), height); // higher temp → smaller y
         const yLo = clampSpan(tempScale(lo), height);
         const span = yLo - yHi;
-        if (span < minSpan) return;
+        if (span < minSpan) return false;
         const cap = Math.min(8, span / 4);
         const yMid = (yHi + yLo) / 2;
         g.append('path')
@@ -418,7 +440,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         const xLo = clampSpan(tempScale(lo), width);
         const xHi = clampSpan(tempScale(hi), width);
         const span = xHi - xLo;
-        if (span < minSpan) return;
+        if (span < minSpan) return false;
         const cap = Math.min(8, span / 4);
         const xMid = (xLo + xHi) / 2;
         g.append('path')
@@ -443,6 +465,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .style('fill', 'var(--chart-label)')
           .text(label);
       }
+      return true;
     };
 
     // Partition the temp axis at the interior `pivots` (ascending) and draw one
@@ -527,8 +550,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         // The forecast's own 9-point predictive CDF (display units) — the source
         // for the KDE overlay, the confidence shade, and the CQR exceedance test.
         const bandPoints = bandQuantilePoints(band, currentMetric, system);
-        // Forecast KDE (skipped only for a degenerate zero-spread band).
-        const density = forecastDensityCurve(bandPoints).filter(
+        // Forecast KDE. A degenerate (point-mass) band renders as a narrow spike
+        // rather than nothing — see forecastDensityCurve.
+        const density = forecastDensityCurve(bandPoints, domHi2 - domLo2).filter(
           (pt) => pt.t >= domLo2 && pt.t <= domHi2
         );
 
@@ -572,15 +596,29 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           if (marker && histValues.length >= 5) {
             const loT = valueAtTailFraction(poolConv, marker.tierCutoff, false);
             const hiT = valueAtTailFraction(poolConv, marker.tierCutoff, true);
-            const p = marker.tierTwoSided
-              ? probabilityBetween(bandPoints, loT, hiT)
-              : probabilityOneSided(bandPoints, refValue, marker.isHighSide);
+            // Degenerate middle band: p20 == p80 (a bone-dry precip window, both on
+            // the 0mm floor). The two-sided [p20,p80] region collapses to a point, so
+            // there's nothing to hatch. Treat it as the one-sided "dry" claim it
+            // really is: shade the dry spike up to the first populated bin's top edge
+            // (the same range the fallback bracket labels ~99%) and grade it by the
+            // forecast's probability of staying dry.
+            const degenerate =
+              marker.tierTwoSided && Math.abs(hiT - loT) < 1e-6 && nonEmptyBins.length > 0;
+            const dryEdge = degenerate ? nonEmptyBins[0].x1! : hiT;
+            const p = degenerate
+              ? probabilityOneSided(bandPoints, dryEdge, false)
+              : marker.tierTwoSided
+                ? probabilityBetween(bandPoints, loT, hiT)
+                : probabilityOneSided(bandPoints, refValue, marker.isHighSide);
 
             // Region bounds on the temp axis (display units), clamped to the drawn
             // support so the clip rect never spills past the curve.
             let regLo: number;
             let regHi: number;
-            if (marker.tierTwoSided) {
+            if (degenerate) {
+              regLo = domLo2;
+              regHi = dryEdge;
+            } else if (marker.tierTwoSided) {
               regLo = loT;
               regHi = hiT;
             } else if (marker.isHighSide) {
@@ -735,7 +773,17 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           // Relaxed minSpan so a floor-hugging precip band (p20 at 0mm, p80 a few
           // mm, against an axis stretched to storm days) still renders its bracket
           // instead of being skipped for being too short.
-          drawSpanBracket(loT, hiT, '60%', 6);
+          const drewMild = drawSpanBracket(loT, hiT, '60%', 6);
+          // Fully-degenerate band: a bone-dry window where p20 = p80 = 0mm on the
+          // axis floor, so the middle-60% bracket collapses to zero span and the
+          // "60%" label is meaningless anyway. Rather than draw nothing, fall back
+          // to the real climatology split (same share-partition the settled view
+          // uses): bracket the dry spike labelled with its ACTUAL day-share and the
+          // wet remainder with its own — e.g. ~99% dry / ~1% wet — pivoting on the
+          // top of the first populated bin.
+          if (!drewMild && nonEmptyBins.length) {
+            drawSharePartition([nonEmptyBins[0].x1!]);
+          }
         } else if (marker) {
           perpLine(refValue)
             .attr('class', 'forecast-ref-line')
