@@ -9,7 +9,6 @@ import {
   probabilityOneSided,
   probabilityBetween,
   valueAtTailFraction,
-  confidenceWord,
   confidenceSuffix,
 } from '../utils/confidence';
 import CONFIG from '../utils/config';
@@ -423,13 +422,12 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           const share = Math.round((atValue / Math.max(1, climatology.length)) * 100);
           forecastPredicate = `like ${share}% of ${nounP}${since}`;
         }
-        // p prefixes the verdict word (top). It also drives the bottom line: on any
-        // ±window tier (forecastPredicate set) that whole line becomes the plain-
-        // English statement of p — "~C% chance this day will be <predicate>" — since
-        // p IS exactly the chance the forecast falls in the region the predicate
-        // claims. Only all-time keeps its own line + the coarse (Pr>…%) bucket.
-        const word = confidenceWord(p);
-        verdict = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${verdict.charAt(0).toLowerCase()}${verdict.slice(1)}`;
+        // p drives the bottom line: on any ±window tier (forecastPredicate set)
+        // that whole line becomes the plain-English statement of p — "~C% chance
+        // this day will be <predicate>" — since p IS exactly the chance the
+        // forecast falls in the region the predicate claims. Only all-time keeps
+        // its own line + the coarse (Pr>…%) bucket. (The verdict itself carries no
+        // confidence qualifier anymore — the bottom line says it plainly.)
         if (forecastPredicate !== null) {
           // Round to the nearest 5% (and cap at 95, never "~100%") — the "~"
           // already says approximate, and a wide forecast band can't support a
