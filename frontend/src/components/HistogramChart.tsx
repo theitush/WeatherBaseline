@@ -753,6 +753,52 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             .transition()
             .duration(500)
             .style('opacity', 1);
+
+          // Extend MainChart's value line to the KDE's median. band.mid is the
+          // forecast median = the value the dot/line sits at, so a dashed segment at
+          // that temperature — from the edge the two charts share, out to the density
+          // curve at the median — reads as the value line continuing into, and
+          // terminating at, the middle of the forecast's own distribution.
+          //   • desktop (horizontal): the histogram abuts MainChart on the right, so
+          //     start at this SVG's left edge (= MainChart's plot-right edge).
+          //   • mobile (vertical): the histogram sits above MainChart sharing the temp
+          //     X-axis, so start at this SVG's bottom edge (facing MainChart below).
+          const medianT = convert(band.mid, currentMetric, system);
+          if (medianT >= domLo2 && medianT <= domHi2) {
+            // Density at the median temp, interpolated over the drawn curve.
+            const densityAt = (t: number): number => {
+              if (t <= density[0].t) return density[0].d;
+              if (t >= density[density.length - 1].t) return density[density.length - 1].d;
+              for (let i = 0; i < density.length - 1; i++) {
+                const a = density[i];
+                const b = density[i + 1];
+                if (t >= a.t && t <= b.t) {
+                  return b.t === a.t ? a.d : a.d + ((t - a.t) / (b.t - a.t)) * (b.d - a.d);
+                }
+              }
+              return 0;
+            };
+            const connector = g.append('line')
+              .attr('class', 'kde-median-connector')
+              .attr('stroke', 'var(--text-h)')
+              .attr('stroke-width', 1.5)
+              .attr('stroke-dasharray', '5,5')
+              .style('opacity', 0);
+            if (isVertical) {
+              connector
+                .attr('x1', tempScale(medianT))
+                .attr('x2', tempScale(medianT))
+                .attr('y1', height + MARGIN.bottom) // SVG bottom edge, toward MainChart below
+                .attr('y2', height - kdeLen(densityAt(medianT)));
+            } else {
+              connector
+                .attr('x1', -MARGIN.left) // SVG left edge = MainChart's plot-right edge
+                .attr('x2', kdeLen(densityAt(medianT)))
+                .attr('y1', tempScale(medianT))
+                .attr('y2', tempScale(medianT));
+            }
+            connector.transition().duration(500).style('opacity', 1);
+          }
         }
 
         if (marker && marker.tierTwoSided) {

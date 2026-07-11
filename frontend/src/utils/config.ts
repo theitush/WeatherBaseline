@@ -124,7 +124,7 @@ const CONFIG: Config = {
     trendLine: 1.0,
     percentileBand90: 0.2,
     percentileBand75: 0.4,
-    dataPoints: 0.2,
+    dataPoints: 0.42,
     histogramBars: 0.7
   },
 

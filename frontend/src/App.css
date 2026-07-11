@@ -478,6 +478,21 @@ body {
   gap: 4px;
 }
 
+/* Forces a row break after the binned-data + target-day pair. Inert on desktop
+   (one wrapping flow row); on mobile it spans the full width so the remaining
+   entries wrap to the line below. */
+.legend-break {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .legend-break {
+    display: block;
+    flex-basis: 100%;
+    height: 0;
+  }
+}
+
 .charts-controls {
   margin-bottom: 12px;
   display: flex;

@@ -256,7 +256,7 @@ const AppContent: React.FC = () => {
               <header className="section-header" />
               <div className="charts-section">
                 <div className="chart-title">{formatChartTitle(currentDate)}</div>
-                <Legend metric={currentMetric} currentDate={currentDate} />
+                <Legend metric={currentMetric} currentDate={currentDate} isForecast={getCurrentBand() != null} />
                 <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
                   {isMobile ? (
                     <>

@@ -377,10 +377,10 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('class', (d) => `data-point${isForecastLike(d) ? ' data-point-forecast' : ''}`)
       .attr('cx', (d) => tx(isVertical ? (d[currentMetric] as number) : d.date, isVertical ? 'temp' : 'time'))
       .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
-      .attr('r', (d) => (isForecastLike(d) ? 2.5 : 2))
+      .attr('r', (d) => (isForecastLike(d) ? 3.2 : 2.8))
       .attr('fill', (d) => (isForecastLike(d) ? 'var(--surface)' : dotColor))
       .attr('stroke', (d) => (isForecastLike(d) ? dotColor : 'none'))
-      .attr('stroke-width', (d) => (isForecastLike(d) ? 1 : 0))
+      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : 0))
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
@@ -556,39 +556,37 @@ const MainChart: React.FC<MainChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
 
-      // Target date written just above the marker (mirrors the radial dial), so
-      // the legend doesn't need a "Target date" entry. e.g. "Jun 7, 2026".
+      // Target VALUE written next to the marker, horizontal (mirrors the gradient
+      // bar's headline number). Replaces the old angled target-date text — the
+      // date now lives in the legend's target-day entry instead.
       const td = currentDateData[0].date;
-      const dateLabel = fmtDate(td);
+      const valueLabel = `${cv(currentTemp).toFixed(vdp)}${unit}`;
       const px = isVertical ? tsv(currentTemp) : timeScale(td);
       const py = isVertical ? timeScale(td) : tsv(currentTemp);
       const labelEl = g.append('text')
         .attr('class', 'current-temp-label')
-        .style('font-size', '11px')
+        .style('font-size', '12px')
         .style('font-weight', '600')
         .style('fill', 'var(--text-h)')
-        .text(dateLabel);
+        .text(valueLabel);
       if (isVertical) {
-        // Mobile: the target date is the most recent row, so it sits at the very
-        // top of the time axis — a label above it would clip out of the tiny top
-        // margin. Place it level, beside the marker, nudged down a hair. Default
-        // to the right; in extreme weather the marker is near the right edge, so
-        // flip to the left to keep the text on-screen.
-        const estTextW = dateLabel.length * 6.2; // ~6px/char at 11px
+        // Mobile: the target day sits at the very top of the time axis — a label
+        // above it would clip out of the tiny top margin. Place it level, beside
+        // the marker. Default to the right; near the right edge (extreme weather)
+        // flip left to keep the text on-screen.
+        const estTextW = valueLabel.length * 9.3; // ~9px/char at 16.5px
         const flipLeft = px + 9 + estTextW > width;
         labelEl
           .attr('x', flipLeft ? px - 9 : px + 9)
           .attr('y', py + 4)
           .style('text-anchor', flipLeft ? 'end' : 'start');
       } else {
-        // Desktop: tilt 45° descending left→right *down to* the dot, so the text
-        // sits up-and-left of the marker and clears the histogram on the right.
-        // Anchored at the end (the marker) and rotated +45° about that point.
+        // Desktop: horizontal, at the right edge just above the value line, sitting
+        // up-and-left of the marker (end-anchored) so it clears the histogram.
         labelEl
           .attr('x', px)
-          .attr('y', py - 8)
-          .style('text-anchor', 'end')
-          .attr('transform', `rotate(45, ${px}, ${py - 8})`);
+          .attr('y', py - 7)
+          .style('text-anchor', 'end');
       }
     }
   }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system]);
