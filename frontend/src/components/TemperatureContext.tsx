@@ -105,10 +105,12 @@ const DEAD_CENTER_LINE = [
 const VERDICT_TOP5 = ['Crazy!!!', 'Off the charts!', 'One for the history books!', 'Legend.'];
 // Reserved for a top-1/2/3 value across the WHOLE record (not just its ±N-day
 // window) — the rarest thing the page can show, so the lines go big.
-const VERDICT_ALLTIME = ['Practically unheard of!', 'A page in the record books.', 'Legendary!'];
-const VERDICT_EXTREME = ['Quite unusual.', 'Remarkable.', 'Pretty wild.', 'Pretty rare.'];
-const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.'];
-const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
+const VERDICT_ALLTIME = ['Practically unheard of!', 'A page in the record books.', 'Legendary!']; //top/bottom 5 historical measurements
+const VERDICT_VERY_EXTREME = ['WTF.', 'Unreal.', 'Insane.', 'Holy smokes.']; // top/bottom 5% + 80% confidence or top/bottom 3% for historical
+const VERDICT_PROB_VERY_EXTREME = ['Uncommon.', 'Rare.', 'Remarkable.']; // top/bottom 5%
+const VERDICT_EXTREME = ['Quite unusual.', 'Remarkable.', 'Pretty wild.', 'Pretty rare.']; //top/bottom 10%
+const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.']; // top/bottom 20%
+const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.']; // mid 60%
 
 // Deterministic pick — same (bank, seed) always yields the same phrase, so a
 // verdict stays put across the several re-renders a metric/date switch triggers
@@ -246,6 +248,9 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   let verdict = context.description;
   let rank = 0; // 1-based rank on the day's side; 0 when undeterminable.
   let allTimeRank = 0; // rank across the ENTIRE record (every day, all years); 0 = N/A.
+  // Forecast top-5% day we're ≥80% sure clears the 5% cutoff — drives the strong
+  // verdict bank AND the confetti burst below. Stays false on historical rows.
+  let isVeryExtremeForecast = false;
   {
     // Tier + rarity run off the SAME climatology pool the histogram brackets use:
     // comparablePool at/before the target with FORECAST ROWS EXCLUDED — the target's
@@ -337,7 +342,16 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
           const shown = pct < 0.1 ? '<0.1' : pct.toFixed(1);
           extremeLine = `Only ${shown}% of ${nounP}${since} were this ${adj}!`;
         }
-        verdict = pick(VERDICT_EXTREME, seed);
+        // Top-5% tier — the strongest tail short of a record. The verdict word is
+        // graded by how SURE we are it's really that extreme. HISTORICAL rows (no
+        // band, no confidence) grade on tail depth: top/bottom 3% earns the strong
+        // bank, 3–5% the hedged one. FORECAST rows get re-graded in the confidence
+        // block below once the CQR probability p is known (≥80% → strong, else
+        // hedged). Note: 'extreme' no longer uses VERDICT_EXTREME — that bank moved
+        // down to the 5–10% 'mid' tier.
+        verdict = singleTail <= 0.03
+          ? pick(VERDICT_VERY_EXTREME, seed)
+          : pick(VERDICT_PROB_VERY_EXTREME, seed);
         forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
       } else if (tier === 'mid') {
         // Mid-tier, forecast/recent-model rows only — splits the old 5%→20% gap so
@@ -403,6 +417,16 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         const p = tierTwoSided
           ? probabilityBetween(points, loT, hiT)
           : probabilityOneSided(points, oneT, isHighSide);
+        // Top-5% forecast: confidence-grade the verdict word. ≥80% sure the settled
+        // value clears the 5% cutoff earns the strong "very-extreme" bank (and the
+        // confetti burst below); 50–80% (and the rare <50% floor) the hedged
+        // "probably-very-extreme" bank.
+        if (tier === 'extreme') {
+          isVeryExtremeForecast = p >= 0.8;
+          verdict = isVeryExtremeForecast
+            ? pick(VERDICT_VERY_EXTREME, seed)
+            : pick(VERDICT_PROB_VERY_EXTREME, seed);
+        }
         // Degenerate middle band — p20 == p80 (a bone-dry precip window where nearly
         // every comparable day is 0mm). "…within the middle 60%…" is meaningless when
         // the band is a single point, so restate it against the majority the day
@@ -436,15 +460,18 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     }
   }
 
-  // Confetti for any top day. An in-window top-3 gets the normal burst; an
-  // all-time top-10 (rarest on the page) gets a 5× burst. Re-fires when the
-  // rank-bearing day changes (new date/metric/location landing near the top).
+  // Confetti for a standout day. HISTORICAL rows fire on an in-window top-3 — a
+  // real, settled rank. FORECAST rows are point estimates, so a rank-1 median isn't
+  // a record; they fire ONLY on the confidence-gated very-extreme tier (≥80% sure
+  // they clear the 5% cutoff). An all-time top-10 (rarest on the page) still gets
+  // the 5× burst either way. Re-fires when the standout day changes.
   const isTop3 = rank >= 1 && rank <= 3;
   const isAllTimeTop10 = allTimeRank >= 1 && allTimeRank <= 10;
+  const wantsBurst = band ? isVeryExtremeForecast : isTop3;
   useEffect(() => {
     if (isAllTimeTop10) fireConfetti(5);
-    else if (isTop3) fireConfetti(1);
-  }, [isTop3, isAllTimeTop10, currentMetric, displayTemp]);
+    else if (wantsBurst) fireConfetti(1);
+  }, [wantsBurst, isAllTimeTop10, currentMetric, displayTemp]);
 
   // Lead line above the punchy verdict: "June 7th in Tel Aviv is".
   const leadDate = (() => {
