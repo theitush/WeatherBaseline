@@ -28,7 +28,7 @@ import { valueAtTailFraction } from './confidence';
 
 export type ForecastTier =
   | 'alltime' // top-10 across the WHOLE record
-  | 'top3' // top-3 within the ±window
+  | 'top5' // top-5 within the ±window, HISTORICAL rows only (rank-based ordinal)
   | 'extreme' // single-tail ≤ 5%
   | 'mid' // single-tail ≤ 10% (forecast/bucketed rows only)
   | 'notable' // single-tail ≤ 20%
@@ -98,9 +98,13 @@ export function resolveForecastMarker(
     tier = 'alltime';
     tierCutoff = 10 / Math.max(1, allTimeNative.length);
     tierUsesAllTime = true;
-  } else if (rank <= 3) {
-    tier = 'top3';
-    tierCutoff = 0.05;
+  } else if (!bucketed && rank <= 5) {
+    // Rank-based ordinal ("the 3rd hottest day") — HISTORICAL rows only. A forecast
+    // is a point estimate, so an exact ordinal would overclaim; forecast rows skip
+    // this and fall to the quantile tiers below (extreme = median past the 5%
+    // cutoff, etc.). Cutoff is unused here (no confidence on historical rows).
+    tier = 'top5';
+    tierCutoff = Math.min(0.5, 5 / Math.max(1, n));
   } else if (singleTail <= 0.05) {
     tier = 'extreme';
     tierCutoff = 0.05;

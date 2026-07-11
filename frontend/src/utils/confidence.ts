@@ -1,12 +1,11 @@
 // confidence — turns a forecast row's own 9-quantile band (services/ci.ts: 7
-// CQR-calibrated heads + q0.25/q0.75 interpolated) into a confidence figure for
+// CQR-calibrated heads + q0.25/q0.75 interpolated) into the confidence figure for
 // the top card's bottom line: the "~C% chance this day will be <predicate>"
-// statement, plus a coarse "(Pr>50%/75%/90%/95%/~99%)" suffix on the all-time
-// rarity line. The probability is
-// a real CQR exceedance probability: given the historical rarity threshold a
-// verdict tier is claiming (e.g. "under 10% hottest"), we ask how likely the
-// settled value is to actually land on the correct side of it, using the row's
-// own predictive distribution rather than just its point estimate.
+// statement. The probability is a real CQR exceedance probability: given the
+// historical rarity threshold a verdict tier is claiming (e.g. "under 10%
+// hottest"), we ask how likely the settled value is to actually land on the
+// correct side of it, using the row's own predictive distribution rather than
+// just its point estimate.
 import type { MetricBand, MetricKey } from '../types';
 import type { UnitSystem } from './units';
 import { convert } from './units';
@@ -131,21 +130,4 @@ export function valueAtTailFraction(
     ? Math.max(0, Math.min(n - 1, Math.floor((1 - q) * n)))
     : Math.max(0, Math.min(n - 1, Math.ceil(q * n) - 1));
   return sorted[idx];
-}
-
-/**
- * " (Pr~99%)" / " (Pr>95%)" / " (Pr>90%)" / " (Pr>75%)" / " (Pr>50%)" suffix for
- * the bottom-line rarity text — states the tier's exceedance confidence as a
- * coarse bucket. The " (Pr>50%)" floor
- * covers everything below 75%: for the one-sided tail tiers p >= 0.5 by
- * construction (the tier fires because the band's own mid already sits on the
- * claimed side of the cutoff), so this reads as an honest "more likely than
- * not" rather than a hard number a wide forecast band can't support.
- */
-export function confidenceSuffix(p: number): string {
-  if (p >= 0.99) return ' (Pr~99%)';
-  if (p >= 0.95) return ' (Pr>95%)';
-  if (p >= 0.9) return ' (Pr>90%)';
-  if (p >= 0.75) return ' (Pr>75%)';
-  return ' (Pr>50%)';
 }
