@@ -5,6 +5,7 @@ import CONFIG, { type MetricKey } from '../utils/config';
 export type LegendItem =
   | { type: 'rect'; color: string; label: string; op: number }
   | { type: 'line'; color: string; label: string }
+  | { type: 'dashed'; color: string; label: string }
   | { type: 'circle'; color: string; label: string }
   | { type: 'forecast'; color: string; label: string }
   | { type: 'target'; color: string; label: string }
@@ -30,13 +31,26 @@ export const getRadialLegendData = (metric: MetricKey, currentDate: string): Leg
   ];
 };
 
-export const getLegendData = (metric: MetricKey): LegendItem[] => [
+export const getLegendData = (metric: MetricKey, currentDate?: string): LegendItem[] => [
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand90'), label: '10th–90th pct', op: 0.4 },
   { type: 'rect', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 0.8 },
   { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Rolling median' },
   { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
   { type: 'forecast', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Forecast' },
+  // The dashed target-day marker: MainChart's "today" line and the histogram's
+  // forecast-KDE / settled current-temp line all share this style. Labelled with
+  // the selected date so it reads as "this is the day you picked".
+  ...(currentDate
+    ? [{ type: 'dashed' as const, color: 'var(--text-h)', label: fmtLegendDate(currentDate) }]
+    : []),
 ];
+
+// "Jun 7th, 2026" — matches the date label MainChart writes beside the marker.
+// Parsed at local noon so the day never shifts across a timezone boundary.
+const fmtLegendDate = (dateStr: string): string => {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${MONTHS[d.getMonth()]} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
+};
 
 // Draw a single legend swatch into a d3 selection (centered vertically on y=0).
 export const drawLegendSwatch = (
@@ -47,6 +61,8 @@ export const drawLegendSwatch = (
     sel.append('rect').attr('width', 12).attr('height', 12).attr('y', -6).attr('fill', item.color).attr('opacity', item.op);
   } else if (item.type === 'line') {
     sel.append('line').attr('x1', 0).attr('x2', 12).attr('y1', 0).attr('y2', 0).attr('stroke', item.color).attr('stroke-width', 2.5);
+  } else if (item.type === 'dashed') {
+    sel.append('line').attr('x1', 0).attr('x2', 12).attr('y1', 0).attr('y2', 0).attr('stroke', item.color).attr('stroke-width', 1.5).attr('stroke-dasharray', '3,2');
   } else if (item.type === 'circle') {
     sel.append('circle').attr('cx', 6).attr('cy', 0).attr('r', 2).attr('fill', item.color);
   } else if (item.type === 'forecast') {
@@ -67,6 +83,9 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
       {item.type === 'line' && (
         <line x1={0} x2={12} y1={0} y2={0} stroke={item.color} strokeWidth={2.5} />
       )}
+      {item.type === 'dashed' && (
+        <line x1={0} x2={12} y1={0} y2={0} stroke={item.color} strokeWidth={1.5} strokeDasharray="3,2" />
+      )}
       {item.type === 'circle' && (
         <circle cx={6} cy={0} r={2} fill={item.color} />
       )}
@@ -83,8 +102,8 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
   </svg>
 );
 
-export const Legend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
-  const items = getLegendData(metric);
+export const Legend: React.FC<{ metric: MetricKey; currentDate?: string }> = ({ metric, currentDate }) => {
+  const items = getLegendData(metric, currentDate);
   return (
     <div className="chart-legend">
       {items.map((item) => (

@@ -744,8 +744,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             .attr('class', 'forecast-kde')
             .attr('fill', 'none')
             .attr('stroke', 'var(--text-h)')
-            .attr('stroke-width', 2)
-            .attr('stroke-dasharray', '4,3')
+            // Match the "today" marker line (MainChart's current-temp-line) so the
+            // single dashed target-day legend entry reads true in both modes.
+            .attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', '5,5')
             .attr('d', line(density))
             .style('opacity', 0)
             .transition()
@@ -813,8 +815,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         perpLine(currentTemp)
           .attr('class', 'current-temp-line')
           .attr('stroke', 'var(--text-h)')
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', '4,3');
+          // Same style as the forecast-KDE marker and MainChart's today line, so
+          // the shared dashed target-day legend entry matches whichever draws.
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '5,5');
         drawSharePartition([currentTemp]);
       }
     }
