@@ -391,7 +391,7 @@ const AppContent: React.FC = () => {
                     </p>
                     <p>
                       A reanalysis can't cover the present: ERA5-Land lags real time
-                      by several days, so the last week or two — and the few days
+                      by several days, so the last week — and the few days
                       ahead — have to come from elsewhere. The forecast days use{' '}
                       <a
                         href="https://www.ecmwf.int/en/forecasts/documentation-and-support/medium-range-forecasts"
@@ -403,8 +403,13 @@ const AppContent: React.FC = () => {
                       deterministic model. We use that one specifically because it's
                       from the same institution that builds ERA5, so the physics and
                       the variables line up as closely as a forecast reasonably can
-                      with the archive it's extending.{' '}
-                      
+                      with the archive it's extending.{' '} Even so, the forecast and the
+                      reanalysis don't sit on exactly the same grid, so we run the forecast
+                      through a custom debiasing model. For forecast days you're therefore
+                      seeing not the raw forecast but the model's estimate but a median and a
+                      distribution of how that forecast typically lands in the ERA5-Land
+                      record. This is still a beta version of the model, and we plan to open
+                      source the full thing soon.
                     </p>
                     <p>
                       <strong>Caveat 1:</strong> The forecast is a forecast. Thus, it may change as the
