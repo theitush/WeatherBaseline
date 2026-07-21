@@ -406,8 +406,8 @@ const AppContent: React.FC = () => {
                       with the archive it's extending.{' '} Even so, the forecast and the
                       reanalysis don't sit on exactly the same grid, so we run the forecast
                       through a custom debiasing model. For forecast days you're therefore
-                      seeing not the raw forecast but the model's estimate but a median and a
-                      distribution of how that forecast typically lands in the ERA5-Land
+                      seeing not the raw forecast but the model's estimate of the
+                      distribution (and median) of how that forecast typically lands in the ERA5-Land
                       record. This is still a beta version of the model, and we plan to open
                       source the full thing soon.
                     </p>
