@@ -102,15 +102,16 @@ export const DASHBOARD_HTML = `<!doctype html>
     <h1>HowHotWasIt <span class="sub">first-party analytics · D1 <code>hits</code></span></h1>
     <div class="controls">
       <label class="count" for="range">Range</label>
-      <select id="range" title="Time window counted back from now">
+      <select id="range" title="Time window ending now">
         <option value="3h">Last 3 hours</option>
+        <option value="6h">Last 6 hours</option>
         <option value="24h">Last 24 hours</option>
+        <option value="72h">Last 72 hours</option>
         <option value="week">Last week</option>
         <option value="month">Last month</option>
         <option value="all" selected>All time</option>
       </select>
       <span id="gen" class="count"></span>
-      <button id="refresh">Refresh</button>
     </div>
   </header>
 
@@ -193,7 +194,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   // y-axis metric: 'hits' counts every row; 'users' collapses each bucket to the
   // number of DISTINCT visitors (so one person's 7 views in a bucket → 1).
   var metric = 'hits';
-  var range = 'all';   // time window counted back from now ('all' = no cap)
+  var range = 'all';   // time window ending now ('all' = no cap)
   // col -> raw filter text. Defaults: only humans (the 'who' column reads
   // 'human'/'bot') and the owner's own traffic excluded (~OWNER). Both defaults
   // are real filter text, so they appear in the column boxes and can be edited
@@ -201,6 +202,44 @@ export const DASHBOARD_HTML = `<!doctype html>
   var filters = { human: 'human', visitor: '~' + ME_LABEL };
   var sortCol = 'time', sortDir = -1;  // default newest first (ts desc)
   var colorMap = {};
+
+  // Keep a dashboard tab coherent across browser reloads. sessionStorage is
+  // deliberately tab-scoped: a new analytics tab begins with the sensible
+  // human-only defaults, while a reload keeps the analyst's current view.
+  var STATE_KEY = 'hhwi.analytics.dashboard.state.v1';
+  var RANGE_MS = {
+    '3h': 3 * 3600e3,
+    '6h': 6 * 3600e3,
+    '24h': 24 * 3600e3,
+    '72h': 72 * 3600e3,
+    week: 7 * 864e5,
+    month: 30 * 864e5
+  };
+
+  function restoreState() {
+    var saved;
+    try { saved = JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null'); } catch (e) { return; }
+    if (!saved || typeof saved !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(RANGE_MS, saved.range) || saved.range === 'all') range = saved.range;
+    if (saved.bucket === '10m' || saved.bucket === 'hour' || saved.bucket === 'day') bucket = saved.bucket;
+    if (saved.metric === 'hits' || saved.metric === 'users') metric = saved.metric;
+    if (saved.filters && typeof saved.filters === 'object' && !Array.isArray(saved.filters)) {
+      filters = {};
+      Object.keys(saved.filters).forEach(function (k) {
+        if (COLS.some(function (c) { return c.k === k; }) && typeof saved.filters[k] === 'string') filters[k] = saved.filters[k];
+      });
+    }
+    if (COLS.some(function (c) { return c.k === saved.sortCol; })) sortCol = saved.sortCol;
+    if (saved.sortDir === 1 || saved.sortDir === -1) sortDir = saved.sortDir;
+  }
+
+  function persistState() {
+    try {
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({
+        range: range, bucket: bucket, metric: metric, filters: filters, sortCol: sortCol, sortDir: sortDir
+      }));
+    } catch (e) { /* Keep the dashboard usable when storage is unavailable. */ }
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -513,9 +552,8 @@ export const DASHBOARD_HTML = `<!doctype html>
     return true;
   }
 
-  // The range dropdown → a millisecond window counted back from NOW, so it always
-  // means "the last 3h/24h/week/month up to this instant". 'all' = no cap.
-  var RANGE_MS = { '3h': 3 * 3600e3, '24h': 24 * 3600e3, week: 7 * 864e5, month: 30 * 864e5 };
+  // A range is always counted back from NOW, never from the newest recorded
+  // hit. 'all' has no lower cutoff.
 
   function applyFilterSort() {
     var active = [];
@@ -556,6 +594,7 @@ export const DASHBOARD_HTML = `<!doctype html>
       el.addEventListener('click', function () {
         var k = el.getAttribute('data-sort');
         if (sortCol === k) sortDir = -sortDir; else { sortCol = k; sortDir = 1; }
+        persistState();
         renderHead(); refresh();
       });
     });
@@ -565,6 +604,7 @@ export const DASHBOARD_HTML = `<!doctype html>
       el.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
         filters[el.getAttribute('data-f')] = el.value;
+        persistState();
         refresh();
       });
     });
@@ -613,19 +653,22 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   // ---- wiring ------------------------------------------------------------
-  // The <select> is a real form element, so on a plain page reload browsers
-  // often restore its previously-shown value even though this script always
-  // starts from range = 'all' — sync to whatever's actually selected before
-  // the first load, or the dropdown can show '24h' while all-time data loads.
-  range = $('range').value;
-  $('refresh').addEventListener('click', load);
-  $('range').addEventListener('change', function () { range = this.value; refresh(); });
-  $('clearf').addEventListener('click', function () { filters = {}; renderHead(); refresh(); });
+  restoreState();
+  $('range').value = range;
+  $('bucketseg').querySelectorAll('button').forEach(function (el) {
+    el.classList.toggle('on', el.getAttribute('data-b') === bucket);
+  });
+  $('metricseg').querySelectorAll('button').forEach(function (el) {
+    el.classList.toggle('on', el.getAttribute('data-m') === metric);
+  });
+  $('range').addEventListener('change', function () { range = this.value; persistState(); refresh(); });
+  $('clearf').addEventListener('click', function () { filters = {}; persistState(); renderHead(); refresh(); });
   $('csv').addEventListener('click', downloadCsv);
   $('bucketseg').querySelectorAll('button').forEach(function (el) {
     el.addEventListener('click', function () {
       bucket = el.getAttribute('data-b');
       $('bucketseg').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      persistState();
       refresh();
     });
   });
@@ -633,6 +676,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     el.addEventListener('click', function () {
       metric = el.getAttribute('data-m');
       $('metricseg').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === el); });
+      persistState();
       refresh();
     });
   });
