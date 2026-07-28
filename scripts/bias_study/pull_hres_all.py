@@ -37,6 +37,20 @@ cells, then merges the ledger on top. So you can run this on any box, any number
 of times, and it only fetches the cells R2 doesn't have yet. Pass --overwrite to
 re-pull cells already in R2 (e.g. to fix a wrong date window) instead of skipping.
 
+TOP-UP (--append) — the cheap way to keep the dataset current. Skipping is
+all-or-nothing and --overwrite re-pulls all ~28 months (~53 quota-units/cell), so
+neither extends the tail. --append fetches ONLY each cell's missing days: it reads
+the cell's existing series (local file, else the R2 object), then requests
+[last_date - --resettle-days + 1 .. today - --lag] and merges by date, new rows
+winning. A ~2-month top-up costs ~5 units/cell instead of 53. Cells with no data
+yet fall back to a full-window pull, and cells already at the target end date are
+left untouched (no API call). Rerun it monthly; it is idempotent.
+
+The --resettle-days overlap exists because the historical-forecast API's most
+recent days are still firming up as later runs land — re-fetching the tail
+overwrites those seam days with settled values instead of freezing the first
+value we happened to see.
+
 STOPS GRACEFULLY on rate-limit exhaustion: a 429 / daily-quota error saves the
 ledger and exits 2 ("resume later") instead of hammering. On the free tier it
 pulls ~a day's worth, hits the wall, stops clean; rerun tomorrow to continue.
@@ -48,6 +62,7 @@ Usage (from scripts/bias_study/, with the era5_pipeline venv):
   python pull_hres_all.py --limit 20            # first 20 cells
   python pull_hres_all.py --rate 6              # FULL grid, FREE tier pace
   OPENMETEO_API_KEY=xxx python pull_hres_all.py # FULL grid, Standard plan (fast)
+  python pull_hres_all.py --append --rate 6     # top up every cell's tail
 """
 from __future__ import annotations
 
@@ -98,6 +113,12 @@ END_LAG_DAYS = 10
 # ~here (IFS Cycle 49R1). Earlier dates return nulls / a coarser fallback model,
 # NOT the HRES prod serves — so never request before this, whatever --years says.
 HRES_ARCHIVE_START = date(2024, 3, 1)
+
+
+def quota_units(days: int) -> int:
+    """API "calls" one request costs: Open-Meteo bills ceil(vars/10) * ceil(days/14),
+    so a short tail is billed far below a full-window re-pull (5 vs 53 units)."""
+    return -(-len(VARS) // 10) * -(-days // 14)
 
 
 def snap(coord: float) -> float:
@@ -203,6 +224,29 @@ def write_local_gz(path: Path, rows) -> None:
         f.write(buf.getvalue())
 
 
+def read_existing(gz: Path, r2_key: str, up: R2Uploader) -> list[dict]:
+    """Return a cell's already-pulled rows — from the local mirror if it's there,
+    else from R2 (one Class B GET) so --append works on a fresh box. Empty list
+    when the cell has no data yet or its object is unreadable: the caller then
+    falls back to a full-window pull, which is the correct repair either way."""
+    raw = gz.read_bytes() if gz.exists() else up.get_bytes(r2_key)
+    if not raw:
+        return []
+    try:
+        text = gzip.decompress(raw).decode()
+    except Exception:  # noqa: BLE001 - truncated/corrupt object => re-pull whole
+        return []
+    return [row for row in csv.DictReader(io.StringIO(text)) if row.get("date")]
+
+
+def merge_rows(old: list[dict], new: list[dict]) -> list[dict]:
+    """Union old and new rows by date, date-sorted, NEW winning on collision —
+    the re-fetched tail carries settled values that supersede what we first saw."""
+    by_date = {r["date"]: r for r in old}
+    by_date.update({r["date"]: r for r in new})
+    return [by_date[d] for d in sorted(by_date)]
+
+
 def load_ledger(up: R2Uploader) -> dict:
     """Pull the resume ledger from R2 (so a fresh box knows what's done)."""
     raw = up.get_bytes(LEDGER_KEY)
@@ -242,16 +286,28 @@ def main() -> int:
     ap.add_argument("--overwrite", action="store_true",
                     help="re-pull cells that already exist in R2 (e.g. to fix a "
                          "wrong window) instead of skipping them")
+    ap.add_argument("--append", action="store_true",
+                    help="top-up mode: fetch only each cell's missing tail and "
+                         "merge by date (~10x cheaper than --overwrite)")
+    ap.add_argument("--resettle-days", type=int, default=14,
+                    help="with --append, also re-fetch this many days already on "
+                         "disk, so the unsettled seam gets settled values (14)")
+    ap.add_argument("--lag", type=int, default=END_LAG_DAYS,
+                    help=f"end the window this many days before today "
+                         f"(default {END_LAG_DAYS}; the era5-land archive we join "
+                         f"against lags ~6, so below ~7 buys nothing)")
     ap.add_argument("--ledger-every", type=int, default=1,
                     help="flush the R2 ledger every N cells (default 1: after "
                          "every cell, so a kill never loses a cell's bias meta)")
     args = ap.parse_args()
+    if args.append and args.overwrite:
+        sys.exit("--append and --overwrite are mutually exclusive")
 
     apikey = os.environ.get("OPENMETEO_API_KEY") or None
     host = PAID_HOST if apikey else FREE_HOST
     rate = args.rate if args.rate is not None else (540.0 if apikey else 6.0)
 
-    end = date.today() - timedelta(days=END_LAG_DAYS)
+    end = date.today() - timedelta(days=args.lag)
     start = end - timedelta(days=round(365.25 * args.years))
     # Never request before the archive floor — earlier dates aren't real HRES.
     if start < HRES_ARCHIVE_START:
@@ -267,11 +323,14 @@ def main() -> int:
         cells = cells[: args.limit]
 
     days = (end - start).days + 1
-    calls_per_cell = -(-len(VARS) // 10) * -(-days // 14)
     tier = "Standard (key)" if apikey else "FREE tier (single IP)"
     print(f"window {s} .. {e}  ({days} days)   tier: {tier}")
-    print(f"{len(cells)} cells x ~{calls_per_cell} calls = "
-          f"~{len(cells) * calls_per_cell:,} API calls  @ {rate:.0f}/min")
+    if args.append:
+        print(f"APPEND: per-cell tail only, re-fetching the last "
+              f"{args.resettle_days} days for settling  @ {rate:.0f}/min")
+    else:
+        print(f"{len(cells)} cells x ~{quota_units(days)} calls = "
+              f"~{len(cells) * quota_units(days):,} API calls  @ {rate:.0f}/min")
     print("listing what's already in R2 / loading ledger…", flush=True)
 
     up = R2Uploader()
@@ -291,6 +350,12 @@ def main() -> int:
         skip = set()
         print(f"OVERWRITE: re-pulling all selected cells "
               f"({len(in_r2)} currently in R2 will be replaced)\n")
+    elif args.append:
+        # Every selected cell is visited; the per-cell tail check (not this set)
+        # decides whether it needs an API call at all.
+        skip = set()
+        print(f"APPEND: topping up all selected cells "
+              f"({len(in_r2)} currently in R2)\n")
     else:
         skip = set(done) | in_r2
         print(f"resume: {len(in_r2)} cells already in R2, {len(done)} in ledger "
@@ -300,10 +365,11 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     n_todo = sum(1 for _, sla, slo in cells
                  if f"{sla:.1f}_{slo:.1f}" not in skip)
-    n_ok = n_skip = n_fail = 0
+    n_ok = n_skip = n_fail = n_current = 0
+    units = 0
     t_start = time.time()
     stopped = False
-    print(f"{n_todo} cells to fetch this run "
+    print(f"{n_todo} cells to {'check' if args.append else 'fetch'} this run "
           f"(ledger flush every {args.ledger_every} cell"
           f"{'s' if args.ledger_every != 1 else ''})\n", flush=True)
 
@@ -317,10 +383,28 @@ def main() -> int:
         # progress = cells processed so far this run (ok + fail), out of the to-do count
         nth = n_ok + n_fail + 1
         tag = f"[{nth}/{n_todo}] {name[:28]:28s} {key:14s}"
-        print(f"  {tag} fetching…", flush=True)
+
+        # --append: fetch this cell's tail only. No existing data (new cell, or an
+        # unreadable object) => fall through to the full window, which is both the
+        # first pull and the repair.
+        have, cell_start = [], s
+        if args.append:
+            have = read_existing(gz, r2_key, up)
+            have_end = max((r["date"] for r in have), default=None)
+            if have_end and have_end >= e:
+                n_current += 1
+                print(f"  [{name[:28]:28s} {key:14s}] up to date ({have_end})",
+                      flush=True)
+                continue
+            if have_end:
+                tail = date.fromisoformat(have_end) - timedelta(
+                    days=max(0, args.resettle_days - 1))
+                cell_start = max(tail, start).isoformat()
+
+        print(f"  {tag} fetching {cell_start}..{e}…", flush=True)
         t_cell = time.time()
         try:
-            rows, meta = fetch_hres(host, apikey, slat, slon, s, e, limiter)
+            rows, meta = fetch_hres(host, apikey, slat, slon, cell_start, e, limiter)
         except RateLimitHit as ex:
             print(f"\n  rate/quota limit reached at cell {nth} ({key}): {ex}")
             print("  stopping cleanly — rerun the same command to continue.")
@@ -330,10 +414,15 @@ def main() -> int:
             n_fail += 1
             print(f"  {tag} FAIL: {ex}", flush=True)
             continue
+        units += quota_units((date.fromisoformat(e)
+                              - date.fromisoformat(cell_start)).days + 1)
 
+        n_new = len(rows)
+        rows = merge_rows(have, rows) if have else rows
         write_local_gz(gz, rows)
         up.upload_file(gz, r2_key)
-        done[key] = {"name": name, "rows": len(rows), **meta}
+        done[key] = {"name": name, "rows": len(rows),
+                     "end": rows[-1]["date"] if rows else None, **meta}
         skip.add(key)
         n_ok += 1
 
@@ -342,7 +431,8 @@ def main() -> int:
         hl = meta.get("hres_lat")
         hlon = meta.get("hres_lon")
         hloc = f"HRES@{hl:.3f},{hlon:.3f}" if hl is not None and hlon is not None else "HRES@?"
-        print(f"  {tag} OK  {len(rows)} rows  {hloc}  "
+        span = f"{len(rows)} rows (+{n_new} fetched)" if have else f"{len(rows)} rows"
+        print(f"  {tag} OK  {span}  {hloc}  "
               f"{dt:.1f}s  ({cmin:.0f} cells/min)", flush=True)
         if n_ok % args.ledger_every == 0:
             save_ledger(up, ledger)
@@ -350,9 +440,10 @@ def main() -> int:
                   f"({len(done)} cells recorded)", flush=True)
 
     save_ledger(up, ledger)
-    print(f"\ndone. ok={n_ok} skip={n_skip} fail={n_fail}  "
-          f"({(time.time() - t_start) / 60:.1f} min)")
-    remaining = len(cells) - n_skip - n_ok
+    print(f"\ndone. ok={n_ok} skip={n_skip} fail={n_fail}"
+          f"{f' up-to-date={n_current}' if args.append else ''}  "
+          f"~{units:,} quota-calls  ({(time.time() - t_start) / 60:.1f} min)")
+    remaining = len(cells) - n_skip - n_ok - n_current
     if stopped or remaining > 0:
         print(f"{remaining} cells remaining — rerun the same command to continue.")
         return 2
