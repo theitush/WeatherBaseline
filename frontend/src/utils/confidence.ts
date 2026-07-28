@@ -24,10 +24,10 @@ interface QuantilePoint {
 const PRECIP_TRACE_MM = 1;
 
 /** The row's own 9-point predictive CDF, in display units, ascending by v
- *  (guaranteed monotonic by the debias generator's isotonic pinning; q0.25/q0.75
- *  are interpolated in services/ci.ts and bracketed by their neighbours, so they
- *  keep the order). The two shoulder points sit where the density is highest, so
- *  they sharpen probInInterval's piecewise-linear integration through the bulk.
+ *  (guaranteed monotonic by the debias generator's isotonic pinning, which runs
+ *  over all nine trained heads). The two shoulder points sit where the density is
+ *  highest, so they sharpen probInInterval's piecewise-linear integration through
+ *  the bulk — and as of the q9 retrain they are trained, not interpolated.
  *  Precip quantiles are trace-clamped (<1mm -> 0) to match the archive/base scale. */
 export function bandQuantilePoints(
   band: MetricBand,

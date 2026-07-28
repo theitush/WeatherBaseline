@@ -5,12 +5,14 @@
 // all percentile math) is on the ERA5-Land scale; the M3_base fits correct that
 // mismatch. Those fits are ~1 GB — never Worker-runnable — so we bake them into
 // static per-cell tables on R2 (`debias/debias_{lat}_{lon}.csv.gz`, one gzip of
-// `var,doy,hres,d01,dlo,d10,dmid,d90,dhi,d99` deltas on a doy×hres grid — a full
-// per-level one-sided CQR-calibrated 7-quantile CDF, at levels .01/.05/.10/.50/
-// .90/.95/.99). Here we fetch that table and bilinearly interpolate the delta
-// for each (date, forecast value), returning a corrected quantile set per
-// (date, metric) — plus two untrained shoulder heads (q0.25/q0.75) the client
-// interpolates from the corrected anchors (see PROBIT_Q25_Q75_W).
+// `var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99` deltas on a doy×hres grid —
+// a full per-level one-sided CQR-calibrated 9-quantile CDF, at levels .01/.05/.10/
+// .25/.50/.75/.90/.95/.99). Here we fetch that table and bilinearly interpolate
+// the delta for each (date, forecast value), returning a corrected quantile set
+// per (date, metric). All nine heads are TRAINED — the .25/.75 shoulders used to
+// be interpolated client-side by a probit split-normal rule; they got real heads
+// in the q9 retrain, so a table predating it (7 columns, no d25/d75) is NOT
+// readable here.
 //
 // A missing table, a 404, or a var absent from the table (gated at generation
 // time because the correction demonstrably hurt that cell) yields no band and the
@@ -53,26 +55,18 @@ const METRICS: { key: MetricKey; var: string; nonneg: boolean }[] = [
 // corrected value computed, at the clamped value (matches ci_server.predict_bands).
 const PRECIP_TRACE_MM = 1;
 
-// Probit (split-normal) interior weight z(.75)/z(.90) = 0.526307. The tables ship
-// only 7 trained levels (.01/.05/.10/.50/.90/.95/.99); q25/q75 are placed on the
-// Φ⁻¹(τ)-linear CDF the corrected .10/.50/.90 anchors define — q25 = mid − W·(mid −
-// q10), q75 = mid + W·(q90 − mid). Validated to ≤1.7pp coverage error for temp/wind
-// (scripts/bias_study/q25_q75_interp_check.ipynb); precip's dry-day miss is a
-// zero-inflation artifact of the anchors themselves, not the interpolation. W < 1,
-// so both land inside [q10,mid] / [mid,q90] — monotonicity + the nonneg floor hold
-// with no extra clamp.
-const PROBIT_Q25_Q75_W = 0.526307;
-
 /** Positive modulo (JS `%` keeps the sign of the dividend; Python's does not). */
 const mod = (n: number, m: number): number => ((n % m) + m) % m;
 
-/** One grid delta 7-tuple for a (doy, hres) anchor — the full CQR-calibrated
- *  quantile set at levels .01/.05/.10/.50/.90/.95/.99. */
+/** One grid delta 9-tuple for a (doy, hres) anchor — the full CQR-calibrated
+ *  quantile set at levels .01/.05/.10/.25/.50/.75/.90/.95/.99. */
 interface Delta {
   d01: number;
   dlo: number;
   d10: number;
+  d25: number;
   dmid: number;
+  d75: number;
   d90: number;
   dhi: number;
   d99: number;
@@ -133,7 +127,9 @@ function buildTable(rows: Record<string, string>[]): CellTable | null {
       d01: parseFloat(row.d01),
       dlo: parseFloat(row.dlo),
       d10: parseFloat(row.d10),
+      d25: parseFloat(row.d25),
       dmid: parseFloat(row.dmid),
+      d75: parseFloat(row.d75),
       d90: parseFloat(row.d90),
       dhi: parseFloat(row.dhi),
       d99: parseFloat(row.d99),
@@ -245,7 +241,9 @@ export async function fetchBands(
       let q01 = base + interp(grid, doy, base, 'd01');
       let lo = base + interp(grid, doy, base, 'dlo');
       let q10 = base + interp(grid, doy, base, 'd10');
+      let q25 = base + interp(grid, doy, base, 'd25');
       let mid = base + interp(grid, doy, base, 'dmid');
+      let q75 = base + interp(grid, doy, base, 'd75');
       let q90 = base + interp(grid, doy, base, 'd90');
       let hi = base + interp(grid, doy, base, 'dhi');
       let q99 = base + interp(grid, doy, base, 'd99');
@@ -253,16 +251,13 @@ export async function fetchBands(
         q01 = Math.max(0, q01);
         lo = Math.max(0, lo);
         q10 = Math.max(0, q10);
+        q25 = Math.max(0, q25);
         mid = Math.max(0, mid);
+        q75 = Math.max(0, q75);
         q90 = Math.max(0, q90);
         hi = Math.max(0, hi);
         q99 = Math.max(0, q99);
       }
-      // Interpolate the two untrained shoulder heads from the (already clipped,
-      // monotone) .10/.50/.90 anchors — see PROBIT_Q25_Q75_W. Bracketed by their
-      // neighbours, so no separate nonneg clamp is needed.
-      const q25 = mid - PROBIT_Q25_Q75_W * (mid - q10);
-      const q75 = mid + PROBIT_Q25_Q75_W * (q90 - mid);
       perMetric[key] = {
         q01: round3(q01),
         lo: round3(lo),

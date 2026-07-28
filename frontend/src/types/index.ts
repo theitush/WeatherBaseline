@@ -6,18 +6,17 @@ import type { MetricKey } from '../utils/config';
 /**
  * A bias-corrected 9-quantile CDF for one metric on one day, in native units
  * (°C / mm / m·s⁻¹): q0.01, q0.05 (`lo`), q0.10, q0.25, q0.50 (`mid` — the
- * bias-corrected best estimate), q0.75, q0.90, q0.95 (`hi`), q0.99. Seven levels
- * come from the cell's static R2 debias table; q0.25/q0.75 are NOT trained heads —
- * services/ci.ts interpolates them (probit) from the corrected q0.10/q0.50/q0.90.
+ * bias-corrected best estimate), q0.75, q0.90, q0.95 (`hi`), q0.99. All nine are
+ * TRAINED heads read straight off the cell's static R2 debias table.
  * Present on forecast/recent rows; absent on settled history.
  */
 export interface MetricBand {
   q01: number;
   lo: number;
   q10: number;
-  q25: number; // interpolated client-side (probit), not a trained head — see services/ci.ts
+  q25: number;
   mid: number;
-  q75: number; // interpolated client-side (probit), not a trained head — see services/ci.ts
+  q75: number;
   q90: number;
   hi: number;
   q99: number;
