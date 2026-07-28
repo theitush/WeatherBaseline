@@ -12,8 +12,8 @@ Key insight: M3_base's only per-day inputs are the forecast value + the date
 cell x var the model collapses to a smooth 2D surface  delta = f(hres_value, doy).
 We sample that surface on a (doy x hres) grid and write it out.
 
-Per cell x var, for each grid point we predict all 7 quantiles, sort ascending
-(precip crosses), and ship ALL SEVEN *bias deltas* — a 7-point predictive CDF the
+Per cell x var, for each grid point we predict all 9 quantiles, sort ascending
+(precip crosses), and ship ALL NINE *bias deltas* — a 9-point predictive CDF the
 client can interpolate for exceedance claims ("p(top 10%) once ERA5-Land settles").
 The client adds a delta to the raw forecast value: corrected = clip(value + d, 0..).
 Each non-median head carries a per-level ONE-SIDED conformal shift baked in
@@ -21,8 +21,9 @@ Each non-median head carries a per-level ONE-SIDED conformal shift baked in
 within 0.35pp of nominal). The shifts are SIGNED — a negative one pulls in an
 over-shooting head — and independent, so a row can re-cross; it is re-isotonized
 around the PINNED median. CQR never touches q50, so the point value is CQR-free.
-Column names keep the shipped trio dlo/dmid/dhi (= q05/q50/q95) so the current
-ci.ts keeps parsing unchanged; d01/d10/d90/d99 are appended for the CDF client.
+Column names keep the legacy trio dlo/dmid/dhi (= q05/q50/q95), and d25/d75 are
+TRAINED heads as of the q9 fits — they replace the probit split-normal rule the
+client used to interpolate them with (PROBIT_Q25_Q75_W in ci.ts).
 
 GATING (locked 2026-07-04; gated cells given empirical bands 2026-07-05): read
 models/per_cell_{TAG}.csv. Cell x vars where the M3_base POINT correction hurts —
@@ -38,8 +39,9 @@ every cell identically with NO gating logic. Validity: cqr_per_level_validity.ip
 
 OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key) — now EVERY
 cell gets a file (model surface where trusted, empirical band where gated):
-  debias_{lat}_{lon}.csv.gz   columns: var,doy,hres,d01,dlo,d10,dmid,d90,dhi,d99
-  (deltas, 2 dp)  ~4 x 53 x 13 ~= 2.7K rows ~= 15-30 KB/cell.
+  debias_{lat}_{lon}.csv.gz
+    columns: var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99
+  (deltas, 2 dp)  ~4 x 53 x 13 ~= 2.7K rows ~= 20-40 KB/cell.
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
@@ -76,12 +78,14 @@ N_HRES_ANCHORS = 15
 PRECIP_ANCHOR_QUANTILES = [0.0, 0.5, 0.75, 0.9, 0.95, 0.98, 0.99, 0.995, 1.0]
 N_PRECIP_LINEAR = 6
 
-QUANTILE_LEVELS = tqd.QUANTILES        # [.01, .05, .10, .50, .90, .95, .99]
-Q50 = QUANTILE_LEVELS.index(0.50)      # index into the per-row SORTED 7-vector
-# per-cell csv columns for the sorted heads, in level order. The middle trio
-# keeps the shipped names (dlo/dmid/dhi = q05/q50/q95) so the current ci.ts
-# keeps parsing unchanged; the four new heads extend it to a 7-point CDF.
-LEVEL_COLUMNS = ["d01", "dlo", "d10", "dmid", "d90", "dhi", "d99"]
+QUANTILE_LEVELS = tqd.QUANTILES   # [.01, .05, .10, .25, .50, .75, .90, .95, .99]
+Q50 = QUANTILE_LEVELS.index(0.50)      # index into the per-row SORTED 9-vector
+# per-cell csv columns for the sorted heads, in level order. dlo/dmid/dhi keep
+# their legacy names (= q05/q50/q95) so an already-deployed ci.ts keeps parsing a
+# new table unchanged — it reads columns BY NAME and ignores ones it doesn't know,
+# so a 9-column table is readable by the 7-column client. That makes the R2
+# promotion order-independent: tables may ship before or after the frontend.
+LEVEL_COLUMNS = ["d01", "dlo", "d10", "d25", "dmid", "d75", "d90", "dhi", "d99"]
 
 # gated tables are doy-constant (the empirical fits do not condition on doy); two
 # straddling anchors are enough for the client's circular interp — with the delta
@@ -327,7 +331,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", default=str(HERE / "data" / "debias"),
                     help="local mirror dir for the per-cell tables")
-    ap.add_argument("--model-tag", default="qn8727_s0",
+    ap.add_argument("--model-tag", default="qn8727_s0_q9",
                     help="TAG of the shipped fits + per_cell CSV to bake")
     ap.add_argument("--gate-threshold", type=float, default=0.1,
                     help="drop cell x vars where mae_q50 - mae_raw exceeds this")

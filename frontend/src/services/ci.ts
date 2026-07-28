@@ -96,11 +96,17 @@ function dayOfYear(dateStr: string): number {
   return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
 }
 
+// R2 key prefix holding the tables. Overridable ONLY so a regenerated table set
+// can be staged under a separate prefix (e.g. VITE_DEBIAS_PREFIX=debias-q9) and
+// exercised end-to-end against live R2 while production keeps reading `debias/`
+// untouched. Unset everywhere except a local staging run — the default IS prod.
+const DEBIAS_PREFIX = import.meta.env.VITE_DEBIAS_PREFIX ?? 'debias';
+
 /** URL of a cell's debias table, mirroring tieredData.fileUrl conventions. */
 function debiasUrl(lat: number, lon: number): string {
   const name = `debias_${snap(lat).toFixed(1)}_${snap(lon).toFixed(1)}.csv.gz`;
   const prefix = DATA_BASE ? '' : '/data';
-  return `${DATA_BASE}${prefix}/debias/${name}`;
+  return `${DATA_BASE}${prefix}/${DEBIAS_PREFIX}/${name}`;
 }
 
 /** Parse the flat CSV rows into per-var grids. Returns null for an empty table. */

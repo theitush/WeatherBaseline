@@ -3,16 +3,22 @@
 The production training run of ml_debias.ipynb's pipeline, as a script for the
 gcloud box (e2-highcpu-16 — 16 vCPUs but only 16 GB RAM, hence the dtype
 shrink + per-var column slicing below; the float64/object full-grid frame gets
-the process OOM-killed). Per variable (tmax, tmin, precip, wind) it fits FOUR
-CatBoost MultiQuantile models — quantiles 1/5/10/50/90/95/99 in one fit each,
+the process OOM-killed). Per variable (tmax, tmin, precip, wind) it fits a
+CatBoost MultiQuantile model — quantiles 1/5/10/25/50/75/90/95/99 in ONE fit,
 so q50 is the point correction and the outer pairs give 90%/98% bands:
 
   M2_base   geo + seasonal + fc_version                      (no cell identity)
-  M3_base   M2_base + `key` as a native categorical
+  M3_base   M2_base + `key` as a native categorical           <- the shipped one
   M2_cross  M2_base + the other three hres_* values (regime features)
   M3_cross  M3_base + the other three hres_* values
 
-16 fits total. Unweighted (extremity weights would bias the quantiles — the
+--variants defaults to M3_base ALONE: 4 fits, not 16. The bakeoff is settled and
+cannot be reopened by a retrain. M3_cross scores better on every var, but it
+consumes the other three hres_* values, so its surface is 5-D — make_debias_tables
+can only bake a variant whose sole per-day inputs are (forecast value, date), i.e.
+a 2-D surface. M3_base is the best BAKEABLE variant, not the best variant.
+
+Unweighted (extremity weights would bias the quantiles — the
 notebook's own Sec.12 rationale). Split, features, trace clamp and fc_version
 replicate ml_debias.ipynb exactly (monthly blocks, every 5th to test, 3-day
 embargo, seed 0); early stopping uses a validation carve-out from TRAIN blocks
@@ -31,7 +37,7 @@ PIPELINE (each step gates the next; any missing data raises):
                    crossing rate, feature importances, per-cell CSV for gating
 
 OUTPUT (models/):
-  {variant}_{var}_{TAG}.cbm      the 16 models        TAG = qn{cells}_s{seed}
+  {variant}_{var}_{TAG}.cbm      TAG = qn{cells}_s{seed}_q{n_quantiles}
   spec_{TAG}.json                knobs, features, cell list, best iterations
   eval_{TAG}.csv                 headline table (also printed)
   per_cell_{TAG}.csv             per cell x var x variant: MAE/p95 raw vs q50
@@ -78,7 +84,10 @@ VALUE_COLS = [v["col"] for v in VARS]
 
 # --- knobs (split params replicate ml_debias.ipynb exactly) ---
 SEED = 0
-QUANTILES = [0.01, 0.05, 0.10, 0.50, 0.90, 0.95, 0.99]
+# 9 levels. The .25/.75 pair is TRAINED (it used to be interpolated client-side by
+# a probit split-normal rule in frontend/src/services/ci.ts); the shoulders carry
+# the most probability mass, so they get real heads rather than a parametric guess.
+QUANTILES = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
 MAX_ITERS = 1500          # cap; early stopping picks the real count
 OD_WAIT = 75              # stop after this many iterations without val improvement
 HOLDOUT_EVERY = 5         # every Nth month-block -> test
@@ -286,14 +295,29 @@ def load_and_verify(static: pd.DataFrame, allow_partial: bool) -> pd.DataFrame:
 
 
 # ------------------------------------------------------- 4. features + split
+# Seasonal phase stays on RAW day-of-year. Quantizing it to the 53 weekly bake
+# anchors was tried and rejected 2026-07-28 (A/B, 300 cells, seed 0): the theory
+# was that ~1500 trees split cos/sin at arbitrary thresholds, so the fitted doy
+# response is a staircase finer than the bake grid can carry — i.e. it aliases.
+# Real, but it costs nothing measurable. Test MAE identical to 4 dp (mixed signs);
+# END-TO-END SERVED error — |era5 - (hres + interpolated dmid)| through the actual
+# baked table — identical to ±0.002 on values of 0.5-0.9. The sub-week structure
+# is tree noise, so aliasing it is harmless. Don't re-add without a metric that
+# shows a gain; self_check CANNOT adjudicate it (it scores a step-function model
+# against a linear interpolant, so it penalises quantization by construction).
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     day_of_year = df["date"].dt.dayofyear
     df["cos_doy"] = np.cos(2 * np.pi * day_of_year / 365.25)
     df["sin_doy"] = np.sin(2 * np.pi * day_of_year / 365.25)
     df["season"] = (df["date"].dt.month % 12 // 3).map(
         {0: "DJF", 1: "MAM", 2: "JJA", 3: "SON"})
+    # sorted() is LOAD-BEARING: FC_CHANGES is declared newest-first, and each mask
+    # is `date >= change_date`, so applying them in declaration order lets the
+    # OLDER cycle's mask overwrite the newer one's rows — 50r1 never survived, and
+    # make_debias_tables then baked against a category the model had never seen.
+    # Oldest-first means the latest applicable cycle wins, as intended.
     fc_version = pd.Series(FC_BASE, index=df.index)
-    for change_date, cycle in FC_CHANGES:
+    for change_date, cycle in sorted(FC_CHANGES):
         fc_version = fc_version.mask(df["date"] >= change_date, cycle)
     df["fc_version"] = fc_version
 
@@ -458,7 +482,16 @@ def main() -> int:
                     help="skip the archive-slice refresh (reuse current slices)")
     ap.add_argument("--allow-partial", action="store_true",
                     help="DEBUG: warn+drop missing/stale cells instead of raising")
+    ap.add_argument("--variants", nargs="+", default=["M3_base"],
+                    choices=sorted(VARIANTS),
+                    help="variants to fit (default: M3_base, the only one shipped). "
+                         "The full 4-variant bakeoff is settled and cannot change: "
+                         "M3_cross scores better but takes the other three hres_* "
+                         "values, so its surface is 5-D and cannot be baked into a "
+                         "static per-cell table. Pass all four only to redo the "
+                         "comparison for its own sake.")
     args = ap.parse_args()
+    variants = {name: VARIANTS[name] for name in args.variants}
 
     static = preflight(args.limit, args.allow_partial)
     if not args.skip_pull:
@@ -469,7 +502,11 @@ def main() -> int:
     df = shrink(df)
 
     MODELS.mkdir(exist_ok=True)
-    tag = f"qn{df.key.nunique()}_s{SEED}"
+    # The quantile count is IN the tag. fit_or_load reuses any cached .cbm whose
+    # path exists, so without this a rerun would silently load the shipped 7-level
+    # fits while the code indexes a 9-level layout — Q50 would read the 0.90 head
+    # and produce plausible garbage rather than crashing.
+    tag = f"qn{df.key.nunique()}_s{SEED}_q{len(QUANTILES)}"
     spec = {"tag": tag, "seed": SEED, "quantiles": QUANTILES,
             "iters_cap": args.iters, "od_wait": OD_WAIT,
             "holdout_every": HOLDOUT_EVERY, "val_every": VAL_EVERY,
@@ -477,8 +514,8 @@ def main() -> int:
             "date_min": str(df.date.min().date()),
             "date_max": str(df.date.max().date()),
             "n_rows": int(len(df)), "n_cells": int(df.key.nunique()),
-            "variants": {v: feature_cols("tmax", *VARIANTS[v])
-                         for v in VARIANTS},
+            "variants": {v: feature_cols("tmax", *variants[v])
+                         for v in variants},
             "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "tree_counts": {}, "cells": sorted(df.key.unique())}
 
@@ -496,7 +533,7 @@ def main() -> int:
         test = var_df[var_df.role == "test"]
         log(f"== {name}: train {len(train):,} / val {len(val):,} / "
             f"test {len(test):,} rows ==")
-        for variant, (with_cell, with_cross) in VARIANTS.items():
+        for variant, (with_cell, with_cross) in variants.items():
             cols = feature_cols(name, with_cell, with_cross)
             cat_features = ["fc_version"] + (["key"] if with_cell else [])
             model, trees = fit_or_load(name, variant, train, val, cols,
