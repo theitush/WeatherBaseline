@@ -5,18 +5,21 @@ of days") are distorted by a systematic offset between the **archive** tier
 (ERA5-Land, the climatology) and the **forecast** tier (IFS-HRES).
 
 ## Files
-- `pull_overlap.py` — read-only puller. Baseline = archive `.gz` pulled from R2
-  (`weather-baseline`) to `data/archive/`; HRES = `historical-forecast-api` (IFS)
-  at the identical snapped 0.1° point. Output `data/overlap.csv` (tidy long).
-- `analyze.py` — CLI summary (same stats as the notebook, no plots).
-- `bias_study.ipynb` / `.html` — research notebook with graphs. **Start here.**
+- `pull_hres_all.py` — production-scale, resumable pull of IFS-HRES forecast
+  history for every study cell.
+- `pull_archive_slice.py` — matching ERA5-Land archive extract for those cells.
+- `train_quantile_debias.py` — joins the two sources and trains the correction
+  models.
+- `make_debias_tables.py` — bakes the trained models into the deployable tables.
 
 ## Run
 ```bash
-../era5_pipeline/.venv/bin/python pull_overlap.py            # 20-cell pilot, 2yr
-../era5_pipeline/.venv/bin/jupyter nbconvert --to notebook --execute --inplace bias_study.ipynb
+../era5_pipeline/.venv/bin/python pull_hres_all.py
+../era5_pipeline/.venv/bin/python pull_archive_slice.py --local --overwrite
+../era5_pipeline/.venv/bin/python train_quantile_debias.py
+../era5_pipeline/.venv/bin/python make_debias_tables.py
 ```
-Cost: HRES side only, ~53 calls/cell → ~1060 for the pilot (~11% of 10k/day free tier).
+See `HRES_VM_RUN.md` for the full-grid HRES acquisition runbook.
 
 ## Pilot findings (20 cells, 2024-06 .. 2026-05) — directional, not final
 

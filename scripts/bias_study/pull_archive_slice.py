@@ -22,7 +22,7 @@ is the normal case). Use this to build the training slice straight from a local
 pull without touching R2.
 
 OUTPUT — a local dir paralleling the HRES one (NOT re-uploaded to R2; this is a
-research extract, same as pull_overlap.py's data/archive/):
+research extract):
   scripts/bias_study/data/archive-overlap/archive_{lat}_{lon}.csv.gz
   columns: date,tmax_C,tmin_C,precip_mm,wind_max_ms  (unchanged archive schema)
 
