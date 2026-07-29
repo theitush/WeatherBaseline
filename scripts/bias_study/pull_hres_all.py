@@ -16,9 +16,10 @@ OUTPUT — its OWN R2 prefix, separate from the live serving tiers:
    the resume ledger per cell, as a bias-model feature — the grid offset between
    our 0.1deg point and HRES's O1280 cell is itself part of the bias.)
 
-RESUME — R2-mirrored ledger at hres-forecast/.hres_progress.json (same pattern as
+RESUME — R2-mirrored ledger at <r2-prefix>/.hres_progress.json (same pattern as
 the era5 --overwrite ledger). A recreated/rebooted box pulls the ledger back and
-skips cells already done. Rerun the same command after any interruption.
+skips cells already done. A NEW --r2-prefix is therefore the safe, resumable way
+to rebuild the entire dataset without replacing the previous one.
 
 RATE — the Open-Meteo Standard plan ($29/mo, cancel when done) lifts the 10k/day
 cap; the binding limit is then 600 calls/min. At ~53 weighted calls/cell (4 vars,
@@ -32,10 +33,11 @@ And OPTIONALLY a paid Open-Meteo key (Standard $29/mo, key-based not IP-based):
   OPENMETEO_API_KEY=...        # absent => free tier (single IP, --rate 6)
 
 RESUME is two-layered so it works from a FRESH VM with an empty local dir: on
-start it lists what's ALREADY in R2 (hres-forecast/*.csv.gz) and skips those
-cells, then merges the ledger on top. So you can run this on any box, any number
-of times, and it only fetches the cells R2 doesn't have yet. Pass --overwrite to
-re-pull cells already in R2 (e.g. to fix a wrong date window) instead of skipping.
+start it lists what's ALREADY in the selected R2 prefix (*.csv.gz) and skips those
+cells, then merges the ledger on top. So you can run a normal pull on any box, any
+number of times, and it only fetches the cells R2 doesn't have yet. --overwrite
+re-pulls cells already in R2, but does not preserve that skip set across a restart;
+use a new --r2-prefix for a large resumable rebuild.
 
 TOP-UP (--append) — the cheap way to keep the dataset current. Skipping is
 all-or-nothing and --overwrite re-pulls all ~28 months (~53 quota-units/cell), so
@@ -63,6 +65,8 @@ Usage (from scripts/bias_study/, with the era5_pipeline venv):
   python pull_hres_all.py --rate 6              # FULL grid, FREE tier pace
   OPENMETEO_API_KEY=xxx python pull_hres_all.py # FULL grid, Standard plan (fast)
   python pull_hres_all.py --append --rate 6     # top up every cell's tail
+  python pull_hres_all.py --r2-prefix hres-forecast-ifs-hres --years 99
+                                               # fresh, full, resumable rebuild
 """
 from __future__ import annotations
 
@@ -91,10 +95,7 @@ sys.path.insert(0, str(HERE.parent / "era5_pipeline"))
 from r2_upload import R2Uploader  # noqa: E402
 
 CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
-OUT_DIR = HERE / "data" / "hres-forecast"      # local mirror of the R2 prefix
-R2_PREFIX = "hres-forecast"
-LEDGER_KEY = f"{R2_PREFIX}/.hres_progress.json"
-LOCAL_LEDGER = OUT_DIR / ".hres_progress.json"  # local mirror of the R2 ledger
+DEFAULT_R2_PREFIX = "hres-forecast"
 
 FREE_HOST = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 PAID_HOST = "https://customer-historical-forecast-api.open-meteo.com/v1/forecast"
@@ -251,9 +252,9 @@ def merge_rows(old: list[dict], new: list[dict]) -> list[dict]:
     return [by_date[d] for d in sorted(by_date)]
 
 
-def load_ledger(up: R2Uploader) -> dict:
+def load_ledger(up: R2Uploader, ledger_key: str) -> dict:
     """Pull the resume ledger from R2 (so a fresh box knows what's done)."""
-    raw = up.get_bytes(LEDGER_KEY)
+    raw = up.get_bytes(ledger_key)
     if not raw:
         return {"done": {}}
     try:
@@ -262,12 +263,13 @@ def load_ledger(up: R2Uploader) -> dict:
         return {"done": {}}
 
 
-def save_ledger(up: R2Uploader, ledger: dict) -> None:
+def save_ledger(up: R2Uploader, ledger: dict, ledger_key: str,
+                local_ledger: Path) -> None:
     """Write the ledger to R2 (authoritative resume) AND mirror it locally."""
     blob = json.dumps(ledger).encode()
-    up.put_bytes(blob, LEDGER_KEY, "application/json")
-    LOCAL_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-    LOCAL_LEDGER.write_bytes(blob)
+    up.put_bytes(blob, ledger_key, "application/json")
+    local_ledger.parent.mkdir(parents=True, exist_ok=True)
+    local_ledger.write_bytes(blob)
 
 
 def read_cells():
@@ -293,6 +295,10 @@ def main() -> int:
     ap.add_argument("--append", action="store_true",
                     help="top-up mode: fetch only each cell's missing tail and "
                          "merge by date (~10x cheaper than --overwrite)")
+    ap.add_argument("--r2-prefix", default=DEFAULT_R2_PREFIX,
+                    help="R2 folder for cell files and the resume ledger "
+                         f"(default {DEFAULT_R2_PREFIX!r}); use a new prefix "
+                         "for a separately tracked, resumable rebuild")
     ap.add_argument("--resettle-days", type=int, default=14,
                     help="with --append, also re-fetch this many days already on "
                          "disk, so the unsettled seam gets settled values (14)")
@@ -306,6 +312,12 @@ def main() -> int:
     args = ap.parse_args()
     if args.append and args.overwrite:
         sys.exit("--append and --overwrite are mutually exclusive")
+    r2_prefix = args.r2_prefix.strip("/")
+    if not r2_prefix or ".." in Path(r2_prefix).parts:
+        sys.exit("--r2-prefix must be a non-empty relative R2 folder")
+    out_dir = HERE / "data" / r2_prefix
+    ledger_key = f"{r2_prefix}/.hres_progress.json"
+    local_ledger = out_dir / ".hres_progress.json"
 
     apikey = os.environ.get("OPENMETEO_API_KEY") or None
     host = PAID_HOST if apikey else FREE_HOST
@@ -335,17 +347,17 @@ def main() -> int:
     else:
         print(f"{len(cells)} cells x ~{quota_units(days)} calls = "
               f"~{len(cells) * quota_units(days):,} API calls  @ {rate:.0f}/min")
-    print("listing what's already in R2 / loading ledger…", flush=True)
+    print(f"listing R2 prefix {r2_prefix!r} / loading ledger…", flush=True)
 
     up = R2Uploader()
     # Two-layer resume so a FRESH box with an empty local dir is correct:
     #   1) what R2 already HAS (authoritative — survives a wiped ledger),
     #   2) the ledger (adds the per-cell meta for cells we pulled here).
-    ledger = load_ledger(up)
+    ledger = load_ledger(up, ledger_key)
     done = ledger["done"]
     in_r2 = {
         k.split("/")[-1].removeprefix("hres_").removesuffix(".csv.gz")
-        for k in up.list_sizes(f"{R2_PREFIX}/")
+        for k in up.list_sizes(f"{r2_prefix}/")
         if k.endswith(".csv.gz")
     }
     if args.overwrite:
@@ -366,7 +378,7 @@ def main() -> int:
               f"-> {len(skip)} to skip\n")
 
     limiter = RateLimiter(rate)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     n_todo = sum(1 for _, sla, slo in cells
                  if f"{sla:.1f}_{slo:.1f}" not in skip)
     n_ok = n_skip = n_fail = n_current = 0
@@ -382,8 +394,8 @@ def main() -> int:
         if key in skip:
             n_skip += 1
             continue
-        gz = OUT_DIR / f"hres_{key}.csv.gz"
-        r2_key = f"{R2_PREFIX}/hres_{key}.csv.gz"
+        gz = out_dir / f"hres_{key}.csv.gz"
+        r2_key = f"{r2_prefix}/hres_{key}.csv.gz"
         # progress = cells processed so far this run (ok + fail), out of the to-do count
         nth = n_ok + n_fail + 1
         tag = f"[{nth}/{n_todo}] {name[:28]:28s} {key:14s}"
@@ -439,11 +451,11 @@ def main() -> int:
         print(f"  {tag} OK  {span}  {hloc}  "
               f"{dt:.1f}s  ({cmin:.0f} cells/min)", flush=True)
         if n_ok % args.ledger_every == 0:
-            save_ledger(up, ledger)
+            save_ledger(up, ledger, ledger_key, local_ledger)
             print(f"  {tag} ledger flushed to R2 "
                   f"({len(done)} cells recorded)", flush=True)
 
-    save_ledger(up, ledger)
+    save_ledger(up, ledger, ledger_key, local_ledger)
     print(f"\ndone. ok={n_ok} skip={n_skip} fail={n_fail}"
           f"{f' up-to-date={n_current}' if args.append else ''}  "
           f"~{units:,} quota-calls  ({(time.time() - t_start) / 60:.1f} min)")

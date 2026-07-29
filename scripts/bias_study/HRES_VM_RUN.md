@@ -3,12 +3,19 @@
 `pull_hres_all.py` grabs ~2 years of settled IFS-HRES daily forecasts (tmax, tmin,
 precip, wind_max) for **every cell**, at the same snapped 0.1° point + nearest-cell
 selection the prod Worker uses, and uploads each cell to its **own R2 prefix**
-`hres-forecast/`. It's the forecast side of the archive↔forecast bias model.
+`hres-forecast/` by default. It's the forecast side of the archive↔forecast bias
+model.
 
 It is **resumable from any machine**: on start it lists what's already in R2 and
 fetches only the missing cells. Run it on your laptop, on a VM, restart it, run it
 from a different box — it always continues, never re-pulls. So you can do **both**
 the one-off backfill and later top-ups with the same command.
+
+For a corrected/reproducible rebuild without replacing the old data, choose a new
+prefix such as `hres-forecast-ifs-hres/`. A fresh prefix is also truly resumable:
+the normal (non-`--overwrite`) run skips the objects and ledger entries it has
+already completed. Do **not** add `--overwrite` for this workflow; overwrite starts
+from the beginning on a new invocation.
 
 ---
 
@@ -50,8 +57,8 @@ source ../era5_pipeline/.venv/bin/activate
 export $(grep -v '^#' ../era5_pipeline/r2.env | xargs)   # R2 upload creds
 export OPENMETEO_API_KEY=your_key      # OMIT this line for the free tier
 
-python pull_hres_all.py --only Chicago --years 0.1   # 5s smoke test first
-python pull_hres_all.py                              # the full grid
+python pull_hres_all.py --only Chicago --years 99 --r2-prefix hres-forecast-ifs-hres
+python pull_hres_all.py --years 99 --r2-prefix hres-forecast-ifs-hres
 ```
 
 If it stops (quota, laptop sleep, Ctrl-C), just rerun the last command — it resumes
@@ -108,8 +115,8 @@ gcloud compute instances create hres-pull \
 cloud-platform` is what lets the VM delete itself at the end.
 
 That's it. The VM boots, runs the pull (resuming from R2 if it was ever interrupted),
-then deletes itself. Check progress any time by listing R2: the `hres-forecast/`
-prefix fills up as it goes, and `hres-forecast/.hres_progress.json` is the ledger.
+then deletes itself. Check progress any time by listing R2: the selected prefix
+fills up as it goes, and `<prefix>/.hres_progress.json` is the ledger.
 
 > Don't want it to self-delete (e.g. to inspect logs)? Drop the last 4 lines of the
 > startup script and `gcloud compute instances delete hres-pull --zone=...` by hand
