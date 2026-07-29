@@ -204,6 +204,7 @@ async function refreshRecent(bucket, lat, lon, ttlMs) {
       ...dateRange,
       daily: PRECIP_WIND_FIELDS,
       wind_speed_unit: 'ms',
+      models: FORECAST_MODEL,
       timezone: 'auto',
     }),
   ]);

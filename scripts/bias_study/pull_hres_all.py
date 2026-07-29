@@ -106,6 +106,9 @@ VARS = {
 }
 HRES_FIELDS = ",".join(VARS)
 SCHEMA = ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
+# Must match the live forecast tier; omitting this makes Open-Meteo select its
+# location-dependent "Best Match" model instead of IFS HRES.
+HRES_MODEL = "ecmwf_ifs"
 
 # End a few days behind today so the historical-forecast values are fully settled.
 END_LAG_DAYS = 10
@@ -167,6 +170,7 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3):
         "latitude": slat, "longitude": slon,
         "start_date": start, "end_date": end,
         "daily": HRES_FIELDS, "wind_speed_unit": "ms",
+        "models": HRES_MODEL,
         "timezone": "auto", "cell_selection": "nearest",
     }
     if apikey:
