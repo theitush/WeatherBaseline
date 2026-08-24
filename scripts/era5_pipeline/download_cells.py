@@ -199,6 +199,9 @@ _RETRY_HINTS = (
     "timeout",
 )
 _MAX_RETRIES = 8
+# Attempts for the per-cell R2 merge-base GET. Short: it's one small object, and
+# on a partial-history run the failure path skips the cell rather than clobber it.
+_R2_BASE_RETRIES = 3
 
 
 def _is_transient(err: Exception) -> bool:
@@ -851,6 +854,26 @@ class OverwriteLedger:
                 log(f"overwrite: R2 ledger delete failed ({e})")
 
 
+# The first year any archive can contain. A run that starts here fetches the
+# whole record, so a missing merge base costs nothing — the frame IS the history.
+# A run that starts LATER (a monthly top-up) does not: see MergeBaseUnavailable.
+ARCHIVE_FIRST_YEAR = 1950
+
+# Cells whose write was skipped to protect their R2 history (see write_archive).
+# Appended from tile threads; list.append is atomic, no lock needed.
+_SKIPPED_CELLS: list[str] = []
+
+
+class MergeBaseUnavailable(RuntimeError):
+    """R2 has (or may have) this cell's archive, but this run could not read it.
+
+    Only raised for a PARTIAL-history run — one whose fetched span cannot itself
+    reproduce the whole archive. Writing "fresh" there would upload a file
+    containing the span alone, silently deleting every earlier year from R2. The
+    cell is skipped instead: R2 keeps what it has, and a re-run picks it up.
+    """
+
+
 def _read_archive_frame(source, *, compression="infer"):
     """Read one gzip cell archive into a frame with `date` as datetime.date.
 
@@ -865,30 +888,57 @@ def _read_archive_frame(source, *, compression="infer"):
     return df
 
 
-def _read_r2_base(uploader, name: str):
+def _read_r2_base(uploader, name: str, *, required: bool = False):
     """The cell's current R2 archive as a merge base — frame, or None if R2 has
-    no (readable) copy. A missing/unreadable R2 object is fine: whatever years it
-    lacks are exactly the years this run is fetching, so writing fresh loses
-    nothing. Best-effort: a transient R2 read error also yields None (write fresh).
+    no copy.
+
+    On a FULL-history run a missing or unreadable object is fine: whatever years
+    it lacks are exactly the years this run is fetching, so writing fresh loses
+    nothing, and any read error degrades to None (best-effort).
+
+    `required=True` (a partial-history run, e.g. `--year 2026`) inverts that: the
+    fetched span is only a slice, so a base we failed to read must NOT become a
+    fresh write — that would upload the slice alone over a full archive. Transient
+    errors are retried, then raise MergeBaseUnavailable. A genuine 404 still
+    returns None in both modes: R2 has nothing to lose.
     """
     import io
 
-    try:
-        body = uploader.get_bytes(f"archive/{name}")
-    except Exception as e:  # noqa: BLE001 - reseed is best-effort
-        log(f"  WARN R2 read failed for {name} ({e}); merging without an R2 base")
-        return None
+    body = None
+    for attempt in range(1, _R2_BASE_RETRIES + 1):
+        try:
+            body = uploader.get_bytes(f"archive/{name}")
+            break
+        except Exception as e:  # noqa: BLE001 - reseed is best-effort
+            last = attempt == _R2_BASE_RETRIES
+            if _is_transient(e) and not last:
+                backoff = 2 ** attempt
+                log(f"  R2 read failed for {name} ({type(e).__name__}); "
+                    f"retrying in {backoff}s")
+                time.sleep(backoff)
+                continue
+            if required:
+                raise MergeBaseUnavailable(
+                    f"cannot read R2 base for {name}: {type(e).__name__}: {e}"
+                ) from e
+            log(f"  WARN R2 read failed for {name} ({e}); "
+                "merging without an R2 base")
+            return None
     if not body:
         return None  # R2 has no copy yet — the fetch is producing the full history
     try:
         return _read_archive_frame(io.BytesIO(body), compression="gzip")
     except (EOFError, OSError, ValueError) as e:
+        if required:
+            raise MergeBaseUnavailable(
+                f"R2 archive {name} unreadable ({e.__class__.__name__})") from e
         log(f"  WARN R2 archive {name} unreadable ({e.__class__.__name__}); "
             "merging without an R2 base")
         return None
 
 
-def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
+def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader,
+                require_base: bool = False):
     """The frame to merge a freshly-fetched span onto (None ⇒ write fresh).
 
     - --overwrite (`fresh`): None — rebuild the cell from scratch, dropping stale
@@ -897,6 +947,9 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
       truth. The local disk is deliberately IGNORED here — it may be stale or
       empty, and every year it could contribute is one the fetch is reproducing
       anyway. One R2 GET per cell per run (not per span).
+    - `require_base`: this run fetches only part of the record, so an R2 copy we
+      cannot read is fatal for the cell (MergeBaseUnavailable) rather than a
+      fresh write that would drop the years the span doesn't cover.
     - Later span this run, or a local (--no-upload) run: merge onto the local file
       — freshly R2-seeded this run, or the self-consistent base for a no-upload
       run whose resume itself reads local coverage. A corrupt local file (should
@@ -906,7 +959,7 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
         return None
     if uploader is not None and (lat, lon) not in _R2_SEEDED:
         _R2_SEEDED.add((lat, lon))
-        return _read_r2_base(uploader, path.name)
+        return _read_r2_base(uploader, path.name, required=require_base)
     if not path.exists():
         return None
     try:
@@ -915,7 +968,7 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
         detail = "no R2 uploader — writing fresh from current span only"
         base = None
         if uploader is not None:
-            base = _read_r2_base(uploader, path.name)
+            base = _read_r2_base(uploader, path.name, required=require_base)
             detail = ("reseeded merge base from R2" if base is not None
                       else "no readable R2 copy — writing fresh")
         log(f"  WARN corrupt local archive {path.name} "
@@ -924,7 +977,7 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader):
 
 
 def write_archive(lat: float, lon: float, frame, *, ledger=None,
-                  span=None, uploader=None) -> Path:
+                  span=None, uploader=None, require_base: bool = False) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
     Merge-by-date makes re-running an overlapping span idempotent: existing dates
@@ -938,6 +991,8 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     local disk is treated as scratch, so a stale or empty box can't clobber R2 on
     upload, and a truncated local archive can't crash the tile. The write itself is
     atomic (temp file + os.replace) so a killed run never leaves a truncated file.
+    With `require_base` (a partial-history run) an unreadable R2 base raises
+    MergeBaseUnavailable instead — nothing is written, so R2 keeps its history.
     """
     import pandas as pd
 
@@ -945,7 +1000,8 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / archive_name(lat, lon)
         fresh = ledger is not None and not ledger.is_replaced(lat, lon)
-        base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader)
+        base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader,
+                           require_base=require_base)
         if base is not None:
             merged = (
                 pd.concat([base, frame])
@@ -969,7 +1025,7 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
 
 def run_tile(ds, tile_id, tile_cells, years, batch_years,
              var_workers, resume, latest_date=None, r2_resume=None,
-             uploader=None, ledger=None) -> int:
+             uploader=None, ledger=None, require_base=False) -> int:
     """Fetch all missing year-spans for one tile; return archives written.
 
     If `uploader` is given, each cell's archive is pushed to R2 right after it's
@@ -978,6 +1034,8 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
     `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
     disk is ephemeral) instead of the local archives. `ledger` (--overwrite)
     rebuilds every year from scratch and resumes via its own (cell, span) index.
+    `require_base` marks a partial-history run: a cell whose R2 archive can't be
+    read is skipped (and recorded) rather than overwritten with this span alone.
 
     When a written span reaches the store's newest year (`latest_date.year`) — a
     fresh backfill catching up, or the automatic trailing-year top-up — the cell's
@@ -1020,8 +1078,17 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
         for (lat, lon), frame in frames.items():
             if ledger is not None and ledger.span_done(lat, lon, s, e):
                 continue  # already landed before a crash
-            path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e),
-                                  uploader=uploader)
+            try:
+                path = write_archive(lat, lon, frame, ledger=ledger, span=(s, e),
+                                     uploader=uploader, require_base=require_base)
+            except MergeBaseUnavailable as exc:
+                # Partial-history run and R2's copy is unreadable: writing would
+                # replace a full archive with this span alone. Leave R2 as it is.
+                # (`exc`, not `e` — `e` is this span's end year, and Python
+                # deletes an `except ... as` name when the clause exits.)
+                _SKIPPED_CELLS.append(archive_name(lat, lon))
+                log(f"  !! SKIPPED {archive_name(lat, lon)} — {exc}")
+                continue
             if uploader is not None:
                 uploader.upload_file(path, f"archive/{path.name}")
                 # This span reaches the store's newest year, so the archive now
@@ -1164,13 +1231,23 @@ def main() -> int:
     log(f"store latest date: {latest_date} (ERA5-Land lag) — on resume, tiles "
         "ending before this get their trailing year topped up")
 
+    # A run that doesn't start at ARCHIVE_FIRST_YEAR fetches only a slice of the
+    # record (the monthly top-up: --year 2026). Uploading such a span over an
+    # archive whose R2 copy we failed to read would delete every earlier year, so
+    # in that mode an unreadable base skips the cell instead. Full-history runs
+    # keep the old best-effort behaviour: the span they hold IS the history.
+    require_base = uploader is not None and args.start_year > ARCHIVE_FIRST_YEAR
+    if require_base:
+        log(f"partial-history run (from {args.start_year}): a cell whose R2 "
+            "archive can't be read is SKIPPED, not overwritten")
+
     total_written = 0
     if args.parallel_tiles > 1:
         with ThreadPoolExecutor(max_workers=args.parallel_tiles) as ex:
             futs = {
                 ex.submit(run_tile, ds, t, c, years, args.batch_years,
                           args.var_workers, resume, latest_date, r2_resume,
-                          uploader, ledger): t
+                          uploader, ledger, require_base): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -1180,7 +1257,7 @@ def main() -> int:
             total_written += run_tile(
                 ds, tile_id, tile_cells, years, args.batch_years,
                 args.var_workers, resume, latest_date, r2_resume,
-                uploader, ledger)
+                uploader, ledger, require_base)
 
     # Clean finish: drop the resume ledger so the NEXT overwrite run starts fresh
     # rather than treating this run's completed spans as already-done.
@@ -1198,6 +1275,14 @@ def main() -> int:
         df = pd.read_csv(sample_path)
         print(f"\nsample — {sample_path.name}, {len(df)} days:")
         print(df.describe().loc[["min", "mean", "max"]].round(2).to_string())
+
+    if _SKIPPED_CELLS:
+        shown = ", ".join(_SKIPPED_CELLS[:10])
+        more = f" (+{len(_SKIPPED_CELLS) - 10} more)" if len(_SKIPPED_CELLS) > 10 else ""
+        print(f"\n!! {len(_SKIPPED_CELLS)} cell(s) SKIPPED to protect their R2 "
+              f"history: {shown}{more}")
+        print("   R2 still holds their previous archives — re-run to pick them up.")
+        return 1
     return 0
 
 
