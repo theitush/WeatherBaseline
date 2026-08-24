@@ -926,6 +926,12 @@ ARCHIVE_FIRST_YEAR = 1950
 # Appended from tile threads; list.append is atomic, no lock needed.
 _SKIPPED_CELLS: list[str] = []
 
+# Tiles that raised. A run is hours long over hundreds of tiles, so one tile's
+# error is recorded and stepped over, not fatal: before this, a single failed
+# call aborted main while the executor's own shutdown kept the worker threads
+# running to the end of the queue — the run looked dead and wasn't.
+_FAILED_TILES: list[tuple[str, str]] = []
+
 
 class MergeBaseUnavailable(RuntimeError):
     """R2 has (or may have) this cell's archive, but this run could not read it.
@@ -1103,6 +1109,23 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     return path
 
 
+def run_tile_guarded(*args, **kwargs) -> int:
+    """run_tile, with any error recorded against the tile instead of raised.
+
+    Returns 0 for a tile that failed. The tile keeps whatever cells it had
+    already written (each write is atomic and merges onto R2), so a re-run
+    picks up exactly what's left — see the LastModified sweep in the docs.
+    """
+    tile_id = args[1] if len(args) > 1 else kwargs.get("tile_id", "?")
+    try:
+        return run_tile(*args, **kwargs)
+    except Exception as exc:  # noqa: BLE001
+        _FAILED_TILES.append((tile_id, f"{type(exc).__name__}: {exc}"))
+        log(f"  !! tile {tile_id} FAILED ({type(exc).__name__}: {exc}) — "
+            "continuing with the remaining tiles")
+        return 0
+
+
 def run_tile(ds, tile_id, tile_cells, years, batch_years,
              var_workers, resume, latest_date=None, r2_resume=None,
              uploader=None, ledger=None, require_base=False) -> int:
@@ -1174,8 +1197,17 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
                 # This span reaches the store's newest year, so the archive now
                 # covers the days the `recent` tier was holding — drop the dead
                 # recent object (ensure-fresh rebuilds the real remaining gap).
+                # Best-effort: the object is already dead weight, and the
+                # frontend prefers archive over recent on a shared date. An R2
+                # 5xx here must not cost us the tile — one did, live, on
+                # 2026-08-25, and it took the whole run's accounting with it.
                 if latest_date is not None and e >= latest_date.year:
-                    uploader.delete_object(f"recent/{recent_name(lat, lon)}")
+                    try:
+                        uploader.delete_object(f"recent/{recent_name(lat, lon)}")
+                    except Exception as exc:  # noqa: BLE001
+                        log(f"  WARN could not drop recent/{recent_name(lat, lon)}"
+                            f" ({type(exc).__name__}); it is dead weight, not a"
+                            " correctness problem")
             written += 1
         span = f"{s}" if s == e else f"{s}-{e}"
         log(f"tile {tile_id} | years {span}: wrote {len(frames)} archives"
@@ -1329,7 +1361,7 @@ def main() -> int:
     if args.parallel_tiles > 1:
         with ThreadPoolExecutor(max_workers=args.parallel_tiles) as ex:
             futs = {
-                ex.submit(run_tile, ds, t, c, years, args.batch_years,
+                ex.submit(run_tile_guarded, ds, t, c, years, args.batch_years,
                           args.var_workers, resume, latest_date, r2_resume,
                           uploader, ledger, require_base): t
                 for t, c in tiles.items()
@@ -1338,7 +1370,7 @@ def main() -> int:
                 total_written += fut.result()
     else:
         for tile_id, tile_cells in tiles.items():
-            total_written += run_tile(
+            total_written += run_tile_guarded(
                 ds, tile_id, tile_cells, years, args.batch_years,
                 args.var_workers, resume, latest_date, r2_resume,
                 uploader, ledger, require_base)
@@ -1360,14 +1392,22 @@ def main() -> int:
         print(f"\nsample — {sample_path.name}, {len(df)} days:")
         print(df.describe().loc[["min", "mean", "max"]].round(2).to_string())
 
+    if _FAILED_TILES:
+        print(f"\n!! {len(_FAILED_TILES)} tile(s) FAILED and were stepped over:")
+        for tile_id, why in _FAILED_TILES[:10]:
+            print(f"   {tile_id}: {why}")
+        if len(_FAILED_TILES) > 10:
+            print(f"   (+{len(_FAILED_TILES) - 10} more)")
+        print("   Re-run those tiles with --no-resume: a partly-written tile "
+              "reads complete to the representative-cell check.")
+
     if _SKIPPED_CELLS:
         shown = ", ".join(_SKIPPED_CELLS[:10])
         more = f" (+{len(_SKIPPED_CELLS) - 10} more)" if len(_SKIPPED_CELLS) > 10 else ""
         print(f"\n!! {len(_SKIPPED_CELLS)} cell(s) SKIPPED to protect their R2 "
               f"history: {shown}{more}")
         print("   R2 still holds their previous archives — re-run to pick them up.")
-        return 1
-    return 0
+    return 1 if (_SKIPPED_CELLS or _FAILED_TILES) else 0
 
 
 if __name__ == "__main__":

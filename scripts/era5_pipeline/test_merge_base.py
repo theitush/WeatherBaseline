@@ -239,3 +239,37 @@ def test_the_skip_message_carries_r2_request_ids(tmp_path):
         write_archive(LAT, LON, frame(NEW_SPAN), uploader=up, require_base=True)
     msg = str(caught.value)
     assert "HTTPStatusCode=500" in msg and "RequestId=abc123" in msg
+
+
+# --------------------------------------------------------------------------- #
+# A bad night at R2 must cost cells, never the run (seen live 2026-08-25).
+# --------------------------------------------------------------------------- #
+def test_a_failed_recent_delete_does_not_cost_the_tile(monkeypatch, tmp_path):
+    """The recent/ object is dead weight once the archive covers its days."""
+    up = FakeUploader([gz(frame(HISTORY))])
+    def boom(key):
+        raise RuntimeError("An error occurred (InternalError) calling DeleteObject")
+    up.delete_object = boom
+    cells = [{"lat": LAT, "lon": LON, "tile_id": "11_26"}]
+    monkeypatch.setattr(dc, "missing_years", lambda *a, **k: [2026])
+    monkeypatch.setattr(dc, "process_span", lambda *a, **k: {(LAT, LON): frame(NEW_SPAN)})
+
+    written = dc.run_tile(None, "11_26", cells, [2026], 20, 4, True,
+                          latest_date=date(2026, 8, 15), uploader=up,
+                          require_base=True)
+
+    assert written == 1                      # the archive still counted
+    assert len(up.uploaded) == 1             # and still reached R2
+    assert read_written(tmp_path) is not None
+
+
+def test_one_tile_s_error_is_recorded_not_raised(monkeypatch):
+    """342 tiles over ~4 h: a single raise used to abort the run's accounting
+    while the executor kept the worker threads going to the end of the queue."""
+    monkeypatch.setattr(dc, "_FAILED_TILES", [])
+    def explode(*a, **k):
+        raise RuntimeError("R2 said no")
+    monkeypatch.setattr(dc, "run_tile", explode)
+
+    assert dc.run_tile_guarded(None, "19_2", [], [2026], 20, 4, True) == 0
+    assert [t for t, _ in dc._FAILED_TILES] == ["19_2"]
