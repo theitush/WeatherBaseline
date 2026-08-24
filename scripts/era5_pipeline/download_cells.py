@@ -205,11 +205,27 @@ _RETRY_HINTS = (
     "server disconnected",
     "connection reset",
     "timeout",
+    # Server-side 5xx, both from the zarr store and from R2. Seen live
+    # 2026-08-25: R2 answered a burst of GetObject with InternalError for ~30 s.
+    # Matched on words, not bare status numbers, so a message that merely
+    # contains "500" can't be mistaken for one.
+    "internalerror",
+    "internal error",
+    "slowdown",
+    "serviceunavailable",
+    "service unavailable",
+    "bad gateway",
+    "502",
+    "503",
+    "504",
 )
 _MAX_RETRIES = 8
-# Attempts for the per-cell R2 merge-base GET. Short: it's one small object, and
-# on a partial-history run the failure path skips the cell rather than clobber it.
-_R2_BASE_RETRIES = 3
+# Attempts for the per-cell R2 merge-base GET, backing off 2/4/8/16 s (~30 s
+# total). Sized against a real burst: on 2026-08-25 R2 answered GetObject with
+# InternalError for ~2.5 min and 18 cells were skipped. 30 s rides out the short
+# blips; a longer outage still skips the cell, which is the safe outcome and a
+# repairable one — better than every one of 8,727 cells stalling for minutes.
+_R2_BASE_RETRIES = 5
 
 
 def _is_transient(err: Exception) -> bool:
@@ -935,6 +951,19 @@ def _read_archive_frame(source, *, compression="infer"):
     return df
 
 
+def _r2_error_detail(err: Exception) -> str:
+    """R2's own request ids for a failed call, so a burst can be reported.
+
+    botocore hangs the raw response off ClientError; the request id is what
+    Cloudflare support can trace, and the status separates a server-side 5xx
+    from a client/credential problem. Empty string for anything else.
+    """
+    meta = getattr(err, "response", {}).get("ResponseMetadata", {}) or {}
+    bits = [f"{k}={meta[k]}" for k in ("HTTPStatusCode", "RequestId", "HostId")
+            if meta.get(k)]
+    return f" [{', '.join(bits)}]" if bits else ""
+
+
 def _read_r2_base(uploader, name: str, *, required: bool = False):
     """The cell's current R2 archive as a merge base — frame, or None if R2 has
     no copy.
@@ -958,7 +987,10 @@ def _read_r2_base(uploader, name: str, *, required: bool = False):
             break
         except Exception as e:  # noqa: BLE001 - reseed is best-effort
             last = attempt == _R2_BASE_RETRIES
-            if _is_transient(e) and not last:
+            # When the base is REQUIRED, retry anything: the alternative is
+            # skipping the cell, so a wasted retry on a permanent error costs
+            # seconds while a missed retry costs the cell its top-up.
+            if (required or _is_transient(e)) and not last:
                 backoff = 2 ** attempt
                 log(f"  R2 read failed for {name} ({type(e).__name__}); "
                     f"retrying in {backoff}s")
@@ -967,6 +999,7 @@ def _read_r2_base(uploader, name: str, *, required: bool = False):
             if required:
                 raise MergeBaseUnavailable(
                     f"cannot read R2 base for {name}: {type(e).__name__}: {e}"
+                    f"{_r2_error_detail(e)}"
                 ) from e
             log(f"  WARN R2 read failed for {name} ({e}); "
                 "merging without an R2 base")

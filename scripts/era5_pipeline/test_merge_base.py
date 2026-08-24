@@ -98,7 +98,7 @@ def read_written(tmp_path):
 # The guard: a partial-history run must not overwrite what it cannot read.
 # --------------------------------------------------------------------------- #
 def test_partial_run_skips_the_cell_when_the_r2_base_cannot_be_read(tmp_path):
-    up = FakeUploader([RuntimeError("500 Internal Error")])
+    up = FakeUploader([RuntimeError("500 Internal Error")] * dc._R2_BASE_RETRIES)
     with pytest.raises(MergeBaseUnavailable):
         write_archive(LAT, LON, frame(NEW_SPAN), uploader=up, require_base=True)
     # Nothing written locally => nothing to upload => R2 keeps its history.
@@ -181,7 +181,7 @@ def test_the_r2_base_is_read_once_per_cell_per_run(tmp_path):
 # run_tile records the skip instead of failing the whole tile.
 # --------------------------------------------------------------------------- #
 def test_run_tile_records_the_skip_and_uploads_nothing(monkeypatch, tmp_path):
-    up = FakeUploader([RuntimeError("503 Slow Down")])
+    up = FakeUploader([RuntimeError("503 Slow Down")] * dc._R2_BASE_RETRIES)
     cells = [{"lat": LAT, "lon": LON, "tile_id": "11_26"}]
     monkeypatch.setattr(dc, "missing_years", lambda *a, **k: [2026])
     monkeypatch.setattr(dc, "process_span",
@@ -195,3 +195,47 @@ def test_run_tile_records_the_skip_and_uploads_nothing(monkeypatch, tmp_path):
     assert dc._SKIPPED_CELLS == [archive_name(LAT, LON)]
     assert up.uploaded == [] and up.deleted == []
     assert read_written(tmp_path) is None
+
+
+# --------------------------------------------------------------------------- #
+# Retrying what R2 actually throws (seen live 2026-08-25).
+# --------------------------------------------------------------------------- #
+R2_INTERNAL = ("An error occurred (InternalError) when calling the GetObject "
+               "operation (reached max retries: 4): We encountered an internal "
+               "error. Please try again.")
+
+
+def test_an_r2_internal_error_is_retried_not_skipped(tmp_path):
+    """The burst that skipped 7 cells mid-run: boto3 gives up, we back off."""
+    up = FakeUploader([RuntimeError(R2_INTERNAL), gz(frame(HISTORY))])
+    write_archive(LAT, LON, frame(NEW_SPAN), uploader=up, require_base=True)
+    assert len(up.get_calls) == 2
+    assert read_written(tmp_path) is not None
+
+
+def test_a_required_base_retries_even_an_unrecognised_error(tmp_path):
+    """Skipping the cell is the fallback, so a wasted retry is the cheap side."""
+    up = FakeUploader([RuntimeError("something new"), gz(frame(HISTORY))])
+    write_archive(LAT, LON, frame(NEW_SPAN), uploader=up, require_base=True)
+    assert len(up.get_calls) == 2
+
+
+def test_a_best_effort_base_does_not_retry_an_unrecognised_error(tmp_path):
+    """Full-history run: nothing to lose, so don't spend retries on it."""
+    up = FakeUploader([RuntimeError("something new"), gz(frame(HISTORY))])
+    write_archive(LAT, LON, frame(NEW_SPAN), uploader=up)
+    assert len(up.get_calls) == 1
+    assert list(read_written(tmp_path)["date"]) == NEW_SPAN
+
+
+def test_the_skip_message_carries_r2_request_ids(tmp_path):
+    """What a support ticket needs: status + request id, not just a stack type."""
+    err = RuntimeError(R2_INTERNAL)
+    err.response = {"ResponseMetadata": {"HTTPStatusCode": 500,
+                                         "RequestId": "abc123",
+                                         "HostId": "host9"}}
+    up = FakeUploader([err] * dc._R2_BASE_RETRIES)
+    with pytest.raises(MergeBaseUnavailable) as caught:
+        write_archive(LAT, LON, frame(NEW_SPAN), uploader=up, require_base=True)
+    msg = str(caught.value)
+    assert "HTTPStatusCode=500" in msg and "RequestId=abc123" in msg
