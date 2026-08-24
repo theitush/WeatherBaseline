@@ -121,13 +121,13 @@ def test_edinburgh_recovers_finite_land_one_cell_away(store):
     """Edinburgh (56.0,-3.2) snaps offshore today (all-NaN R2 archive). With the
     land snap it must resolve to a finite land cell ~1 grid cell north, with a
     summer t2m in the FINDINGS-verified ~11-17 C range."""
-    from download_cells import TILE_CELLS
+    from download_cells import TILE_LAT_CELLS, TILE_LON_CELLS
     lat_n, lon_n, time_n = "latitude", "longitude", "valid_time"
     tlat, tlon = 56.0, 356.8  # -3.2 in 0..360
 
-    r, c = 5, 55  # Edinburgh tile 5_55
-    la = slice(r * TILE_CELLS, (r + 1) * TILE_CELLS)
-    lo = slice(c * TILE_CELLS, (c + 1) * TILE_CELLS)
+    r, c = 6, 35  # Edinburgh tile 6_35
+    la = slice(r * TILE_LAT_CELLS, (r + 1) * TILE_LAT_CELLS)
+    lo = slice(c * TILE_LON_CELLS, (c + 1) * TILE_LON_CELLS)
     sub = store["t2m"].sel({time_n: "2020-06-15T12:00:00"}).isel(
         {lat_n: la, lon_n: lo}).compute()
     lats, lons = sub[lat_n].values, sub[lon_n].values
@@ -147,16 +147,16 @@ def test_edinburgh_recovers_finite_land_one_cell_away(store):
 
 @INTEG
 def test_inland_cell_snap_is_noop_vs_current(store):
-    """An inland desert cell (Amman tile 9_5) whose nearest gridpoint is already
+    """An inland desert cell (Amman tile 11_3) whose nearest gridpoint is already
     land must resolve to that exact gridpoint -- the patch changes nothing where
     the old snap was already correct."""
-    from download_cells import TILE_CELLS
+    from download_cells import TILE_LAT_CELLS, TILE_LON_CELLS
     lat_n, lon_n, time_n = "latitude", "longitude", "valid_time"
     tlat, tlon = 31.9, 35.9  # Amman-ish, deep inland
 
-    r, c = 9, 5
-    la = slice(r * TILE_CELLS, (r + 1) * TILE_CELLS)
-    lo = slice(c * TILE_CELLS, (c + 1) * TILE_CELLS)
+    r, c = 11, 3
+    la = slice(r * TILE_LAT_CELLS, (r + 1) * TILE_LAT_CELLS)
+    lo = slice(c * TILE_LON_CELLS, (c + 1) * TILE_LON_CELLS)
     sub = store["t2m"].sel({time_n: "2020-06-15T12:00:00"}).isel(
         {lat_n: la, lon_n: lo}).compute()
     lats, lons = sub[lat_n].values, sub[lon_n].values

@@ -92,7 +92,7 @@ source .venv/bin/activate
 source r2.env                 # exports the R2_* vars for --upload-r2
 
 # Smoke-test one tile end-to-end on the VM first (downloads AND uploads it):
-python download_cells.py --tile 9_5 --year 2020 --upload-r2
+python download_cells.py --tile 11_3 --year 2020 --upload-r2
 
 # Then the full pull — pushes each archive to R2 as it's written:
 python download_cells.py --start-year 1950 --batch-years 20 --parallel-tiles 2 --upload-r2
@@ -147,9 +147,11 @@ and is served as immutable static files — no compute in prod.
 
 ## RAM note
 
-`--batch-years 20` ≈ 3 GB per variable in memory per tile; `--var-workers`
-(default 4) and `--parallel-tiles` multiply that. On the recommended **8 GB**
-GCP box, full settings (`--batch-years 20 --parallel-tiles 2`) fit. On a **4 GB**
-box (Hetzner CPX21) use `--batch-years 10 --var-workers 2 --parallel-tiles 1` or
-the OOM killer hits. The script prints a peak-RAM estimate before fetching — heed
-it.
+`--batch-years 20` ≈ 3.5 GB per variable in memory per tile (5x10deg tiles
+since the July 2026 store revamp, up from 3 GB on the old 6.4deg tiles);
+`--var-workers` (default 4) and `--parallel-tiles` multiply that. On the
+recommended **8 GB** GCP box the old full settings (`--batch-years 20
+--parallel-tiles 2`) are now tight — the script prints a peak-RAM estimate
+before fetching, heed it and drop `--batch-years` or `--parallel-tiles` if it
+exceeds MemAvailable. On a **4 GB** box (Hetzner CPX21) use `--batch-years 10
+--var-workers 2 --parallel-tiles 1` or the OOM killer hits.

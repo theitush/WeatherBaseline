@@ -34,7 +34,8 @@ import numpy as np
 # Reuse the downloader's own logic so this can't diverge from what it skips.
 from download_cells import (
     CELLS_CSV,
-    TILE_CELLS,
+    TILE_LAT_CELLS,
+    TILE_LON_CELLS,
     _compute_step,
     group_by_tile,
     load_cells,
@@ -63,8 +64,8 @@ def probe_tile(ds, tile_id: str, tile_cells: list[dict]) -> list[dict]:
     sel_lons = np.where(lons < 0, lons + 360.0, lons) if lon_is_360 else lons
 
     chunk_row, chunk_col = (int(x) for x in tile_id.split("_"))
-    lat_i0, lat_i1 = chunk_row * TILE_CELLS, chunk_row * TILE_CELLS + TILE_CELLS
-    lon_i0, lon_i1 = chunk_col * TILE_CELLS, chunk_col * TILE_CELLS + TILE_CELLS
+    lat_i0, lat_i1 = chunk_row * TILE_LAT_CELLS, (chunk_row + 1) * TILE_LAT_CELLS
+    lon_i0, lon_i1 = chunk_col * TILE_LON_CELLS, (chunk_col + 1) * TILE_LON_CELLS
     lat_i1 = min(lat_i1, ds.sizes[lat_name])
     lon_i1 = min(lon_i1, ds.sizes[lon_name])
 

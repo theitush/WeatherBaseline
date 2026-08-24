@@ -19,7 +19,7 @@ What it does
   filter    -> keep only land cells (population > 0 is a reasonable proxy;
                ERA5-Land is land-only so ocean cells would be NaN anyway)
   select    -> take the top N
-  bin       -> assign each cell to its 6.4deg zarr storage tile and report the
+  bin       -> assign each cell to its 5x10deg zarr storage tile and report the
                tile count -- THIS is the number the request-quota math needs.
 
 Output
@@ -35,8 +35,8 @@ Output
 The ERA5-Land grid
 ------------------
   0.1deg regular grid. Cell centres at lat in {-90.0, -89.9, ...}, lon likewise.
-  The zarr store chunks 64x64 cells per spatial tile => 6.4deg tiles. We bin on
-  the same 64-cell stride so tile_id maps 1:1 to a zarr spatial chunk.
+  The zarr store chunks 50x100 cells per spatial tile => 5x10deg tiles. We bin
+  on the same strides so tile_id maps 1:1 to a zarr spatial chunk.
 
 GHSL product
 ------------
@@ -71,19 +71,22 @@ OUT = HERE.parents[1] / "data" / "cells.csv"
 # different GHS-POP file does not silently reuse a stale grid.
 POP_CACHE = DATA / "pop_grid.npz"
 
-# ERA5-Land grid: 0.1deg regular. The zarr store packs 64x64 cells per spatial
-# chunk, so the "tile" for quota math is a 64-cell block = 6.4deg.
+# ERA5-Land grid: 0.1deg regular. The zarr store (era5-land-v0.zarr, the
+# Zarr v3 store from the July 2026 EarthDataHub revamp) packs 50 (lat) x 100
+# (lon) cells per spatial chunk, so the "tile" for quota math is a 5x10deg block.
 GRID_DEG = 0.1
-TILE_CELLS = 64
-TILE_DEG = GRID_DEG * TILE_CELLS  # 6.4
+TILE_LAT_CELLS = 50
+TILE_LON_CELLS = 100
+TILE_LAT_DEG = GRID_DEG * TILE_LAT_CELLS  # 5.0
+TILE_LON_DEG = GRID_DEG * TILE_LON_CELLS  # 10.0
 
 # The EarthDataHub zarr store indexes its coordinate arrays as:
 #   latitude  90.0 .. -57.1 step -0.1   (index 0 = lat 90.0, descending)
 #   longitude   0.0 .. 359.9 step  0.1  (index 0 = lon  0.0, ascending, 0..360)
-# A chunk = 64 consecutive indices on each axis. tile_id MUST be derived from
-# THESE indices, not from this script's internal -180..180 lon grid, or it
-# won't map 1:1 to a zarr spatial chunk -- a per-tile fetch would then straddle
-# up to 4 chunks and 4x the request budget.
+# A chunk = 50 consecutive lat indices x 100 lon indices. tile_id MUST be
+# derived from THESE indices, not from this script's internal -180..180 lon
+# grid, or it won't map 1:1 to a zarr spatial chunk -- a per-tile fetch would
+# then straddle up to 4 chunks and 4x the request budget.
 STORE_LAT0 = 90.0  # store latitude[0]
 STORE_LON0 = 0.0   # store longitude[0]
 
@@ -97,12 +100,12 @@ def store_tile(lat: float, lon: float) -> tuple[str, float, float]:
     """
     lat_idx = round((STORE_LAT0 - lat) / GRID_DEG)
     lon_idx = round((lon % 360.0 - STORE_LON0) / GRID_DEG)
-    chunk_row = lat_idx // TILE_CELLS
-    chunk_col = lon_idx // TILE_CELLS
+    chunk_row = lat_idx // TILE_LAT_CELLS
+    chunk_col = lon_idx // TILE_LON_CELLS
     return (
         f"{chunk_row}_{chunk_col}",
-        round(STORE_LAT0 - chunk_row * TILE_DEG, 1),
-        round(STORE_LON0 + chunk_col * TILE_DEG, 1),
+        round(STORE_LAT0 - chunk_row * TILE_LAT_DEG, 1),
+        round(STORE_LON0 + chunk_col * TILE_LON_DEG, 1),
     )
 
 # GHS-POP landing page. The catalogue offers, per epoch (2020/2025):
@@ -242,7 +245,7 @@ def select_top_cells(pop: np.ndarray, lats: np.ndarray, lons: np.ndarray, top_n:
     for rank, idx in enumerate(top_flat):
         r, c = divmod(int(idx), n_lon)
         lat, lon = float(lats[r]), float(lons[c])
-        # 6.4deg tile = the zarr spatial chunk this cell lives in. Derived from
+        # 5x10deg tile = the zarr spatial chunk this cell lives in. Derived from
         # the STORE's coordinate indices (see store_tile) so tile_id maps 1:1
         # to a chunk -- our internal lon grid is -180..180, the store's 0..360.
         tile_id, tile_lat, tile_lon = store_tile(lat, lon)
@@ -315,15 +318,16 @@ def report_budget(cells: list[dict], n_years: int, n_vars: int) -> None:
     """Print the tile count and the resulting zarr request-quota estimate.
 
     request budget = n_tiles * n_years * time_chunks_per_year * n_vars
-    where time_chunks_per_year = 4: the hourly store chunks 2880h = 120 days,
-    and a calendar year (8760-8784 h) crosses 4 of those fixed chunk windows
-    (boundaries are not aligned to Jan 1). Measured against the live store.
-    This is THE number that decides whether the full pull fits inside the
-    500,000/month EarthDataHub quota.
+    where time_chunks_per_year = 7: the hourly store chunks 1440h = 60 days,
+    and a calendar year (8760-8784 h) crosses up to 7 of those fixed chunk
+    windows (boundaries are not aligned to Jan 1). A span-batched pull
+    (download_cells --batch-years) reads each chunk once, ~6.1/year — this
+    per-year figure is the conservative ceiling. This is THE number that
+    decides whether the full pull fits the 500,000/month EarthDataHub quota.
     """
     tiles = sorted({c["tile_id"] for c in cells})
     n_tiles = len(tiles)
-    time_chunks = 4
+    time_chunks = 7
     requests = n_tiles * n_years * time_chunks * n_vars
 
     # cities-per-tile distribution -- shows how much sharing we get
@@ -332,7 +336,7 @@ def report_budget(cells: list[dict], n_years: int, n_vars: int) -> None:
     counts = sorted(per_tile.values(), reverse=True)
 
     print("\n=== tile binning ===", file=sys.stderr)
-    print(f"  {len(cells):,} cells -> {n_tiles:,} distinct 6.4deg tiles", file=sys.stderr)
+    print(f"  {len(cells):,} cells -> {n_tiles:,} distinct 5x10deg tiles", file=sys.stderr)
     print(f"  cells per tile: max={counts[0]}, median={counts[len(counts) // 2]}, "
           f"min={counts[-1]}", file=sys.stderr)
     print("\n=== zarr request budget (full pull) ===", file=sys.stderr)

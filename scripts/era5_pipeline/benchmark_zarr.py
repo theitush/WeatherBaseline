@@ -3,9 +3,9 @@
 Status task #1: compare a single cloud-zarr `.sel()`+`.interp()` against the
 A/B/C CDS bbox strategies measured in `benchmark.py`.
 
-Dataset (HOURLY ERA5-Land, ARCO zarr):
-  https://earthdatahub.destine.eu/collections/era5/datasets/reanalysis-era5-land
-  https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr
+Dataset (HOURLY ERA5-Land, ARCO zarr; Zarr v3 store since the July 2026 revamp):
+  https://earthdatahub.destine.eu/collections/era5/datasets/era5-land
+  https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr
 
 Why the hourly store and not era5-land-daily:
   The `era5-land-daily-utc` store only carries one daily value per cell — a
@@ -13,12 +13,13 @@ Why the hourly store and not era5-land-daily:
   resample to D ourselves: `.resample(time="D").min()` / `.max()`.
 
 Chunking (inspected via the store's t2m encoding):
-  zarr chunks = (valid_time=2880, latitude=64, longitude=64), float32, ~47 MB
-  uncompressed each. 2880 h = 120 days, so one year ≈ 3 time-chunks. 64 cells
-  at 0.1° = a 6.4°×6.4° spatial tile.
+  zarr chunks = (valid_time=1440, latitude=50, longitude=100), float32, ~29 MB
+  uncompressed each. 1440 h = 60 days, so one year ≈ 6-7 time-chunks. 50x100
+  cells at 0.1° = a 5°×10° spatial tile. (The pre-2026-07 Zarr v2 store was
+  2880x64x64 = 120-day, 6.4° chunks.)
   => The right access pattern is: for EACH city, .sel() a small lat/lon WINDOW
      (a few cells, enough for bilinear interp) BEFORE computing. That way dask
-     only fetches the ~3 time-chunks of that one spatial tile per city, not
+     only fetches the time-chunks of that one spatial tile per city, not
      the whole globe. Interpolating the global array first (the naive path)
      schedules far more chunk reads and times out.
 
@@ -56,15 +57,15 @@ HERE = Path(__file__).resolve().parent
 OUT_JSON = HERE / "benchmark_zarr_results.json"
 TMP = HERE / ".bench_tmp"
 
-# Hourly ERA5-Land ARCO zarr store on EarthDataHub.
-ZARR_URL = "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr"
+# Hourly ERA5-Land ARCO zarr store on EarthDataHub (Zarr v3, July 2026 revamp).
+ZARR_URL = "https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr"
 
 # 2m air temperature, hourly. We resample this to daily min/max.
 ZARR_VAR = "t2m"
 
 # Half-width of the per-city lat/lon window, in degrees. The store is 0.1°, so
 # 0.3° = ~7 cells each side — comfortably enough for bilinear interp while
-# still landing inside a single 6.4° spatial chunk for most cities.
+# still landing inside a single 5°×10° spatial chunk for most cities.
 WINDOW_DEG = 0.3
 
 # aiohttp default read timeout is ~5 min total but ~minutes can still trip on a

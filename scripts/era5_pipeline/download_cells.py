@@ -6,12 +6,12 @@ date,tmax_C,tmin_C,precip_mm,wind_max_ms) are unchanged; archives merge by date.
 Design notes:
 
 1. BATCHED TIME SPANS (was: one .compute() per year).
-   The store's time chunks are 2880 h = 120 days, NOT aligned to calendar years.
-   A single year straddles ~4 chunks, and each boundary chunk is shared with the
-   neighbouring year — so year-by-year RE-FETCHES every boundary chunk (~3x the
-   reads). Fetching a multi-year span reads each 120-day chunk exactly once.
+   The store's time chunks are 1440 h = 60 days, NOT aligned to calendar years.
+   A single year straddles ~7 chunks, and each boundary chunk is shared with the
+   neighbouring year — so year-by-year RE-FETCHES every boundary chunk. Fetching
+   a multi-year span reads each 60-day chunk exactly once.
    --batch-years bounds the span so memory stays sane (a span's t2m array is
-   span_years * 8760 * 64 * 64 * 4 bytes; ~20 yr ≈ 3 GB/var per tile).
+   span_years * 8760 * 50 * 100 * 4 bytes; ~20 yr ≈ 3.5 GB/var per tile).
 
 2. PARALLEL FETCHES. The 4 stored vars (t2m, tp, u10, v10) are independent
    network-bound .compute()s, so we fetch them concurrently (thread pool).
@@ -40,8 +40,8 @@ Design notes:
 
 Usage:
   source .venv/bin/activate
-  python download_cells.py --tile 9_37 --year 2020          # one span, one year
-  python download_cells.py --tile 9_5,8_37 --start-year 1950 # resume missing yrs
+  python download_cells.py --tile 11_26 --year 2020          # one span, one year
+  python download_cells.py --tile 17_10,6_3 --start-year 1950 # resume missing yrs
   python download_cells.py --start-year 1950 --batch-years 20 --parallel-tiles 2
 """
 from __future__ import annotations
@@ -64,30 +64,35 @@ REPO = HERE.parent.parent
 CELLS_CSV = REPO / "data" / "cells.csv"
 OUT_DIR = REPO / "data" / "era5-land" / "archive"
 
-# Hourly ERA5-Land ARCO zarr store on EarthDataHub.
-ZARR_URL = "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr"
+# Hourly ERA5-Land ARCO zarr store on EarthDataHub (Zarr v3, July 2026 revamp;
+# same 0.1deg grid and no-Antarctica crop as before, new chunking). The legacy
+# Zarr v2 store (era5/reanalysis-era5-land-no-antartica-v0.zarr, 2880x64x64
+# chunks) is FROZEN at 2026-05-31 — monthly updates land only in this store.
+ZARR_URL = "https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr"
 
 # Stored variables we need. Derived metrics (tmax/tmin from t2m, wind speed from
 # u10+v10) cost nothing extra — the cost is per stored variable fetched.
 ZARR_VARS = ["t2m", "tp", "u10", "v10"]
 
-# The store chunks 64x64 cells per spatial chunk. tile_id encodes the chunk
-# index, so one tile == one 64-cell block on each axis. Must match select_cells.
-TILE_CELLS = 64
+# The store chunks 50 (lat) x 100 (lon) cells per spatial chunk. tile_id
+# encodes the chunk index, so one tile == one 5x10deg chunk. Must match
+# select_cells.
+TILE_LAT_CELLS = 50
+TILE_LON_CELLS = 100
 
 # Hourly steps per year (8760 h; leap years are ~0.03% more — ignore for an
 # estimate). One var's in-memory array over an N-year span is
-# HOURS_PER_YEAR * N * 64 * 64 * float32. Used only for the RAM warning.
+# HOURS_PER_YEAR * N * 50 * 100 * float32. Used only for the RAM warning.
 HOURS_PER_YEAR = 8760
 # Concurrent var fetches each hold their full hourly array at once; the daily
 # resample + sqrt(u^2+v^2) allocate transient copies on top. ~1.5x covers it.
 _RAM_OVERHEAD = 1.5
 
-# Generous per-request HTTP ceiling — a cold ~47 MB chunk can be slow.
+# Generous per-request HTTP ceiling — a cold ~29 MB chunk can be slow.
 HTTP_TIMEOUT_S = 2400
 
-# Default span per .compute(). ~20 yr ≈ 3 GB/var in memory per tile — bounded,
-# while still reading each 120-day time-chunk only once across the span.
+# Default span per .compute(). ~20 yr ≈ 3.5 GB/var in memory per tile — bounded,
+# while still reading each 60-day time-chunk only once across the span.
 DEFAULT_BATCH_YEARS = 20
 
 _T0 = time.time()
@@ -145,12 +150,13 @@ def _available_ram_gb() -> float | None:
 def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int) -> None:
     """Estimate peak RAM for the chosen settings and warn if it's tight.
 
-    Peak ≈ one var's hourly array (HOURS_PER_YEAR * batch_years * 64*64 * 4 B)
+    Peak ≈ one var's hourly array (HOURS_PER_YEAR * batch_years * 50*100 * 4 B)
     held once per concurrent var, times concurrent tiles, times overhead for the
     transient resample/sqrt copies. Compared against MemAvailable so it's loud on
     a small remote box, where an OOM would silently kill the run mid-fetch.
     """
-    per_var_gb = HOURS_PER_YEAR * batch_years * TILE_CELLS * TILE_CELLS * 4 / 1e9
+    per_var_gb = (HOURS_PER_YEAR * batch_years
+                  * TILE_LAT_CELLS * TILE_LON_CELLS * 4 / 1e9)
     peak_gb = per_var_gb * var_workers * parallel_tiles * _RAM_OVERHEAD
     avail = _available_ram_gb()
 
@@ -236,7 +242,7 @@ def load_cells() -> list[dict]:
 
 
 def group_by_tile(cells: list[dict]) -> dict[str, list[dict]]:
-    """Group cells by tile_id so each 6.4deg zarr tile is fetched only once."""
+    """Group cells by tile_id so each 5x10deg zarr tile is fetched only once."""
     by_tile: dict[str, list[dict]] = defaultdict(list)
     for c in cells:
         by_tile[c["tile_id"]].append(c)
@@ -500,7 +506,7 @@ def resolve_land_indices(
         if land.size == 0:
             out.append(None)  # window is all ocean — nothing to snap to
             continue
-        # nearest LAND cell by grid (index) distance — the window is ~6deg, so
+        # nearest LAND cell by grid (index) distance — within one tile window
         # row/col steps are near-equal-area; squared index distance is the right
         # tie-break and far cheaper than a haversine over every land cell.
         d2 = (land[:, 0] - li) ** 2 + (land[:, 1] - ci) ** 2
@@ -518,8 +524,8 @@ def process_span(
     var_workers: int,
 ) -> dict[tuple[float, float], "object"]:
     """Fetch one tile's hourly data for [start_year, end_year], return per-cell
-    daily frames. Reads exactly the tile's one 64x64 spatial chunk per axis and
-    the time-chunks spanning the year range — each chunk fetched once. The 4 vars
+    daily frames. Reads exactly the tile's one 50x100 spatial chunk and the
+    time-chunks spanning the year range — each chunk fetched once. The 4 vars
     are computed concurrently across a thread pool of size var_workers.
     """
     import pandas as pd
@@ -535,10 +541,10 @@ def process_span(
     lons = np.array([c["lon"] for c in tile_cells])
     sel_lons = np.where(lons < 0, lons + 360.0, lons) if lon_is_360 else lons
 
-    # Select EXACTLY this tile's one 64x64 spatial chunk by integer index.
+    # Select EXACTLY this tile's one 50x100 spatial chunk by integer index.
     chunk_row, chunk_col = (int(x) for x in tile_id.split("_"))
-    lat_i0, lat_i1 = chunk_row * TILE_CELLS, chunk_row * TILE_CELLS + TILE_CELLS
-    lon_i0, lon_i1 = chunk_col * TILE_CELLS, chunk_col * TILE_CELLS + TILE_CELLS
+    lat_i0, lat_i1 = chunk_row * TILE_LAT_CELLS, (chunk_row + 1) * TILE_LAT_CELLS
+    lon_i0, lon_i1 = chunk_col * TILE_LON_CELLS, (chunk_col + 1) * TILE_LON_CELLS
     lat_i1 = min(lat_i1, ds.sizes[lat_name])
     lon_i1 = min(lon_i1, ds.sizes[lon_name])
 

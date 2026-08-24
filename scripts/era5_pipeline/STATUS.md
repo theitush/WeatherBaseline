@@ -94,6 +94,15 @@ copy after regenerating:  cp data/era5/cells.csv frontend/public/cells.csv
   this note's "3 time-chunks/year" was the stale bit. Also: the store's latitude
   axis is 1472 cells (90 -> ~-57.1deg), not the full 1801 to -90 -- era5_grid()
   builds the full grid, but no populated top-N cell is below ~-57deg.
+- UPDATE 2026-08-24: EarthDataHub's July 2026 revamp moved the ERA5 collection
+  to Zarr v3 stores with new chunking. Hourly ERA5-Land now lives at
+  `era5/era5-land-v0.zarr`, chunked 1440h (60 days) x 50 lat x 100 lon
+  (5x10deg tiles, ~29 MB raw); a year crosses up to 7 time-chunks. Same 0.1deg
+  grid and 1472x3600 no-Antarctica crop, same variables/units/stepTypes. The
+  old `reanalysis-era5-land-no-antartica-v0.zarr` (Zarr v2, 2880x64x64) is
+  FROZEN at 2026-05-31 -- monthly updates land only in the new stores, so any
+  top-up on pre-migration code silently no-ops. Pipeline + cells.csv tile ids
+  re-derived accordingly; 8727 cells now bin to 342 tiles (was 399).
 - pick GHS-POP epoch (2020 vs 2025) and confirm WGS84 product
 - is 10K the right N? 5K populated cells may already beat the GeoNames list
 

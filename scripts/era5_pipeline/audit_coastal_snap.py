@@ -43,7 +43,8 @@ from pathlib import Path
 import numpy as np
 
 from download_cells import (
-    TILE_CELLS,
+    TILE_LAT_CELLS,
+    TILE_LON_CELLS,
     archive_name,
     open_store,
     resolve_land_indices,
@@ -95,8 +96,8 @@ def tile_window(ds, tile_id: str):
     lat_name = "latitude" if "latitude" in ds.coords else "lat"
     lon_name = "longitude" if "longitude" in ds.coords else "lon"
     r, c = (int(x) for x in tile_id.split("_"))
-    la = slice(r * TILE_CELLS, min((r + 1) * TILE_CELLS, ds.sizes[lat_name]))
-    lo = slice(c * TILE_CELLS, min((c + 1) * TILE_CELLS, ds.sizes[lon_name]))
+    la = slice(r * TILE_LAT_CELLS, min((r + 1) * TILE_LAT_CELLS, ds.sizes[lat_name]))
+    lo = slice(c * TILE_LON_CELLS, min((c + 1) * TILE_LON_CELLS, ds.sizes[lon_name]))
     return lat_name, lon_name, la, lo
 
 
