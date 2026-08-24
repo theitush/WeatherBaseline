@@ -19,7 +19,12 @@ Design notes:
    connections under load, so keep the worker count modest; the per-step retry
    covers the occasional drop.
 
-3. RESUME + MONTHLY TOP-UP. Before fetching, we compute how COMPLETE each year
+3. WHOLE LOCAL DAYS ONLY. Days are bucketed by the cell's solar-local clock, so
+   each span is fetched with a one-day halo and any bucket still short of 24
+   hours (the store's newest day, mid-accumulation) is dropped rather than
+   written — a partial day merges over a complete one and silently corrupts it.
+
+4. RESUME + MONTHLY TOP-UP. Before fetching, we compute how COMPLETE each year
    already is for each tile — its daily-ROW count, not merely whether the year is
    present — and fetch only the years still short of a full year of days. That one
    rule catches a wholly-absent year, an interior gap (a hole from an interrupted
@@ -149,6 +154,9 @@ def _available_ram_gb() -> float | None:
 
 def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int) -> None:
     """Estimate peak RAM for the chosen settings and warn if it's tight.
+
+    `batch_years` is the SPAN actually fetched — min(--batch-years, years asked
+    for) — not the flag, so a single-year top-up isn't costed as a 20-year pull.
 
     Peak ≈ one var's hourly array (HOURS_PER_YEAR * batch_years * 50*100 * 4 B)
     held once per concurrent var, times concurrent tiles, times overhead for the
@@ -555,8 +563,15 @@ def process_span(
     log(f"  tile {tile_id} | years {span}: {len(tile_cells)} cells, "
         f"chunk lat[{lat_i0}:{lat_i1}] lon[{lon_i0}:{lon_i1}]")
 
+    # ONE DAY OF HALO on each side. The daily aggregation buckets by LOCAL day
+    # (see below), so the span's edge days need hours from outside the calendar
+    # span: Austin's local 2026-01-01 runs to 2026-01-02 05:00 UTC, and its local
+    # 2025-12-31 starts at 2025-12-31 06:00 UTC. Without the halo those edge days
+    # aggregate from a partial handful of hours. The halo is clamped by the store
+    # itself (a slice past either end just yields what exists), and costs at most
+    # one extra 60-day time-chunk per variable per span end.
     sub = ds[ZARR_VARS].sel({
-        time_name: slice(str(start_year), str(end_year)),
+        time_name: slice(f"{start_year - 1}-12-31", f"{end_year + 1}-01-01"),
     }).isel({
         lat_name: slice(lat_i0, lat_i1),
         lon_name: slice(lon_i0, lon_i1),
@@ -671,6 +686,16 @@ def process_span(
         wind_max = shift_time(wind_hourly, off_h).resample({time_name: "1D"}).max()
         tp_sum = shift_time(tp_incr, off_h).resample({time_name: "1D"}).sum()
         dates = pd.to_datetime(t2m_max[time_name].values).date
+        # Drop the partial local days at the span's edges (see whole_day_mask).
+        # With the halo above, the only buckets that fail are the ones the store
+        # genuinely cannot complete — the newest day, mid-accumulation.
+        whole = whole_day_mask(t2m_hourly[time_name].values, off_h, dates)
+        if not whole.all():
+            dropped = [str(d) for d, ok in zip(dates, whole) if not ok]
+            log(f"  tile {tile_id} | years {span}: offset {off_h:+d}h — "
+                f"{len(dropped)} partial local day(s) dropped: "
+                f"{', '.join(dropped)}")
+        dates = dates[whole]
 
         for c, slon in members:
             idx = idx_by_cell[(c["lat"], c["lon"])]
@@ -683,16 +708,38 @@ def process_span(
             sel = {lat_name: row, lon_name: col}
             frame = pd.DataFrame({
                 "date": dates,
-                "tmax_C": np.round(t2m_max.isel(sel).values - 273.15, 3),
-                "tmin_C": np.round(t2m_min.isel(sel).values - 273.15, 3),
-                "precip_mm": np.round(tp_sum.isel(sel).values * 1000.0, 3),
-                "wind_max_ms": np.round(wind_max.isel(sel).values, 3),
+                "tmax_C": np.round(t2m_max.isel(sel).values[whole] - 273.15, 3),
+                "tmin_C": np.round(t2m_min.isel(sel).values[whole] - 273.15, 3),
+                "precip_mm": np.round(tp_sum.isel(sel).values[whole] * 1000.0, 3),
+                "wind_max_ms": np.round(wind_max.isel(sel).values[whole], 3),
             }).sort_values("date")
             frames[(c["lat"], c["lon"])] = frame[
                 ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
             ]
 
     return frames
+
+
+def whole_day_mask(time_values, off_h: int, bucket_dates) -> np.ndarray:
+    """Which daily buckets hold all 24 hours of their LOCAL day.
+
+    `resample("1D")` over a time axis shifted by `off_h` always produces a
+    partial bucket at each end — for a -6 h cell the first bucket holds the six
+    evening hours of the day BEFORE the fetched span, for a +3 h cell the last
+    bucket holds three hours of the day AFTER it. Those buckets aggregate to a
+    tmax/tmin/precip built from a fraction of the day (measured: 4.5 C low on a
+    real boundary day), and merge-by-date would write that over a complete row.
+
+    Returns a boolean mask over `bucket_dates`, True where the bucket holds 24
+    hourly steps. Solar offsets are whole hours and DST-free, so a complete local
+    day is exactly 24 steps, leap years included.
+    """
+    import pandas as pd
+
+    shifted = pd.DatetimeIndex(time_values) + pd.Timedelta(hours=off_h)
+    per_day = pd.Series(1, index=shifted).resample("1D").sum()
+    counts = {ts.date(): int(n) for ts, n in per_day.items()}
+    return np.array([counts.get(d, 0) == 24 for d in bucket_dates], dtype=bool)
 
 
 def archive_name(lat: float, lon: float) -> str:
@@ -1202,7 +1249,11 @@ def main() -> int:
     if uploader is not None:
         print(f"  upload: R2 bucket '{uploader.bucket}' (archive/ keys), "
               "per-archive as written")
-    warn_ram(args.batch_years, args.var_workers, args.parallel_tiles)
+    # A span can never be longer than the year range asked for: `--year 2026`
+    # holds one year of hourly data, not --batch-years' worth. Estimating from
+    # the flag alone made a 1 GB top-up print a 21 GB OOM warning.
+    warn_ram(min(args.batch_years, len(years)), args.var_workers,
+             args.parallel_tiles)
     print()
 
     log("opening zarr store...")
