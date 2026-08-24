@@ -243,6 +243,18 @@ over the 500K/month EarthDataHub quota, so a full-history rerun splits across
 two quota months. Bytes and wall time land in the same place; the request count
 is the constraint that changed.
 
+### It also heals the partial boundary days
+
+Until 2026-08-25 every fetched span wrote its edge local days from a partial
+handful of hours (fixed in `download_cells.py`: one-day halo + drop anything
+short of 24 h). The rows still carrying that artifact are the ones no run has
+rewritten since — the `--batch-years 20` span boundaries (1969-12-31,
+1989-12-31, 2009-12-31 for a west-of-UTC cell, the 1970/1990/2010 Jan 1s for an
+east-of-UTC one) and the year boundaries of older top-ups. Measured on Austin:
+a partial 2025-12-31 read tmax 15.9 °C where the whole day was 20.4 °C. The
+2026 top-up repaired 2025-12-31 and 2026-05-31 for every cell; the rest need a
+span that covers them, which a full-history rerun does for free.
+
 ### It is additive, not a re-download
 
 `tp` is never re-pulled and existing archives keep their `tmax_C` / `tmin_C` /
