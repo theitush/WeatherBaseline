@@ -7,7 +7,12 @@ measured evidence to be picked up cold.
 
 ## Perceived heat & perceived cold (apparent temperature)
 
-**Status:** BLOCKED on UX clarity. Research done 2026-08-24, nothing implemented.
+**Status:** UX prototype COMMITTED on branch `felt-lens` (f758a316 + follow-ups),
+deliberately kept OFF `main`: the lens defaults ON with invented humidity, so on
+`main` any routine Pages deploy would ship fabricated numbers as the landing
+experience. Merge only after the archive rerun and the felt-variable debias run
+below. The compare page is explicitly OUT OF SCOPE for the lens (decided
+2026-08-24) — it always shows measured air temperature and its axis says so.
 
 Add two metrics that shadow the two we already ship: an apparent max alongside
 `tmax_C`, an apparent min alongside `tmin_C`. Humidity is never displayed as its
@@ -20,6 +25,21 @@ units people feel.
   with tmin. This beats a single year-round `feels_like` that flips between
   indices at a threshold — no threshold to defend, and the irrelevant one simply
   sits at ~0 (see the complementarity table below).
+- **Both indices apply to BOTH metrics (revised 2026-08-24).** The pairing above
+  is about which index is usually *material* per metric, not which is
+  *applicable*, and reading it as the latter drops two real cases: a windy −8 °C
+  winter **day**, whose high would get no adjustment at all, and a muggy 27 °C
+  tropical **night**, which is exactly when heat becomes dangerous (measured in
+  the prototype: Delhi 2025-06-20 tmin 27.1 °C → felt 33.3 °C). The two indices
+  are defined on disjoint ranges — heat index at/above 26.7 °C (80 °F), wind
+  chill at/below 10 °C with V ≥ 4.8 km/h — so they can never both be active for
+  one value. "Run both, take whichever is in range" is therefore a single
+  well-defined function of (T, dewpoint, wind), not a threshold to defend.
+  Between 10 and 26.7 °C neither applies and apparent = air temperature.
+- **Known floor:** NWS heat index is undefined below 80 °F, so a humid night at
+  25–26 °C gets no bump even though it plainly feels worse than a dry one at the
+  same temperature. Steadman's apparent temperature would cover that band. Live
+  with it, or revisit the index choice specifically for the tmin slot.
 - **The two indices are SETTLED (2026-08-24):**
   - heat — **NWS heat index** (Rothfusz), from temperature + RH
   - cold — **wind chill** (JAG/TI 2001), from temperature + 10 m wind
@@ -28,12 +48,15 @@ units people feel.
   Wind chill is valid for T ≤ 10 °C and V ≥ 4.8 km/h; ERA5-Land `u10`/`v10` are
   already at the correct 10 m reference height. See the footnote on rejected
   alternatives before reopening this.
-- **Clamp both.** Each index can return a value on the wrong side of air
-  temperature outside its valid range, which renders as "it felt 2.8° cooler
-  than it was" — a formula artifact, not a perception. Store
-  `apparent_max = max(tmax, heat_index)` and `apparent_min = min(tmin, wind_chill)`.
-  Not an edge case: NWS HI falls below air temperature on 99% of Madrid days and
-  90% of Phoenix days, since dry air sits under its valid range.
+- **Clamp each index to its own direction.** Each can return a value on the wrong
+  side of air temperature outside its valid range, which renders as "it felt 2.8°
+  cooler than it was" — a formula artifact, not a perception. Heat index may only
+  push UP, wind chill only DOWN: `max(T, heat_index)` and `min(T, wind_chill)`
+  respectively, applied per the range gate above. Not an edge case: NWS HI falls
+  below air temperature on 99% of Madrid days and 90% of Phoenix days, since dry
+  air sits under its valid range. In the UI this is a feature — Phoenix's dry
+  heat shows *no gap at all*, which is the "but it's a dry heat" argument settled
+  on screen.
 - ⚠️ **Heat numbers in this document were measured with humidex**, before the
   index decision. The structure holds — which cities, which traps, the
   complementarity — since both indices are monotone in T and moisture. The
@@ -46,12 +69,72 @@ units people feel.
   temperature it is shown next to: at Tel Aviv's Tmax hour RH was 32% while the
   daily *mean* RH was 58%.
 
-### Open UX questions (what's actually blocking)
+### UX — resolved 2026-08-24 by a local prototype
 
-1. Do both metrics occupy permanent card slots everywhere, or surface
-   conditionally when the gap is material? The gap is ~0 on a median day but
-   6–12 °C on the extreme days people actually look up.
-2. 
+Question 1 below ("permanent slots vs. conditional") is answered: **neither — it's
+a lens.** A settings toggle rewrites what Max/Min Temperature *mean*, so charts,
+histograms, percentiles, records and the prose verdict all recompute against felt
+climatology. "Top 5% hottest" then means top 5% of *felt* days. No new metric
+buttons, no new card slots, and precipitation/wind are untouched.
+
+Making it unmistakable without shouting — four signals, quietest first:
+
+1. The card's lead sentence changes verb: "…max temperature in Tel Aviv **is**"
+   → "**felt like**". Prose carries it; no badge, no colour.
+2. A hairline ghost tick on the record spectrum marks the measured air
+   temperature, labelled `30.7° actual`. The gap between the two ticks *is* the
+   humidity (or the wind), read out in degrees. Hidden below 0.5 °C, so a dry
+   calm day self-explains as "it felt like what it was".
+3. Chart axes switch to "Felt Max Temp (°C)", so a chart read on its own still
+   says what it's measuring. **"Felt", not "apparent"** — apparent temperature is
+   the correct term (WMO, BoM) but reads as "seeming/ostensible", the wrong
+   connotation for a number we assert is real. Keep the technical name for the
+   tooltip and FAQ, where the indices can be named.
+4. The settings toggle stays lit while on, unlike the theme/units buttons, which
+   are symmetric A/B flips.
+
+Tried and dropped: an `≈` marker on the metric pills. Too cryptic to earn the
+space once the axis label was doing the same job.
+
+**Architecture the prototype settled on:** both readings — air and apparent — are
+computed for every row ONCE at load (`computeApparent`), and the toggle is a pure
+re-projection of rows already in memory (`projectLens`): zero network requests in
+either direction, verified. In the shipped version the apparent columns arrive in
+the tier CSVs and `computeApparent` simply disappears; the projection stays.
+Rows carry `air_max`/`air_min` + `apparent_max`/`apparent_min`, and
+`max_temperature`/`min_temperature` are the *displayed* projection of one pair —
+which is why no chart, statistic or verdict needed a per-component change. Bands
+are carried in both forms (`air_band`/`apparent_band`) and swapped alongside.
+The lens **defaults ON**: what a day felt like is the question people arrive with.
+
+**Prototype status:** committed on branch `felt-lens`,
+`frontend/src/services/feelsLike.ts` + `hooks/useFeelsLike.ts` + wiring. Wind is
+real-ish (stored `wind_max_ms` × an invented 0.6 mean-from-max factor);
+**dewpoint is INVENTED** from the diurnal range, because the archive rerun below
+hasn't happened. It gets the archetypes right (tropics muggy, desert clamped to
+zero gap) and reads several degrees too dry for a continental summer. No number
+in it means anything — do not tune thresholds against it. In the shipped version
+all of this mock plumbing is deleted: `apparent_max` / `apparent_min` are just
+two more columns in the tier CSVs, fetched with the page like every other metric.
+
+The lens state is pinned in the URL as a trailing `felt`/`air` segment on the
+temperature metrics (`/lat,lon/date/tmax/felt`) so a shared link reproduces the
+sharer's numbers; the segment trails the metric because the Worker's analytics
+derive the metric from the token position and the crawler middleware reads only
+the first three segments. Arrival hits and in-app metric/lens changes therefore
+log the lens state with no worker changes.
+
+### Still open
+
+1. ~~Permanent card slots vs. conditional surfacing~~ — answered above.
+2. **Felt-variable debias run.** The forecast/recent CQR bands are trained on
+   air temperature. The prototype translates them by the felt−air delta (delta
+   treated as known) — acceptable for judging UX, not for shipping: the real
+   version needs its own quantile-debias training on `apparent_max` /
+   `apparent_min` (same pipeline as [scripts/bias_study], new target variables),
+   plus hourly forecast inputs in the Worker's ensure-fresh path so the index is
+   formed before the daily aggregation on the live tiers too. Acknowledged
+   2026-08-24; not yet scoped or costed.
 ### Why the gap earns its slot
 
 Full-year 2025, humidex vs tmax and wind chill vs tmin:
@@ -114,7 +197,10 @@ diffuse-Tmax cities where a fixed hour fails. `solar_offset_hours` /
 
 ## Archive rerun for hourly-derived metrics
 
-**Status:** BLOCKED on the same UX clarity — question 3 above sets the year range.
+**Status:** year range DECIDED 2026-08-24 — **full history 1950–2026** (~54 h,
+17.5 TB at `--parallel-tiles 4`). Full history is the whole point of the app; the
+1991–2020 row in the cost table below is kept for reference only. Still needs an
+exact tile×year scope + explicit approval before any run, per the standing rule.
 
 Both new metrics need hourly inputs we currently discard after reducing to daily.
 
@@ -148,6 +234,14 @@ bytes. Timed on land tile `10_14` (315 cells, 82% land): 47.2 MB in 2.1 s,
 | 1 variable, full history | 4.4 TB | ~13 h |
 | **4 variables, full history** | **17.5 TB** | **~54 h** |
 | 4 variables, 1991–2020 normals | 6.8 TB | ~21 h |
+
+⚠️ **Measured against the RETIRED store.** Those numbers were timed before the
+July 2026 revamp; the pipeline now reads `era5/era5-land-v0.zarr`, chunked
+`(1440, 50, 100)` = 60 days × 5°×10°, ~28.8 MB raw. Re-derived on the new grid:
+342 tiles × ~469 time-chunks × 4 variables ≈ **635K chunk requests, ~18 TB** —
+over the 500K/month EarthDataHub quota, so a full-history rerun splits across
+two quota months. Bytes and wall time land in the same place; the request count
+is the constraint that changed.
 
 ### It is additive, not a re-download
 
