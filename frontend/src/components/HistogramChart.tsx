@@ -705,7 +705,12 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             const regionPts = density.filter((pt) => pt.t >= regLo && pt.t <= regHi);
             if (regionPts.length) {
               const maxRegD = d3.max(regionPts, (pt) => pt.d) as number;
-              const solid = regionPts.filter((pt) => pt.d >= 0.08 * maxRegD);
+              // A degenerate KDE (every density NaN, e.g. a forecast tier that
+              // hasn't been topped up yet) leaves nothing above the trim
+              // threshold, and reduce() on an empty array throws — taking the
+              // whole chart down with it. Fall back to the untrimmed region.
+              const trimmed = regionPts.filter((pt) => pt.d >= 0.08 * maxRegD);
+              const solid = trimmed.length ? trimmed : regionPts;
               const tMin = d3.min(solid, (pt) => pt.t) as number;
               const tMax = d3.max(solid, (pt) => pt.t) as number;
               const cT = (tMin + tMax) / 2;
