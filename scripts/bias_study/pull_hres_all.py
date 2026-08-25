@@ -65,6 +65,14 @@ STOPS GRACEFULLY on rate-limit exhaustion: a 429 / daily-quota error saves the
 ledger and exits 2 ("resume later") instead of hammering. On the free tier it
 pulls ~a day's worth, hits the wall, stops clean; rerun tomorrow to continue.
 
+CONCURRENCY (--workers, default 4) — cells are processed by a small thread pool
+so one slow Open-Meteo response (cold-chunk reads can stall for a minute+)
+doesn't block the whole sweep. The --rate limiter is shared across workers, so
+total API calls/min are unchanged; workers only overlap the waiting. A stalled
+read times out at 45s and retries in place — the retry usually hits the now-
+warmed chunk cache and returns in seconds. Counters, the ledger, and progress
+lines are applied single-writer on the main thread.
+
 Usage (from scripts/bias_study/, with the era5_pipeline venv):
   source ../era5_pipeline/.venv/bin/activate
   source ../era5_pipeline/r2.env
@@ -90,6 +98,7 @@ import sys
 import threading
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -182,14 +191,16 @@ def _looks_like_daily_quota(text: str) -> bool:
     return "daily" in t or "minutely" not in t and "limit" in t and "exceeded" in t
 
 
-def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3):
+def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
+               max_net=3):
     """Return (rows, meta) for the snapped point.
 
     rows: list of dicts in SCHEMA order. meta: the actual HRES cell the API used
     (its center lat/lon + DEM elevation) — recorded as a bias-model feature.
 
     Raises RateLimitHit when the daily quota is exhausted (caller stops the run);
-    transient per-minute 429s are retried with backoff up to max_429.
+    transient per-minute 429s are retried with backoff up to max_429, and network
+    errors (read timeouts, connection resets) up to max_net.
     """
     params = {
         "latitude": slat, "longitude": slon,
@@ -201,13 +212,24 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3):
     if apikey:
         params["apikey"] = apikey
     last = None
-    n_429 = 0
+    n_429 = n_net = 0
     for attempt in range(6):
         if attempt:
             time.sleep(min(2 ** attempt, 30))
         limiter.acquire()
-        r = requests.get(host, params=params, timeout=90,
-                         headers={"User-Agent": "HowHotWasIt-biasstudy/1.0"})
+        try:
+            r = requests.get(host, params=params, timeout=(10, 45),
+                             headers={"User-Agent": "HowHotWasIt-biasstudy/1.0"})
+        except requests.RequestException as ex:
+            # A stalled read (cold-chunk responses can hang for a minute+) or a
+            # connection blip. Retry in place: the retry usually hits the now-
+            # warmed chunk cache and returns in seconds. Note a timed-out
+            # request may still have been billed, so cap the retries.
+            last = ex
+            n_net += 1
+            if n_net >= max_net:
+                raise RuntimeError(f"network failure x{n_net}: {ex}") from ex
+            continue
         last = r
         if r.ok:
             j = r.json()
@@ -240,7 +262,9 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3):
         # Other 4xx is a hard per-cell error (bad params); don't burn retries.
         if r.status_code < 500:
             raise RuntimeError(f"{r.status_code} {r.text[:200]}")
-    raise RuntimeError(f"HRES failed after retries (last {last.status_code if last else '?'})")
+    detail = (f"{last.status_code}" if isinstance(last, requests.Response)
+              else repr(last) if last is not None else "?")
+    raise RuntimeError(f"HRES failed after retries (last {detail})")
 
 
 def write_local_gz(path: Path, rows) -> None:
@@ -341,6 +365,11 @@ def main() -> int:
     ap.add_argument("--ledger-every", type=int, default=1,
                     help="flush the R2 ledger every N cells (default 1: after "
                          "every cell, so a kill never loses a cell's bias meta)")
+    ap.add_argument("--workers", type=int, default=4,
+                    help="concurrent cells in flight (default 4). The --rate "
+                         "limiter is shared, so total API calls/min are "
+                         "unchanged — workers only keep one slow response "
+                         "from stalling the whole sweep")
     args = ap.parse_args()
     if args.append and args.overwrite:
         sys.exit("--append and --overwrite are mutually exclusive")
@@ -425,89 +454,121 @@ def main() -> int:
 
     limiter = RateLimiter(rate)
     out_dir.mkdir(parents=True, exist_ok=True)
-    n_todo = sum(1 for _, sla, slo in cells
-                 if f"{sla:.1f}_{slo:.1f}" not in skip)
-    n_ok = n_skip = n_fail = n_current = 0
+    todo = [(name, sla, slo) for name, sla, slo in cells
+            if f"{sla:.1f}_{slo:.1f}" not in skip]
+    n_skip = len(cells) - len(todo)
+    n_todo = len(todo)
+    n_ok = n_fail = n_current = 0
     units = 0
     t_start = time.time()
     stopped = False
+    stop = threading.Event()
     print(f"{n_todo} cells to {'check' if args.append else 'fetch'} this run "
-          f"(ledger flush every {args.ledger_every} cell"
-          f"{'s' if args.ledger_every != 1 else ''})\n", flush=True)
+          f"({args.workers} workers, ledger flush every {args.ledger_every} "
+          f"cell{'s' if args.ledger_every != 1 else ''})\n", flush=True)
 
-    for idx, (name, slat, slon) in enumerate(cells):
+    def process(name: str, slat: float, slon: float) -> dict:
+        """One cell, on a worker thread: check, fetch, write local, upload.
+        Only returns a result dict — counters, the ledger, and numbered
+        progress lines are applied by the main thread (single-writer)."""
         key = f"{slat:.1f}_{slon:.1f}"
-        if key in skip:
-            n_skip += 1
-            continue
+        res = {"name": name, "key": key}
+        if stop.is_set():
+            return {**res, "kind": "stopped"}
         gz = out_dir / f"hres_{key}.csv.gz"
         r2_key = f"{r2_prefix}/hres_{key}.csv.gz"
-        # progress = cells visited so far this run (ok + fail + up-to-date), out
-        # of every cell this run will visit — so the counter reaches n_todo even
-        # when --append finds most cells current
-        nth = n_ok + n_fail + n_current + 1
-        tag = f"[{nth}/{n_todo}] {name[:28]:28s} {key:14s}"
-
-        # --append: fetch this cell's tail only. No existing data (new cell, or an
-        # unreadable object) => fall through to the full window, which is both the
-        # first pull and the repair.
+        # --append: fetch this cell's tail only. No existing data (new cell, or
+        # an unreadable object) => fall through to the full window, which is
+        # both the first pull and the repair.
         have, cell_start = [], s
         if args.append:
             have = read_existing(gz, r2_key, up)
             have_end = max((r["date"] for r in have), default=None)
             if have_end and have_end >= e:
-                n_current += 1
-                print(f"  {tag} up to date ({have_end})", flush=True)
-                continue
+                return {**res, "kind": "current", "end": have_end}
             if have_end:
                 tail = date.fromisoformat(have_end) - timedelta(
                     days=max(0, args.resettle_days - 1))
                 cell_start = max(tail, start).isoformat()
-
-        cell_days = (date.fromisoformat(e) - date.fromisoformat(cell_start)).days + 1
+        res["days"] = (date.fromisoformat(e)
+                       - date.fromisoformat(cell_start)).days + 1
         if args.dry_run:
-            units += quota_units(cell_days)
-            n_ok += 1
-            print(f"  {tag} would fetch {cell_start}..{e}  "
-                  f"({cell_days} days, {quota_units(cell_days):.2f} calls)", flush=True)
-            continue
-
-        print(f"  {tag} fetching {cell_start}..{e}…", flush=True)
+            return {**res, "kind": "dry", "start": cell_start}
+        # single-write print (text+newline in one string): worker threads share
+        # stdout, and print()'s separate newline write could interleave lines
+        print(f"  [{'…':^4}] {name[:28]:28s} {key:14s} "
+              f"fetching {cell_start}..{e}…\n", end="", flush=True)
         t_cell = time.time()
         try:
-            rows, meta = fetch_hres(host, apikey, slat, slon, cell_start, e, limiter)
+            rows, meta = fetch_hres(host, apikey, slat, slon, cell_start, e,
+                                    limiter)
         except RateLimitHit as ex:
-            print(f"\n  rate/quota limit reached at cell {nth} ({key}): {ex}")
-            print("  stopping cleanly — rerun the same command to continue.")
-            stopped = True
-            break
+            stop.set()  # queued workers bail at the top instead of hammering
+            return {**res, "kind": "ratelimit", "err": str(ex)}
         except Exception as ex:  # noqa: BLE001 - log, keep going, retry on rerun
-            n_fail += 1
-            print(f"  {tag} FAIL: {ex}", flush=True)
-            continue
-        units += quota_units(cell_days)
-
+            return {**res, "kind": "fail", "err": str(ex)}
         n_new = len(rows)
         rows = merge_rows(have, rows) if have else rows
         write_local_gz(gz, rows)
         up.upload_file(gz, r2_key)
-        done[key] = {"name": name, "rows": len(rows),
-                     "end": rows[-1]["date"] if rows else None, **meta}
-        skip.add(key)
-        n_ok += 1
+        return {**res, "kind": "ok", "rows": len(rows), "n_new": n_new,
+                "had": bool(have), "meta": meta,
+                "end": rows[-1]["date"] if rows else None,
+                "dt": time.time() - t_cell}
 
-        dt = time.time() - t_cell
-        cmin = n_ok / max(1e-9, (time.time() - t_start) / 60)
-        hl = meta.get("hres_lat")
-        hlon = meta.get("hres_lon")
-        hloc = f"HRES@{hl:.3f},{hlon:.3f}" if hl is not None and hlon is not None else "HRES@?"
-        span = f"{len(rows)} rows (+{n_new} fetched)" if have else f"{len(rows)} rows"
-        print(f"  {tag} OK  {span}  {hloc}  "
-              f"{dt:.1f}s  ({cmin:.0f} cells/min)", flush=True)
-        if n_ok % args.ledger_every == 0 and not args.dry_run:
-            save_ledger(up, ledger, ledger_key, local_ledger)
-            print(f"  {tag} ledger flushed to R2 "
-                  f"({len(done)} cells recorded)", flush=True)
+    pool = ThreadPoolExecutor(max_workers=max(1, args.workers))
+    futures = [pool.submit(process, *cell) for cell in todo]
+    try:
+        for fut in as_completed(futures):
+            r = fut.result()
+            if r["kind"] == "stopped":
+                continue
+            # progress = cells visited so far this run (ok + fail + up-to-date),
+            # out of every cell this run will visit — the counter reaches
+            # n_todo even when --append finds most cells current
+            nth = n_ok + n_fail + n_current + 1
+            tag = f"[{nth}/{n_todo}] {r['name'][:28]:28s} {r['key']:14s}"
+            if r["kind"] == "current":
+                n_current += 1
+                print(f"  {tag} up to date ({r['end']})", flush=True)
+            elif r["kind"] == "dry":
+                n_ok += 1
+                units += quota_units(r["days"])
+                print(f"  {tag} would fetch {r['start']}..{e}  ({r['days']} "
+                      f"days, {quota_units(r['days']):.2f} calls)", flush=True)
+            elif r["kind"] == "ratelimit":
+                print(f"\n  rate/quota limit reached at {r['key']}: {r['err']}")
+                print("  stopping cleanly — rerun the same command to continue.")
+                stopped = True
+            elif r["kind"] == "fail":
+                n_fail += 1
+                print(f"  {tag} FAIL: {r['err']}", flush=True)
+            else:  # ok
+                units += quota_units(r["days"])
+                meta = r["meta"]
+                done[r["key"]] = {"name": r["name"], "rows": r["rows"],
+                                  "end": r["end"], **meta}
+                skip.add(r["key"])
+                n_ok += 1
+                cmin = n_ok / max(1e-9, (time.time() - t_start) / 60)
+                hl, hlon = meta.get("hres_lat"), meta.get("hres_lon")
+                hloc = (f"HRES@{hl:.3f},{hlon:.3f}"
+                        if hl is not None and hlon is not None else "HRES@?")
+                span = (f"{r['rows']} rows (+{r['n_new']} fetched)"
+                        if r["had"] else f"{r['rows']} rows")
+                print(f"  {tag} OK  {span}  {hloc}  "
+                      f"{r['dt']:.1f}s  ({cmin:.0f} cells/min)", flush=True)
+                if n_ok % args.ledger_every == 0 and not args.dry_run:
+                    save_ledger(up, ledger, ledger_key, local_ledger)
+                    print(f"  {tag} ledger flushed to R2 "
+                          f"({len(done)} cells recorded)", flush=True)
+    except KeyboardInterrupt:
+        stop.set()
+        stopped = True
+        print("\ninterrupted — flushing the ledger; rerun the same command to "
+              "continue (in-flight cells take a few seconds to wind down)")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     if not args.dry_run:
         save_ledger(up, ledger, ledger_key, local_ledger)
