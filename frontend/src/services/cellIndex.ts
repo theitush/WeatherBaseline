@@ -128,14 +128,3 @@ export function snapToNearestCell(lat: number, lon: number, cells: Cell[]): Snap
   return best ? { cell: best, distanceKm: bestKm } : null;
 }
 
-/**
- * Resolve a coords-only URL back into a display name: find the cell nearest the
- * URL's coords and return its label. The URL coords ARE a cell centre, so the
- * nearest cell is an exact match in practice; we still snap (rather than require
- * exact equality) to tolerate rounding to 2dp in the URL.
- */
-export async function lookupCellName(lat: number, lon: number): Promise<string> {
-  const cells = await loadCells();
-  const snapped = snapToNearestCell(lat, lon, cells);
-  return snapped?.cell.name ?? '';
-}

@@ -5,7 +5,7 @@ import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } 
 import { geolocateByIp, parseDate, addDays } from '../services/api';
 import { loadCellTimeline, getCellHasArchive, logMetricView } from '../services/tieredData';
 import { fetchBands } from '../services/ci';
-import { loadCells, snapToNearestCell, lookupCellName } from '../services/cellIndex';
+import { loadCells, snapToNearestCell } from '../services/cellIndex';
 import { parsePath, buildPath } from '../services/urlState';
 import {
   calculateYearlyAggregates,
@@ -405,16 +405,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A coords-only URL has no name; resolve it from the cell list so the search
-  // box shows where the data is from. Runs once on a URL-seeded load — the local
-  // lookup is instant, so the label appears without any blocking geocode.
+  // A coords-only URL is resolved against the cell list: name AND coordinates
+  // snap to the nearest curated cell. The snap (not an exact match) is load-
+  // bearing — cells occasionally move or merge (the 2026-08 snap rewrite moved
+  // 121 of them to their true data gridpoints), so an old permalink's coords
+  // may no longer be a cell centre; fetching them raw would 404 on retired R2
+  // keys. Runs once on a URL-seeded load; skipped if the user has already
+  // navigated elsewhere by the time the cell list arrives.
   useEffect(() => {
     if (!initial) return; // a default/IP/search load already has a name
     let cancelled = false;
-    lookupCellName(initial.lat, initial.lon).then((name) => {
-      if (!cancelled && name) {
-        setLocation((prev) => ({ ...prev, name }));
-      }
+    loadCells().then((cells) => {
+      if (cancelled) return;
+      const snapped = snapToNearestCell(initial.lat, initial.lon, cells);
+      if (!snapped) return;
+      setLocation((prev) => {
+        // Only a still-URL-seeded location may be snapped; a user search that
+        // beat this lookup wins.
+        if (prev.lat !== initial.lat || prev.lon !== initial.lon) return prev;
+        const { lat, lon, name } = snapped.cell;
+        return { lat, lon, name };
+      });
     });
     return () => {
       cancelled = true;
