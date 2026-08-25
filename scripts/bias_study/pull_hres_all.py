@@ -21,11 +21,13 @@ the era5 --overwrite ledger). A recreated/rebooted box pulls the ledger back and
 skips cells already done. A NEW --r2-prefix is therefore the safe, resumable way
 to rebuild the entire dataset without replacing the previous one.
 
-RATE — the Open-Meteo Standard plan ($29/mo, cancel when done) lifts the 10k/day
-cap; the binding limit is then 600 calls/min. At ~53 weighted calls/cell (4 vars,
-~2yr => ceil(4/10)*ceil(730/14)=53) the whole 10k-cell grid is ~550k calls, well
-inside Standard's 1M/mo, finishing in ~1 day at the default --rate 540 calls/min.
-On the FREE tier instead, pass --rate 6 (stays under 10k/day) — ~2 months.
+RATE — Open-Meteo bills weighted, FRACTIONAL calls, not HTTP requests:
+  weight = nLocations * (nDays / 14) * (nVariables / 10)      [nDays floored at 14]
+At 4 vars, one location, ~2.4yr that is (880/14)*(4/10) = ~25 calls/cell, so the
+full 8.7k-cell grid is ~220k weighted calls. Free tier caps are 600/min, 5k/hour,
+10k/day, 300k/month (per IP); the Standard plan ($29/mo, cancel when done) lifts
+the daily cap with a 1M/month budget. NOTE --rate paces REQUESTS, not weighted
+calls — check the cost with --dry-run before assuming a rate keeps you under a cap.
 
 Auth — R2 S3 token in env (reuses era5_pipeline/r2.env):
   R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY  [R2_BUCKET=weather-baseline]
@@ -48,6 +50,12 @@ winning. A ~2-month top-up costs ~5 units/cell instead of 53. Cells with no data
 yet fall back to a full-window pull, and cells already at the target end date are
 left untouched (no API call). Rerun it monthly; it is idempotent.
 
+--end pins that target to a FIXED date instead of today - --lag. On the free tier
+a full-grid top-up spans several days, and a drifting target smears the dataset's
+end date across the whole run (every cell stops at whatever "today - lag" was when
+its turn came). Pass --end so a multi-day, resumable run lands every cell on the
+same last day. --dry-run prices a run without touching the API.
+
 The --resettle-days overlap exists because the historical-forecast API's most
 recent days are still firming up as later runs land — re-fetching the tail
 overwrites those seam days with settled values instead of freezing the first
@@ -65,6 +73,8 @@ Usage (from scripts/bias_study/, with the era5_pipeline venv):
   python pull_hres_all.py --rate 6              # FULL grid, FREE tier pace
   OPENMETEO_API_KEY=xxx python pull_hres_all.py # FULL grid, Standard plan (fast)
   python pull_hres_all.py --append --rate 6     # top up every cell's tail
+  python pull_hres_all.py --append --end 2026-08-01 --dry-run
+                                               # price a top-up to a fixed day
   python pull_hres_all.py --r2-prefix hres-forecast-ifs-hres --years 99
                                                # fresh, full, resumable rebuild
 """
@@ -119,10 +129,24 @@ END_LAG_DAYS = 10
 HRES_ARCHIVE_START = date(2024, 3, 1)
 
 
-def quota_units(days: int) -> int:
-    """API "calls" one request costs: Open-Meteo bills ceil(vars/10) * ceil(days/14),
-    so a short tail is billed far below a full-window re-pull (5 vs 53 units)."""
-    return -(-len(VARS) // 10) * -(-days // 14)
+# Open-Meteo bills FRACTIONAL weighted calls, not requests:
+#   weight = nLocations * (nDays / 14) * (nVariables / 10)
+# with nDays floored at 14 — data sits in 14-day compressed chunks, so a shorter
+# window is the same work server-side. Neither factor is rounded up: 1 variable
+# really is 0.1, and their own worked example (20yr x 10 loc x 1 var = 260.7)
+# only reproduces under exact fractional arithmetic.
+# https://openmeteo.substack.com/p/weather-data-for-multiple-locations
+QUOTA_CHUNK_DAYS = 14
+QUOTA_VARS_PER_CALL = 10
+
+
+def quota_units(days: int, locations: int = 1) -> float:
+    """Weighted API calls one request costs. Fractional: our 4-variable request
+    over <=14 days is 0.4 calls, so a tail top-up is ~60x cheaper than the
+    full-window re-pull (0.4 vs ~25 calls/cell)."""
+    return (locations
+            * max(days, QUOTA_CHUNK_DAYS) / QUOTA_CHUNK_DAYS
+            * len(VARS) / QUOTA_VARS_PER_CALL)
 
 
 def snap(coord: float) -> float:
@@ -302,6 +326,14 @@ def main() -> int:
     ap.add_argument("--resettle-days", type=int, default=14,
                     help="with --append, also re-fetch this many days already on "
                          "disk, so the unsettled seam gets settled values (14)")
+    ap.add_argument("--end",
+                    help="pin the window end to this YYYY-MM-DD instead of "
+                         "today - --lag (which drifts with the calendar). Use it "
+                         "to top every cell up to one fixed date, e.g. "
+                         "--end 2026-08-01; --lag is then ignored.")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the per-cell window and total quota cost, make "
+                         "no API calls and write nothing (R2 or disk)")
     ap.add_argument("--lag", type=int, default=END_LAG_DAYS,
                     help=f"end the window this many days before today "
                          f"(default {END_LAG_DAYS}; the era5-land archive we join "
@@ -323,7 +355,21 @@ def main() -> int:
     host = PAID_HOST if apikey else FREE_HOST
     rate = args.rate if args.rate is not None else (540.0 if apikey else 6.0)
 
-    end = date.today() - timedelta(days=args.lag)
+    if args.end:
+        try:
+            end = date.fromisoformat(args.end)
+        except ValueError:
+            sys.exit("--end must be a YYYY-MM-DD date")
+        if end >= date.today():
+            sys.exit(f"--end {end} is not in the past; the historical-forecast "
+                     f"archive has nothing there yet")
+        settled = date.today() - timedelta(days=args.lag)
+        if end > settled:
+            print(f"NOTE: --end {end} is inside the {args.lag}-day settling "
+                  f"window (settled through {settled}); those last days may "
+                  f"still firm up. Re-run later with the same --end to resettle.")
+    else:
+        end = date.today() - timedelta(days=args.lag)
     start = end - timedelta(days=round(365.25 * args.years))
     # Never request before the archive floor — earlier dates aren't real HRES.
     if start < HRES_ARCHIVE_START:
@@ -345,8 +391,8 @@ def main() -> int:
         print(f"APPEND: per-cell tail only, re-fetching the last "
               f"{args.resettle_days} days for settling  @ {rate:.0f}/min")
     else:
-        print(f"{len(cells)} cells x ~{quota_units(days)} calls = "
-              f"~{len(cells) * quota_units(days):,} API calls  @ {rate:.0f}/min")
+        print(f"{len(cells)} cells x ~{quota_units(days):.2f} weighted calls = "
+              f"~{len(cells) * quota_units(days):,.0f} API calls  @ {rate:.0f}/min")
     print(f"listing R2 prefix {r2_prefix!r} / loading ledger…", flush=True)
 
     up = R2Uploader()
@@ -417,6 +463,14 @@ def main() -> int:
                     days=max(0, args.resettle_days - 1))
                 cell_start = max(tail, start).isoformat()
 
+        cell_days = (date.fromisoformat(e) - date.fromisoformat(cell_start)).days + 1
+        if args.dry_run:
+            units += quota_units(cell_days)
+            n_ok += 1
+            print(f"  {tag} would fetch {cell_start}..{e}  "
+                  f"({cell_days} days, {quota_units(cell_days):.2f} calls)", flush=True)
+            continue
+
         print(f"  {tag} fetching {cell_start}..{e}…", flush=True)
         t_cell = time.time()
         try:
@@ -430,8 +484,7 @@ def main() -> int:
             n_fail += 1
             print(f"  {tag} FAIL: {ex}", flush=True)
             continue
-        units += quota_units((date.fromisoformat(e)
-                              - date.fromisoformat(cell_start)).days + 1)
+        units += quota_units(cell_days)
 
         n_new = len(rows)
         rows = merge_rows(have, rows) if have else rows
@@ -450,15 +503,18 @@ def main() -> int:
         span = f"{len(rows)} rows (+{n_new} fetched)" if have else f"{len(rows)} rows"
         print(f"  {tag} OK  {span}  {hloc}  "
               f"{dt:.1f}s  ({cmin:.0f} cells/min)", flush=True)
-        if n_ok % args.ledger_every == 0:
+        if n_ok % args.ledger_every == 0 and not args.dry_run:
             save_ledger(up, ledger, ledger_key, local_ledger)
             print(f"  {tag} ledger flushed to R2 "
                   f"({len(done)} cells recorded)", flush=True)
 
-    save_ledger(up, ledger, ledger_key, local_ledger)
-    print(f"\ndone. ok={n_ok} skip={n_skip} fail={n_fail}"
+    if not args.dry_run:
+        save_ledger(up, ledger, ledger_key, local_ledger)
+    print(f"\n{'DRY RUN — nothing written. ' if args.dry_run else ''}"
+          f"done. ok={n_ok} skip={n_skip} fail={n_fail}"
           f"{f' up-to-date={n_current}' if args.append else ''}  "
-          f"~{units:,} quota-calls  ({(time.time() - t_start) / 60:.1f} min)")
+          f"~{units:,.1f} weighted API calls  "
+          f"({(time.time() - t_start) / 60:.1f} min)")
     remaining = len(cells) - n_skip - n_ok - n_current
     if stopped or remaining > 0:
         print(f"{remaining} cells remaining — rerun the same command to continue.")
