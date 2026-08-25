@@ -17,6 +17,12 @@ step and requires --yes.
                only objects that exist). Requires --yes. Old permalinks to
                moved cells then 404 until the client's cells.csv refreshes —
                the URL-snap fallback in the frontend covers this.
+  --deprecate  the non-destructive alternative to --delete-old (USER CHOICE
+               2026-08-25): server-side copy each old object to
+               deprecated/{tier}/... (ETag-verified), then delete the
+               original key. The live namespaces come up clean while every
+               byte stays recoverable under the deprecated/ prefix. Requires
+               --yes for the post-copy delete of the originals.
   --status     HEAD every old/new key and summarize state.
 
 Auth: R2 S3 credentials from env, or loaded automatically from r2.env next to
@@ -231,6 +237,41 @@ def do_delete_old(up: R2Uploader, plan: list[dict], yes: bool) -> int:
     return len(leftovers)
 
 
+def do_deprecate(up: R2Uploader, plan: list[dict], yes: bool) -> int:
+    """Move every retired old-key object under deprecated/ instead of deleting."""
+    targets = []
+    for r in plan:
+        if r["action"] in ("move", "move_repull") or r["action"].startswith("drop"):
+            for tier in TIERS:
+                targets.append((r["name"], key_for(tier, r["old_base"])))
+    existing = [(n, k, head_etag(up, k)) for n, k in targets]
+    existing = [(n, k, e) for n, k, e in existing if e is not None]
+    print(f"[deprecate] {len(existing)} object(s) to move under deprecated/")
+    if not yes:
+        print("[deprecate] dry run — pass --yes to move them")
+        return 0
+    failures = 0
+    moved = kept = 0
+    for n, k, etag in existing:
+        dep_key = f"deprecated/{k}"
+        if head_etag(up, dep_key) != etag:
+            up.client.copy_object(
+                Bucket=up.bucket, Key=dep_key,
+                CopySource={"Bucket": up.bucket, "Key": k},
+            )
+            if head_etag(up, dep_key) != etag:
+                print(f"  FAIL copy mismatch: {dep_key} ({n}) — original kept")
+                failures += 1
+                kept += 1
+                continue
+        up.client.delete_object(Bucket=up.bucket, Key=k)
+        moved += 1
+    leftovers = [(n, k) for n, k, _ in existing if head_etag(up, k) is not None]
+    print(f"[deprecate] moved {moved}, kept-in-place {kept}, "
+          f"originals still present {len(leftovers)}")
+    return failures + len(leftovers) - kept
+
+
 def do_status(up: R2Uploader, plan: list[dict]) -> int:
     counts = defaultdict(int)
     for r in plan:
@@ -251,15 +292,19 @@ def main() -> int:
     ap.add_argument("--copy", action="store_true")
     ap.add_argument("--write-csv", action="store_true")
     ap.add_argument("--delete-old", action="store_true")
+    ap.add_argument("--deprecate", action="store_true")
     ap.add_argument("--status", action="store_true")
-    ap.add_argument("--yes", action="store_true", help="confirm --delete-old")
+    ap.add_argument("--yes", action="store_true",
+                    help="confirm --delete-old / --deprecate")
     args = ap.parse_args()
-    if not (args.copy or args.write_csv or args.delete_old or args.status):
-        ap.error("pick a phase: --copy / --write-csv / --delete-old / --status")
+    if not (args.copy or args.write_csv or args.delete_old or args.deprecate
+            or args.status):
+        ap.error("pick a phase: --copy / --write-csv / --deprecate / "
+                 "--delete-old / --status")
 
     plan = load_plan()
     failures = 0
-    if args.copy or args.delete_old or args.status:
+    if args.copy or args.delete_old or args.deprecate or args.status:
         _load_r2_env()
         up = R2Uploader()
     else:
@@ -268,6 +313,8 @@ def main() -> int:
         failures += do_copy(up, plan)
     if args.write_csv:
         failures += do_write_csv(plan)
+    if args.deprecate:
+        failures += do_deprecate(up, plan, args.yes)
     if args.delete_old:
         failures += do_delete_old(up, plan, args.yes)
     if args.status:

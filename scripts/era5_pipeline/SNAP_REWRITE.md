@@ -128,9 +128,11 @@ cells (their data was a duplicate of the survivor's key).
       404s /api/ensure-fresh for unknown coords, so EVERY moved cell needs a
       Worker redeploy (`node scripts/gen-cell-keys.mjs` + `wrangler deploy`)
       alongside the Pages deploy. Done 2026-08-25 (8620 keys).
-- [ ] --delete-old --yes + --status + bucket counts — ON HOLD (user said don't
-      delete, 2026-08-25). 491 old objects still on R2; nothing 404s from the
-      rewrite itself.
+- [x] old keys retired via `--deprecate --yes` (USER CHOICE over deletion,
+      2026-08-25): all 491 old-key objects moved to the `deprecated/` prefix
+      (ETag-verified copy before each original was removed; moved 491 /
+      leftovers 0). The live tiers are clean; the bytes remain recoverable —
+      restoring = copying back out of `deprecated/`.
 
 **Deploy incident (2026-08-25, resolved):** the Pages deploy shipped months of
 committed-but-undeployed frontend work (prod deploys are manual), including
