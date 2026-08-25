@@ -55,6 +55,11 @@ const METRICS: { key: MetricKey; var: string; nonneg: boolean }[] = [
 // corrected value computed, at the clamped value (matches ci_server.predict_bands).
 const PRECIP_TRACE_MM = 1;
 
+// Probit (split-normal) interior weight z(.75)/z(.90) — the 7-level-table
+// fallback for q25/q75 (see buildTable). Kept alongside the trained-head path
+// so one bundle serves both table generations.
+const PROBIT_Q25_Q75_W = 0.526307;
+
 /** Positive modulo (JS `%` keeps the sign of the dividend; Python's does not). */
 const mod = (n: number, m: number): number => ((n % m) + m) % m;
 
@@ -123,14 +128,26 @@ function buildTable(rows: Record<string, string>[]): CellTable | null {
     const hres = parseFloat(row.hres);
     doySets.get(v)!.add(doy);
     hresSets.get(v)!.add(hres);
+    const d10 = parseFloat(row.d10);
+    const dmid = parseFloat(row.dmid);
+    const d90 = parseFloat(row.d90);
     grid.points.set(pointKey(doy, hres), {
       d01: parseFloat(row.d01),
       dlo: parseFloat(row.dlo),
-      d10: parseFloat(row.d10),
-      d25: parseFloat(row.d25),
-      dmid: parseFloat(row.dmid),
-      d75: parseFloat(row.d75),
-      d90: parseFloat(row.d90),
+      d10,
+      // The live R2 tables still ship the 7-level schema (no d25/d75 — those
+      // arrive with the 9-level retrain). Fall back to the probit shoulder
+      // rule the 7-level bundle always used: interior weight z(.75)/z(.90) =
+      // 0.526307 places q25/q75 on the Φ⁻¹(τ)-linear CDF the .10/.50/.90
+      // anchors define (validated ≤1.7pp, q25_q75_interp_check.ipynb). The
+      // hres base cancels, so the same relation holds on deltas. Parsing the
+      // missing columns unguarded turned every band NaN (prod 2026-08-25).
+      d25: row.d25 !== undefined ? parseFloat(row.d25)
+        : dmid - PROBIT_Q25_Q75_W * (dmid - d10),
+      dmid,
+      d75: row.d75 !== undefined ? parseFloat(row.d75)
+        : dmid + PROBIT_Q25_Q75_W * (d90 - dmid),
+      d90,
       dhi: parseFloat(row.dhi),
       d99: parseFloat(row.d99),
     });
