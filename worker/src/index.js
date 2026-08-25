@@ -162,6 +162,19 @@ function handleGeo(request, env, ctx) {
 // local dev) is swallowed so logging never affects the response. Read it back
 // on the private /dashboard page (served by analytics.js).
 // ---------------------------------------------------------------------------
+// A dev server on the maintainer's own machine, not a visitor: `npm run dev`
+// runs `wrangler dev --remote`, so the D1 binding below is the REAL database and
+// every local page view lands in the live stats. The ?owner= key can't cover
+// that — it lives in localStorage, which is scoped per origin *including port*,
+// so localhost:5173, localhost:5199 and the prod domain are three separate
+// stores (a fresh headless profile is a fourth). Recognising the origin itself
+// needs no key and survives every port/profile.
+function isLocalDevHost(host) {
+  if (!host) return false;
+  const name = host.replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return name === 'localhost' || name.endsWith('.localhost') || name === '127.0.0.1' || name === '::1';
+}
+
 async function sha256Hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -177,6 +190,11 @@ async function logHit(request, env, meta) {
     let refHost = null;
     const ref = request.headers.get('Referer');
     if (ref) { try { refHost = new URL(ref).host; } catch { /* malformed */ } }
+    // Where the call came FROM (Origin on the fetch; Referer is the fallback for
+    // the beacons that omit it) — used only for the local-dev check below.
+    let originHost = refHost;
+    const origin = request.headers.get('Origin');
+    if (origin) { try { originHost = new URL(origin).host; } catch { /* malformed */ } }
     // Stable id (no per-day rotation) so a returning person hashes the same on a
     // later day. Pseudonymous: no raw IP is stored and no cookie is set.
     const salt = env.VISITOR_SALT || 'hhwi';
@@ -193,6 +211,8 @@ async function logHit(request, env, meta) {
         if (okey && okey === env.OWNER_KEY) visitor = 'owner';
       } catch { /* malformed URL — keep the hash */ }
     }
+    // Same bucket for local dev, key or no key (see isLocalDevHost).
+    if (isLocalDevHost(originHost)) visitor = 'owner';
     await db
       .prepare(
         `INSERT INTO hits (ts, visitor, kind, page, country, city, referer, asn_org, ua, query, matched, served, dist_km)
