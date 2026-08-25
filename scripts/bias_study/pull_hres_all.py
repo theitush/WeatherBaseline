@@ -442,8 +442,10 @@ def main() -> int:
             continue
         gz = out_dir / f"hres_{key}.csv.gz"
         r2_key = f"{r2_prefix}/hres_{key}.csv.gz"
-        # progress = cells processed so far this run (ok + fail), out of the to-do count
-        nth = n_ok + n_fail + 1
+        # progress = cells visited so far this run (ok + fail + up-to-date), out
+        # of every cell this run will visit — so the counter reaches n_todo even
+        # when --append finds most cells current
+        nth = n_ok + n_fail + n_current + 1
         tag = f"[{nth}/{n_todo}] {name[:28]:28s} {key:14s}"
 
         # --append: fetch this cell's tail only. No existing data (new cell, or an
@@ -455,8 +457,7 @@ def main() -> int:
             have_end = max((r["date"] for r in have), default=None)
             if have_end and have_end >= e:
                 n_current += 1
-                print(f"  [{name[:28]:28s} {key:14s}] up to date ({have_end})",
-                      flush=True)
+                print(f"  {tag} up to date ({have_end})", flush=True)
                 continue
             if have_end:
                 tail = date.fromisoformat(have_end) - timedelta(
