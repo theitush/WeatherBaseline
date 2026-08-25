@@ -1,5 +1,10 @@
 # Next session: audit the nearest-land snap for silently relocated cells
 
+> **DONE 2026-08-25.** The audit ran (227 snapped, 14 over the 25 km cap) and
+> the full rewrite was executed the same day — see **SNAP_REWRITE.md** for the
+> outcome, the verification record, and the downstream (debias/HRES)
+> obligations. This brief is kept as the original problem statement.
+
 ## The ask
 
 `resolve_land_indices` in [download_cells.py](download_cells.py) snaps a cell whose
@@ -49,11 +54,22 @@ mask a full span builds. Extend it to report, per cell:
   do not change that without thinking about the lat-dependent cell width)
 - the tile id, cell name and population (so the impact is rankable)
 
-Run it over **all tiles** (a cell not snapped this run could still be snapped on
-a rerun with a different span), and write a CSV sorted by distance descending.
-Cost is ~331 tiles × ~47 MB against the DestinE store, the pipeline's own
-source. **Quote the volume and get an explicit go before running it** — see the
+Run it over **all tiles** — not because a rerun could snap differently (land is
+static, it can't), but because the resume log is incomplete: its scope line says
+331 tiles / 7,897 cells, i.e. ~10 tiles finished in earlier runs and were never
+reprocessed, so their snaps were never logged. The current cells.csv spans
+**341** tiles. Write a CSV sorted by distance descending. Cost is ~341 tiles ×
+~47 MB ≈ 16 GB against the DestinE store, the pipeline's own source. **Quote
+the volume and get an explicit go before running it** — see the
 `download_cells` token rule in memory.
+
+> **2026-08-25 review:** the audit script now exists —
+> [audit_snap_distances.py](audit_snap_distances.py). It implements this method
+> plus: per-tile mask caching to `snap_audit_masks/*.npz` (cap-tuning reruns are
+> free), the true haversine-nearest land column (exposes the index-metric drift
+> at high latitude), a `cross_tile_possible` flag (see below), and the all-ocean
+> guard as a hard error. Math validated offline against the Christmas Island
+> case (351 km reproduced). Only the store fetch is pending approval.
 
 ## What to do with the answer
 
@@ -67,8 +83,37 @@ source. **Quote the volume and get an explicit go before running it** — see th
   needs the same treatment Christmas Island got: verify by reproducing its rows
   from the snapped gridpoint, then drop the cell and delete all four tier
   objects (`archive/`, `recent/`, `forecast/`, `debias/`).
-- Cells snapped a *short* way are fine and expected — that is the F1 coastal fix
-  working as designed. Do not regress it.
+- **Except**: a far-snapped cell flagged `cross_tile_possible` sits nearer to
+  its tile's edge than to the land the snap chose — a neighboring tile may hold
+  much closer land. That is a window artifact (the snap only searches within
+  one tile), not a Christmas-Island case; the fix there is padding the window
+  or special-casing the cell, **not** dropping a real city. Check its
+  8-neighborhood masks before deciding.
+- **USER DECISION 2026-08-25 (firm): every legitimately snapped cell gets its
+  `cells.csv` coordinate MOVED to the resolved land gridpoint** (`res_lat`/
+  `res_lon` in the audit CSV). The coordinate's job is to point at where the
+  data comes from — the UI reports geocode→coordinate distance and must be
+  honest. The **name stays** (Sittwe's card is still Sittwe; only the pin moves
+  ~1 gridpoint to the data source). This is the F1 rewrite procedure again,
+  minus blank archives. Implications to handle in the rewrite:
+  - **R2 keys derive from coords** (`archive_<lat>_<lon>` × archive/recent/
+    forecast/debias): each moved cell needs a four-tier server-side copy to the
+    new key + delete of the old, or a re-pull. Verify count before/after.
+  - **Collisions**: the land gridpoint may already be another cell's coordinate
+    (F1 saw 183 dups) — merge, don't duplicate.
+  - Recompute `tile_id`/`tile_lat`/`tile_lon` for moved cells (a move can cross
+    a tile edge); regenerate `cell_elevation.csv` (make_cell_elevation.py,
+    ERA5-Land only); redeploy `/cells.csv` (Pages static, CRLF preserved).
+  - **Do NOT re-derive names** via the naming pipeline (known non-idempotent,
+    Barcelona regression) — names are kept verbatim.
+  - Check the local-solar-day offset doesn't change for any lon move; if it
+    does, that cell needs a re-pull, not a key rename.
+  - After the rewrite the runtime snap becomes a no-op for every moved cell
+    (its nearest gridpoint IS land), so the cap only ever fires on genuinely
+    new/broken cases — loudly.
+- Far-snapped cells are NOT moved — relabeling West Java as "Flying Fish Cove"
+  is the bug, not the fix. Over-cap = drop (Christmas Island treatment);
+  `cross_tile_possible` = widen the window first, then move to the *near* land.
 
 ## Watch out for
 

@@ -1,0 +1,122 @@
+name,old_base,new_base,ok,days,worst_dC
+"Mata-Utu, Wallis and Futuna",-13.3_-176.2,-13.6_-172.6,True,15,0.0
+"San Andrés, Colombia",12.6_-81.7,12.6_-83.6,True,15,0.0
+"Road Town, British Virgin Islands",18.4_-64.6,18.4_-65.7,True,15,0.0
+"Pago Pago, American Samoa",-14.3_-170.7,-14.0_-171.5,True,15,0.0
+"Cockburn Town, Turks and Caicos Islands",21.5_-71.1,21.8_-71.8,True,15,0.0
+"Espargos, Cabo Verde",16.8_-22.9,16.2_-22.9,True,15,0.0
+"Saint-Pierre, Saint Pierre and Miquelon",46.8_-56.2,47.0_-56.0,True,15,0.0
+"Labuan, Malaysia",5.3_115.2,5.3_115.4,True,15,0.0
+"Dakhla, Western Sahara",23.7_-16.0,23.7_-15.8,True,15,0.0
+"Port-Gentil, Gabon",-0.7_8.8,-0.8_8.9,True,15,0.0
+"Kralendijk, Bonaire, Saint Eustatius and Saba ",12.2_-68.3,12.1_-68.2,True,15,0.0
+"Papeete, French Polynesia",-17.5_-149.6,-17.6_-149.5,True,15,0.0
+"Nouméa, New Caledonia",-22.3_166.4,-22.2_166.5,True,15,0.0
+"Jincheng, Taiwan",24.4_118.3,24.5_118.2,True,15,0.0
+"Freeport, Bahamas",26.5_-78.7,26.6_-78.6,True,15,0.0
+"Sinop, Turkey",42.0_35.2,41.9_35.1,True,15,0.0
+"Tórshavn, Faroe Islands",62.0_-6.8,62.1_-6.9,True,15,0.0
+"Ankaloaka, Toliara, Madagascar",-23.4_43.7,-23.3_43.7,True,15,0.0
+"Annapolis, United States",39.0_-76.5,39.1_-76.5,True,15,0.0
+"Apia, Samoa",-13.8_-171.8,-13.9_-171.8,True,15,0.0
+"Arecibo, Puerto Rico",18.5_-66.7,18.4_-66.7,True,15,0.0
+"Arica, Chile",-18.5_-70.3,-18.4_-70.3,True,15,0.0
+"Barceloneta, Puerto Rico",18.5_-66.5,18.4_-66.5,True,15,0.0
+"Basse-Terre, Guadeloupe",16.0_-61.7,16.1_-61.7,True,15,0.0
+"Boumerdas, Algeria",36.8_3.5,36.7_3.5,True,15,0.0
+"Burgas, Bulgaria",42.5_27.5,42.6_27.5,True,15,0.0
+"Bushehr, Iran",29.0_50.8,28.9_50.8,True,15,0.0
+"Cagliari, Italy",39.2_9.1,39.3_9.1,True,15,0.0
+"Caleta San Pedro, La Serena, Chile",-29.9_-71.3,-29.8_-71.3,True,15,0.0
+"Cienfuegos, Cuba",22.1_-80.4,22.2_-80.4,True,15,0.0
+"Colonia del Sacramento, Uruguay",-34.5_-57.8,-34.4_-57.8,True,15,0.0
+"Dubrovnik, Croatia",42.6_18.1,42.7_18.1,True,15,0.0
+"Fort-de-France, Martinique",14.6_-61.1,14.7_-61.1,True,15,0.0
+"Gibraltar, Gibraltar",36.1_-5.4,36.2_-5.4,True,15,0.0
+"Gisborne, New Zealand",-38.7_178.0,-38.6_178.0,True,15,0.0
+"Harper, Liberia",4.4_-7.7,4.5_-7.7,True,15,0.0
+"Jacmel, Haiti",18.2_-72.5,18.3_-72.5,True,15,0.0
+"Kep, Cambodia",10.5_104.3,10.6_104.3,True,15,0.0
+"Klaipėda, Lithuania",55.7_21.1,55.8_21.1,True,15,0.0
+"Kochi, Japan",33.5_133.5,33.6_133.5,True,15,0.0
+"Kristiansand, Norway",58.1_8.0,58.2_8.0,True,15,0.0
+"La Unión, El Salvador",13.3_-87.8,13.4_-87.8,True,15,0.0
+"Les Cayes, Haiti",18.2_-73.7,18.3_-73.7,True,15,0.0
+"Liepāja, Latvia",56.5_21.0,56.6_21.0,True,15,0.0
+"Madang, Papua New Guinea",-5.2_145.8,-5.1_145.8,True,15,0.0
+"Maldonado, Uruguay",-34.9_-55.0,-34.8_-55.0,True,15,0.0
+"Mariehamn, Aland Islands",60.1_19.9,60.2_19.9,True,15,0.0
+"Molde, Norway",62.7_7.2,62.8_7.2,True,15,0.0
+"Monaco, Monaco",43.7_7.4,43.8_7.4,True,15,0.0
+"Monastir, Tunisia",35.8_10.8,35.7_10.8,True,15,0.0
+"Mukalla, Yemen",14.5_49.1,14.6_49.1,True,15,0.0
+"Ngerulmud, Palau",7.5_134.6,7.6_134.6,True,15,0.0
+"Panjim, India",15.5_73.8,15.6_73.8,True,15,0.0
+"Pattani, Thailand",6.9_101.3,6.8_101.3,True,15,0.0
+"Plymouth, Montserrat",16.7_-62.2,16.8_-62.2,True,15,0.0
+"Ponta Delgada, Portugal",37.7_-25.7,37.8_-25.7,True,15,0.0
+"Prachuap Khiri Khan, Thailand",11.8_99.8,11.9_99.8,True,15,0.0
+"Praia, Cabo Verde",14.9_-23.5,15.0_-23.5,True,15,0.0
+"Puerto Montt, Chile",-41.5_-72.9,-41.4_-72.9,True,15,0.0
+"Punta Arenas, Chile",-53.2_-70.9,-53.1_-70.9,True,15,0.0
+"Rijeka, Croatia",45.3_14.4,45.4_14.4,True,15,0.0
+"Roseau, Dominica",15.3_-61.4,15.4_-61.4,True,15,0.0
+"San-Pédro, Ivory Coast",4.7_-6.6,4.8_-6.6,True,15,0.0
+"Setúbal, Portugal",38.5_-8.9,38.6_-8.9,True,15,0.0
+"Shatby, Alexandria, Egypt",31.2_29.9,31.1_29.9,True,15,0.0
+"Sittwe, Myanmar",20.1_92.9,20.2_92.9,True,15,0.0
+"Split, Croatia",43.5_16.4,43.6_16.4,True,15,0.0
+"Stavanger, Norway",59.0_5.7,58.9_5.7,True,15,0.0
+"Suai, Timor Leste",-9.3_125.3,-9.2_125.3,True,15,0.0
+"Tokushima, Japan",34.1_134.6,34.2_134.6,True,15,0.0
+"Umm Al Quwain City, United Arab Emirates",25.6_55.6,25.5_55.6,True,15,0.0
+"Venice, Italy",45.4_12.3,45.5_12.3,True,15,0.0
+"Victoria, Canada",48.4_-123.4,48.5_-123.4,True,15,0.0
+"Zadar, Croatia",44.1_15.2,44.2_15.2,True,15,0.0
+"Zerão, Macapá, Brazil",0.0_-51.1,0.0_-51.2,True,15,0.0
+"Šibenik, Croatia",43.7_15.9,43.8_15.9,True,15,0.0
+"Ţarţūs, Syria",34.9_35.9,35.0_35.9,True,15,0.0
+"Angkasapura, Jayapura, Indonesia",-2.5_140.7,-2.5_140.6,True,15,0.0
+"Kokopo, Papua New Guinea",-4.3_152.3,-4.3_152.2,True,15,0.0
+"Kuala Belait, Brunei",4.6_114.2,4.6_114.3,True,15,0.0
+"Galle, Sri Lanka",6.0_80.2,6.0_80.3,True,15,0.0
+"Paramaribo, Suriname",5.9_-55.2,5.9_-55.3,True,15,0.0
+"Colón, Panama",9.4_-79.9,9.4_-79.8,True,15,0.0
+"Honiara, Solomon Islands",-9.4_159.9,-9.4_159.8,True,15,0.0
+"Limón, Costa Rica",10.0_-83.0,10.0_-83.1,True,15,0.0
+"San Fernando, Trinidad and Tobago",10.3_-61.5,10.3_-61.4,True,15,0.0
+"Sihanoukville, Cambodia",10.6_103.5,10.6_103.6,True,15,0.0
+"Saint George's, Grenada",12.1_-61.8,12.1_-61.7,True,15,0.0
+"Antsiranana, Madagascar",-12.3_49.3,-12.3_49.4,True,15,0.0
+"Darwin, Australia",-12.5_130.8,-12.5_130.7,True,15,0.0
+"Oranjestad, Aruba",12.5_-70.0,12.5_-69.9,True,15,0.0
+"Banjul, Gambia",13.5_-16.6,13.5_-16.5,True,15,0.0
+"Sambava, Madagascar",-14.3_50.2,-14.3_50.1,True,15,0.0
+"Mindelo, Cabo Verde",16.9_-25.0,16.9_-24.9,True,15,0.0
+"Basseterre, Saint Kitts and Nevis",17.3_-62.7,17.3_-62.8,True,15,0.0
+"Belize City, Belize",17.5_-88.2,17.5_-88.3,True,15,0.0
+"Maintirano, Madagascar",-18.1_44.0,-18.1_44.1,True,15,0.0
+"Montego Bay, Jamaica",18.5_-77.9,18.5_-77.8,True,15,0.0
+"George Town, Cayman Islands",19.3_-81.4,19.3_-81.3,True,15,0.0
+"Nagua, Dominican Republic",19.4_-69.8,19.4_-69.9,True,15,0.0
+"Morondava, Madagascar",-20.3_44.3,-20.3_44.4,True,15,0.0
+"Nouadhibou, Mauritania",20.9_-17.0,20.9_-17.1,True,15,0.0
+"Sur, Oman",22.6_59.5,22.6_59.4,True,15,0.0
+"Swakopmund, Namibia",-22.7_14.5,-22.7_14.6,True,15,0.0
+"Nassau, Bahamas",25.1_-77.3,25.1_-77.4,True,15,0.0
+"Hurghada, Egypt",27.3_33.8,27.3_33.7,True,15,0.0
+"Marsá Maţrūḩ, Egypt",31.4_27.2,31.4_27.1,True,15,0.0
+"Tobruk, Libya",32.1_24.0,32.1_23.9,True,15,0.0
+"Melilla, Spain",35.3_-2.9,35.3_-3.0,True,15,0.0
+"Mahdia, Tunisia",35.5_11.1,35.5_11.0,True,15,0.0
+"Ceuta, Spain",35.9_-5.3,35.9_-5.4,True,15,0.0
+"Béjaïa, Algeria",36.8_5.1,36.8_5.0,True,15,0.0
+"Bizerte, Tunisia",37.3_9.9,37.3_9.8,True,15,0.0
+"Mytilene, Greece",39.1_26.6,39.1_26.5,True,15,0.0
+"Zonguldak, Turkey",41.5_31.8,41.5_31.9,True,15,0.0
+"Ajaccio, France",41.9_8.7,41.9_8.8,True,15,0.0
+"Saint Helier, Jersey",49.2_-2.1,49.2_-2.2,True,15,0.0
+"Kalmar, Sweden",56.7_16.4,56.7_16.5,True,15,0.0
+"Jūrmala, Latvia",57.0_23.8,57.0_23.9,True,15,0.0
+"Ventspils, Latvia",57.4_21.6,57.4_21.7,True,15,0.0
+"Bodø, Norway",67.3_14.4,67.3_14.5,True,15,0.0

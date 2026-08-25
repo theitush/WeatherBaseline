@@ -1218,6 +1218,8 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tile", help="tile_id(s), comma-separated; default: all")
+    ap.add_argument("--cells", help="cell name(s), ';'-separated — restrict the "
+                    "run to just these cells (surgical re-pulls)")
     ap.add_argument("--year", type=int, help="single year (shorthand)")
     ap.add_argument("--start-year", type=int, default=1950)
     ap.add_argument("--end-year", type=int, default=datetime.now().year,
@@ -1290,6 +1292,19 @@ def main() -> int:
         tiles = {t: by_tile[t] for t in wanted}
     else:
         tiles = by_tile
+
+    if args.cells:
+        # Surgical scope: only the named cells (';'-separated — names contain
+        # commas). Added for the 2026-08 snap rewrite (San Andrés offset-flip
+        # re-pull); combine with --tile/--overwrite for one-cell rebuilds.
+        wanted_names = {n.strip() for n in args.cells.split(";") if n.strip()}
+        tiles = {t: [c for c in cs if c["name"] in wanted_names]
+                 for t, cs in tiles.items()}
+        tiles = {t: cs for t, cs in tiles.items() if cs}
+        found = {c["name"] for cs in tiles.values() for c in cs}
+        if missing_names := wanted_names - found:
+            print(f"no cell(s) named: {'; '.join(sorted(missing_names))}")
+            return 1
 
     n_cells = sum(len(v) for v in tiles.values())
     print("ERA5-Land cell download (v2: batched + parallel + resumable)")

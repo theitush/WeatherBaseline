@@ -18,3 +18,7 @@ __pycache__/
 
 # Note: benchmark_zarr_results*.json are committed intentionally as the
 # decision record for why zarr was chosen over the CDS API (see STATUS.md).
+
+# Snap-distance audit: cached per-tile land masks + report (regenerable)
+snap_audit_masks/
+snap_audit.csv

@@ -1,0 +1,228 @@
+cell_id,name,population,action,merge_into,survivor_name,survivor_population,old_lat,old_lon,new_lat,new_lon,snap_km,old_base,new_base,offset_old_h,offset_new_h,offset_flip,old_tile_id,new_tile_id,new_tile_lat,new_tile_lon,tile_changed
+8620,"Mata-Utu, Wallis and Futuna",6611,move,,,,-13.3,-176.2,-13.6,-172.6,390.75,-13.3_-176.2,-13.6_-172.6,-12,-12,False,20_18,20_18,-10.0,180.0,False
+7795,"San Andrés, Colombia",64755,move_repull,,,,12.6,-81.7,12.6,-83.6,206.18,12.6_-81.7,12.6_-83.6,-5,-6,True,15_27,15_27,15.0,270.0,False
+8565,"Saint Croix, U.S. Virgin Islands",11988,drop_dup_existing,"Fajardo, Puerto Rico","Fajardo, Puerto Rico",25825,17.7,-64.7,18.3,-65.7,125.04,17.7_-64.7,18.3_-65.7,-4,-4,False,14_29,14_29,20.0,290.0,False
+8401,"Road Town, British Virgin Islands",22848,move,,,,18.4,-64.6,18.4,-65.7,116.06,18.4_-64.6,18.4_-65.7,-4,-4,False,14_29,14_29,20.0,290.0,False
+8597,"The Valley, Anguilla",9514,drop_decision,"Basseterre, Saint Kitts and Nevis","Basseterre, Saint Kitts and Nevis",16252,18.2,-63.1,17.4,-62.8,94.46,18.2_-63.1,17.4_-62.8,-4,-4,False,14_29,14_29,20.0,290.0,False
+8393,"Pago Pago, American Samoa",23564,move,,,,-14.3,-170.7,-14.0,-171.5,92.48,-14.3_-170.7,-14.0_-171.5,-11,-11,False,20_18,20_18,-10.0,180.0,False
+8289,"Charlotte Amalie, U.S. Virgin Islands",30082,drop_dup_existing,"Fajardo, Puerto Rico","Fajardo, Puerto Rico",30082,18.3,-64.9,18.3,-65.7,84.46,18.3_-64.9,18.3_-65.7,-4,-4,False,14_29,14_29,20.0,290.0,False
+8464,"Marigot, Saint Martin",19522,drop_decision,"Basseterre, Saint Kitts and Nevis","Basseterre, Saint Kitts and Nevis",16252,18.1,-63.1,17.4,-62.8,84.07,18.1_-63.1,17.4_-62.8,-4,-4,False,14_29,14_29,20.0,290.0,False
+8617,"Cockburn Town, Turks and Caicos Islands",6946,move,,,,21.5,-71.1,21.8,-71.8,79.67,21.5_-71.1,21.8_-71.8,-5,-5,False,13_28,13_28,25.0,280.0,False
+8577,"Philipsburg, Sint Maarten",10776,drop_decision,"Basseterre, Saint Kitts and Nevis","Basseterre, Saint Kitts and Nevis",16252,18.0,-63.0,17.4,-62.8,70.0,18.0_-63.0,17.4_-62.8,-4,-4,False,14_29,14_29,20.0,290.0,False
+8552,"Espargos, Cabo Verde",12959,move,,,,16.8,-22.9,16.2,-22.9,66.72,16.8_-22.9,16.2_-22.9,-2,-2,False,14_33,14_33,20.0,330.0,False
+8618,"Gustavia, Saint Barthelemy",6875,drop_decision,"Basseterre, Saint Kitts and Nevis","Basseterre, Saint Kitts and Nevis",16252,17.9,-62.8,17.4,-62.8,55.6,17.9_-62.8,17.4_-62.8,-4,-4,False,14_29,14_29,20.0,290.0,False
+8381,"Saint Peter Port, Guernsey",23940,drop_dup_moved,"Saint Helier, Jersey","Saint Helier, Jersey",79100,49.5,-2.5,49.2,-2.2,39.81,49.5_-2.5,49.2_-2.2,0,0,False,8_35,8_35,50.0,350.0,False
+8649,"Saint-Pierre, Saint Pierre and Miquelon",4385,move,,,,46.8,-56.2,47.0,-56.0,26.93,46.8_-56.2,47.0_-56.0,-4,-4,False,8_30,8_30,50.0,300.0,False
+7649,"Labuan, Malaysia",78194,move,,,,5.3,115.2,5.3,115.4,22.14,5.3_115.2,5.3_115.4,8,8,False,16_11,16_11,10.0,110.0,False
+7849,"Dakhla, Western Sahara",59745,move,,,,23.7,-16.0,23.7,-15.8,20.36,23.7_-16.0,23.7_-15.8,-1,-1,False,13_34,13_34,25.0,340.0,False
+7492,"Port-Gentil, Gabon",94465,move,,,,-0.7,8.8,-0.8,8.9,15.72,-0.7_8.8,-0.8_8.9,1,1,False,18_0,18_0,0.0,0.0,False
+8260,"Conakry, Guinea",31585,drop_dup_existing,"Dixinn, Conakry, Guinea","Dixinn, Conakry, Guinea",1173937,9.5,-13.7,9.6,-13.6,15.62,9.5_-13.7,9.6_-13.6,-1,-1,False,16_34,16_34,10.0,340.0,False
+6249,"Maceió, Brazil",149548,drop_dup_existing,"Satuba, Maceió, Brazil","Satuba, Maceió, Brazil",285388,-9.7,-35.7,-9.6,-35.8,15.61,-9.7_-35.7,-9.6_-35.8,-2,-2,False,19_32,19_32,-5.0,320.0,False
+8561,"Kralendijk, Bonaire, Saint Eustatius and Saba ",12220,move,,,,12.2,-68.3,12.1,-68.2,15.55,12.2_-68.3,12.1_-68.2,-5,-5,False,15_29,15_29,15.0,290.0,False
+510,"Dakar, Senegal",902222,drop_dup_existing,"Niakoul Rab, Pikine, Senegal","Dakar, Senegal",902222,14.7,-17.4,14.8,-17.3,15.47,14.7_-17.4,14.8_-17.3,-1,-1,False,15_34,15_34,15.0,340.0,False
+8270,"Papeete, French Polynesia",31332,move,,,,-17.5,-149.6,-17.6,-149.5,15.36,-17.5_-149.6,-17.6_-149.5,-10,-10,False,21_21,21_21,-15.0,210.0,False
+8206,"Nouméa, New Caledonia",34960,move,,,,-22.3,166.4,-22.2,166.5,15.15,-22.3_166.4,-22.2_166.5,11,11,False,22_16,22_16,-20.0,160.0,False
+8375,"Jincheng, Taiwan",24226,move,,,,24.4,118.3,24.5,118.2,15.04,24.4_118.3,24.5_118.2,8,8,False,13_11,13_11,25.0,110.0,False
+8322,"Freeport, Bahamas",28082,move,,,,26.5,-78.7,26.6,-78.6,14.92,26.5_-78.7,26.6_-78.6,-5,-5,False,12_28,12_28,30.0,280.0,False
+8282,"Sinop, Turkey",30386,move,,,,42.0,35.2,41.9,35.1,13.86,42.0_35.2,41.9_35.1,2,2,False,9_3,9_3,45.0,30.0,False
+8452,"Tórshavn, Faroe Islands",20123,move,,,,62.0,-6.8,62.1,-6.9,12.28,62.0_-6.8,62.1_-6.9,0,0,False,5_35,5_35,65.0,350.0,False
+1230,"Aden, Yemen",529760,drop_dup_existing,"Ash Shaykh ‘Uthmān, Yemen","Ash Shaykh ‘Uthmān, Yemen",662298,12.8,45.0,12.9,45.0,11.12,12.8_45.0,12.9_45.0,3,3,False,15_4,15_4,15.0,40.0,False
+1868,"Agadir, Morocco",400576,drop_dup_existing,"Aourir, Agadir, Morocco","Agadir, Morocco",400576,30.4,-9.6,30.5,-9.6,11.12,30.4_-9.6,30.5_-9.6,-1,-1,False,11_35,11_35,35.0,350.0,False
+6718,"Al Wakrah, Qatar",140786,drop_dup_existing,"Doha, Baladiyat ad Dawhah, Qatar","Al Wakrah, Qatar",140786,25.2,51.6,25.3,51.6,11.12,25.2_51.6,25.3_51.6,3,3,False,12_5,12_5,30.0,50.0,False
+7511,"Ankaloaka, Toliara, Madagascar",92891,move,,,,-23.4,43.7,-23.3,43.7,11.12,-23.4_43.7,-23.3_43.7,3,3,False,22_4,22_4,-20.0,40.0,False
+7665,"Annapolis, United States",76194,move,,,,39.0,-76.5,39.1,-76.5,11.12,39.0_-76.5,39.1_-76.5,-5,-5,False,10_28,10_28,40.0,280.0,False
+861,"Antalya, Turkey",665701,drop_dup_existing,"Varsak, Antalya, Turkey","Antalya, Turkey",665701,36.9,30.7,37.0,30.7,11.12,36.9_30.7,37.0_30.7,2,2,False,10_3,10_3,40.0,30.0,False
+7785,"Apia, Samoa",66234,move,,,,-13.8,-171.8,-13.9,-171.8,11.12,-13.8_-171.8,-13.9_-171.8,-11,-11,False,20_18,20_18,-10.0,180.0,False
+835,"Apowa, Sekondi-Takoradi, Ghana",679142,drop_dup_existing,"Effia Kwesimintsim Municipal District, Sekondi-Takoradi, Ghana","Apowa, Sekondi-Takoradi, Ghana",679142,4.9,-1.8,5.0,-1.8,11.12,4.9_-1.8,5.0_-1.8,0,0,False,17_35,17_35,5.0,350.0,False
+8440,"Arecibo, Puerto Rico",20526,move,,,,18.5,-66.7,18.4,-66.7,11.12,18.5_-66.7,18.4_-66.7,-4,-4,False,14_29,14_29,20.0,290.0,False
+7430,"Arica, Chile",100918,move,,,,-18.5,-70.3,-18.4,-70.3,11.12,-18.5_-70.3,-18.4_-70.3,-5,-5,False,21_28,21_28,-15.0,280.0,False
+7571,"Askān al Mīnā’, Aqaba, Jordan",86172,drop_dup_existing,"Aqaba Sub-District, Eilat, Southern District, Israel","Askān al Mīnā’, Aqaba, Jordan",86172,29.5,35.0,29.6,35.0,11.12,29.5_35.0,29.6_35.0,2,2,False,12_3,12_3,30.0,30.0,False
+3690,"Bairro Alto Gingone, Pemba, Mozambique",234711,drop_dup_existing,"Muitua, Pemba, Mozambique","Bairro Alto Gingone, Pemba, Mozambique",234711,-13.0,40.5,-13.1,40.5,11.12,-13.0_40.5,-13.1_40.5,3,3,False,20_4,20_4,-10.0,40.0,False
+2833,"Bandar Abbas, Iran",298654,drop_dup_existing,"Shahrak-e Nāmjū, Iran","Bandar Abbas, Iran",298654,27.2,56.3,27.3,56.3,11.12,27.2_56.3,27.3_56.3,4,4,False,12_5,12_5,30.0,50.0,False
+222,"Barcelona, Spain",1378712,drop_dup_existing,"Nou Barris, Spain","Barcelona, Spain",1378712,41.4,2.2,41.5,2.2,11.12,41.4_2.2,41.5_2.2,0,0,False,9_0,9_0,45.0,0.0,False
+8579,"Barceloneta, Puerto Rico",10711,move,,,,18.5,-66.5,18.4,-66.5,11.12,18.5_-66.5,18.4_-66.5,-4,-4,False,14_29,14_29,20.0,290.0,False
+8312,"Basse-Terre, Guadeloupe",28610,move,,,,16.0,-61.7,16.1,-61.7,11.12,16.0_-61.7,16.1_-61.7,-4,-4,False,14_29,14_29,20.0,290.0,False
+998,"Basın Sitesi Mahallesi, İzmir, Turkey",609748,drop_dup_existing,"Çiğli, Turkey","Basın Sitesi Mahallesi, İzmir, Turkey",609748,38.4,27.1,38.5,27.1,11.12,38.4_27.1,38.5_27.1,2,2,False,10_2,10_2,40.0,20.0,False
+690,"Beirut, Lebanon",765609,drop_dup_existing,"Baabda, Beirut, Lebanon","Beirut, Lebanon",765609,33.9,35.5,33.8,35.5,11.12,33.9_35.5,33.8_35.5,2,2,False,11_3,11_3,35.0,30.0,False
+7904,"Boumerdas, Algeria",55869,move,,,,36.8,3.5,36.7,3.5,11.12,36.8_3.5,36.7_3.5,0,0,False,10_0,10_0,40.0,0.0,False
+7585,"Burgas, Bulgaria",84443,move,,,,42.5,27.5,42.6,27.5,11.12,42.5_27.5,42.6_27.5,2,2,False,9_2,9_2,45.0,20.0,False
+7455,"Bushehr, Iran",97541,move,,,,29.0,50.8,28.9,50.8,11.12,29.0_50.8,28.9_50.8,3,3,False,12_5,12_5,30.0,50.0,False
+7243,"Cagliari, Italy",126102,move,,,,39.2,9.1,39.3,9.1,11.12,39.2_9.1,39.3_9.1,1,1,False,10_0,10_0,40.0,0.0,False
+7365,"Caleta San Pedro, La Serena, Chile",109157,move,,,,-29.9,-71.3,-29.8,-71.3,11.12,-29.9_-71.3,-29.8_-71.3,-5,-5,False,23_28,23_28,-25.0,280.0,False
+3900,"Caleta, La Romana, Dominican Republic",222336,drop_dup_existing,"Villa Hermosa, La Romana, Dominican Republic","Caleta, La Romana, Dominican Republic",222336,18.4,-69.0,18.5,-69.0,11.12,18.4_-69.0,18.5_-69.0,-5,-5,False,14_29,14_29,20.0,290.0,False
+760,"Callao, Peru",728765,drop_dup_existing,"Callao, Lima, Peru","Callao, Lima, Peru",1630820,-12.1,-77.1,-12.0,-77.1,11.12,-12.1_-77.1,-12.0_-77.1,-5,-5,False,20_28,20_28,-10.0,280.0,False
+6561,"Cape Coast, Ghana",143483,drop_dup_existing,"Egyirfa, Cape Coast, Central, Ghana","Cape Coast, Ghana",143483,5.1,-1.2,5.2,-1.2,11.12,5.1_-1.2,5.2_-1.2,0,0,False,16_35,16_35,10.0,350.0,False
+8405,"Cataño, San Juan, Puerto Rico",22520,drop_dup_existing,"Puerto Nuevo, San Juan, Puerto Rico","Puerto Nuevo, San Juan, Puerto Rico",243043,18.5,-66.1,18.4,-66.1,11.12,18.5_-66.1,18.4_-66.1,-4,-4,False,14_29,14_29,20.0,290.0,False
+227,"Cebu City, Philippines",1365958,drop_dup_existing,"Consolacion, Cebu City, Philippines","Cebu City, Philippines",1365958,10.3,123.9,10.4,123.9,11.12,10.3_123.9,10.4_123.9,8,8,False,15_12,15_12,15.0,120.0,False
+7792,"Cienfuegos, Cuba",65385,move,,,,22.1,-80.4,22.2,-80.4,11.12,22.1_-80.4,22.2_-80.4,-5,-5,False,13_27,13_27,25.0,270.0,False
+8490,"Colonia del Sacramento, Uruguay",17366,move,,,,-34.5,-57.8,-34.4,-57.8,11.12,-34.5_-57.8,-34.4_-57.8,-4,-4,False,24_30,24_30,-30.0,300.0,False
+3698,"Constanţa, Romania",234261,drop_dup_existing,"Năvodari, Romania","Constanţa, Romania",234261,44.2,28.6,44.3,28.6,11.12,44.2_28.6,44.3_28.6,2,2,False,9_2,9_2,45.0,20.0,False
+7156,"Cueto, Santander, Spain",133299,drop_dup_existing,"San Salvador, Santander, Spain","Cueto, Santander, Spain",133299,43.5,-3.8,43.4,-3.8,11.12,43.5_-3.8,43.4_-3.8,0,0,False,9_35,9_35,45.0,350.0,False
+8569,"Dubrovnik, Croatia",11891,move,,,,42.6,18.1,42.7,18.1,11.12,42.6_18.1,42.7_18.1,1,1,False,9_1,9_1,45.0,10.0,False
+5781,"El Dique, Cumaná, Venezuela",159704,drop_dup_existing,"Araya, Venezuela","El Dique, Cumaná, Venezuela",159704,10.5,-64.2,10.6,-64.2,11.12,10.5_-64.2,10.6_-64.2,-4,-4,False,15_29,15_29,15.0,290.0,False
+6699,"Esmeraldas, Ecuador (N)",141112,drop_dup_existing,"Esmeraldas, Ecuador","Esmeraldas, Ecuador",141112,1.0,-79.7,0.9,-79.7,11.12,1.0_-79.7,0.9_-79.7,-5,-5,False,17_28,17_28,5.0,280.0,False
+7611,"Fort-de-France, Martinique",81873,move,,,,14.6,-61.1,14.7,-61.1,11.12,14.6_-61.1,14.7_-61.1,-4,-4,False,15_29,15_29,15.0,290.0,False
+1671,"Fortaleza, Brazil",428742,drop_dup_existing,"Cidade dos Funcionários, Fortaleza, Brazil","Cidade dos Funcionários, Fortaleza, Brazil",760153,-3.7,-38.5,-3.8,-38.5,11.12,-3.7_-38.5,-3.8_-38.5,-3,-3,False,18_32,18_32,0.0,320.0,False
+3749,"Genoa, Italy",231135,drop_dup_existing,"Serra Riccò, Genoa, Italy","Genoa, Italy",231135,44.4,8.9,44.5,8.9,11.12,44.4_8.9,44.5_8.9,1,1,False,9_0,9_0,45.0,0.0,False
+7739,"Gibraltar, Gibraltar",70149,move,,,,36.1,-5.4,36.2,-5.4,11.12,36.1_-5.4,36.2_-5.4,0,0,False,10_35,10_35,40.0,350.0,False
+8453,"Gisborne, New Zealand",20113,move,,,,-38.7,178.0,-38.6,178.0,11.12,-38.7_178.0,-38.6_178.0,12,12,False,25_17,25_17,-35.0,170.0,False
+8583,"Gros Islet, Saint Lucia",10529,drop_dup_existing,"Castries, Saint Lucia","Castries, Saint Lucia",67663,14.1,-61.0,14.0,-61.0,11.12,14.1_-61.0,14.0_-61.0,-4,-4,False,15_29,15_29,15.0,290.0,False
+6363,"Haarlem, The Netherlands",147357,drop_dup_existing,"Velsen-Zuid, The Netherlands","Haarlem, The Netherlands",147357,52.4,4.6,52.5,4.6,11.12,52.4_4.6,52.5_4.6,0,0,False,7_0,7_0,55.0,0.0,False
+7879,"Harper, Liberia",57865,move,,,,4.4,-7.7,4.5,-7.7,11.12,4.4_-7.7,4.5_-7.7,-1,-1,False,17_35,17_35,5.0,350.0,False
+5196,"Hayy ash Shati, Şalālah, Oman",173662,drop_dup_existing,"Şalālah, Oman","Şalālah, Oman",173662,17.0,54.1,17.1,54.1,11.12,17.0_54.1,17.1_54.1,4,4,False,14_5,14_5,20.0,50.0,False
+6498,"Honolulu, United States",144675,drop_dup_existing,"Kalihi Valley, United States","Honolulu, United States",144675,21.3,-157.9,21.4,-157.9,11.12,21.3_-157.9,21.4_-157.9,-11,-11,False,13_20,13_20,25.0,200.0,False
+6060,"Huacho, Peru",153333,drop_dup_existing,"Huaura, Peru","Huacho, Peru",153333,-11.1,-77.6,-11.0,-77.6,11.12,-11.1_-77.6,-11.0_-77.6,-5,-5,False,20_28,20_28,-10.0,280.0,False
+7318,"Jacmel, Haiti",114934,move,,,,18.2,-72.5,18.3,-72.5,11.12,18.2_-72.5,18.3_-72.5,-5,-5,False,14_28,14_28,20.0,280.0,False
+6624,"Kampung Klebang Besar, Malacca, Malaysia",142413,drop_dup_existing,"Kampung Kerubong, Malaysia","Kampung Klebang Besar, Malacca, Malaysia",142413,2.2,102.2,2.3,102.2,11.12,2.2_102.2,2.3_102.2,7,7,False,17_10,17_10,5.0,100.0,False
+8481,"Kep, Cambodia",18319,move,,,,10.5,104.3,10.6,104.3,11.12,10.5_104.3,10.6_104.3,7,7,False,15_10,15_10,15.0,100.0,False
+1261,"Kingston, Jamaica",519517,drop_dup_existing,"Constant Spring, Kingston, Jamaica","Kingston, Jamaica",519517,18.0,-76.8,18.1,-76.8,11.12,18.0_-76.8,18.1_-76.8,-5,-5,False,14_28,14_28,20.0,280.0,False
+7909,"Klaipėda, Lithuania",55496,move,,,,55.7,21.1,55.8,21.1,11.12,55.7_21.1,55.8_21.1,1,1,False,6_2,6_2,60.0,20.0,False
+7480,"Kochi, Japan",95650,move,,,,33.5,133.5,33.6,133.5,11.12,33.5_133.5,33.6_133.5,9,9,False,11_13,11_13,35.0,130.0,False
+8170,"Kristiansand, Norway",37636,move,,,,58.1,8.0,58.2,8.0,11.12,58.1_8.0,58.2_8.0,1,1,False,6_0,6_0,60.0,0.0,False
+3218,"Kuwait City, Kuwait",266839,drop_dup_existing,"Ḩawallī, Kuwait","Ḩawallī, Kuwait",1301560,29.4,48.0,29.3,48.0,11.12,29.4_48.0,29.3_48.0,3,3,False,12_4,12_4,30.0,40.0,False
+8484,"La Unión, El Salvador",17813,move,,,,13.3,-87.8,13.4,-87.8,11.12,13.3_-87.8,13.4_-87.8,-6,-6,False,15_27,15_27,15.0,270.0,False
+8355,"Laventille, Trinidad and Tobago",25712,drop_dup_existing,"Port of Spain, Trinidad and Tobago","Port of Spain, Trinidad and Tobago",187386,10.6,-61.5,10.7,-61.5,11.12,10.6_-61.5,10.7_-61.5,-4,-4,False,15_29,15_29,15.0,290.0,False
+8439,"Les Cayes, Haiti",20601,move,,,,18.2,-73.7,18.3,-73.7,11.12,18.2_-73.7,18.3_-73.7,-5,-5,False,14_28,14_28,20.0,280.0,False
+7952,"Liepāja, Latvia",52360,move,,,,56.5,21.0,56.6,21.0,11.12,56.5_21.0,56.6_21.0,1,1,False,6_2,6_2,60.0,20.0,False
+3535,"Lomé, Togo",244590,drop_dup_existing,"Cacaveli, Lomé, Maritime, Togo","Cacaveli, Lomé, Maritime, Togo",978219,6.1,1.2,6.2,1.2,11.12,6.1_1.2,6.2_1.2,0,0,False,16_0,16_0,10.0,0.0,False
+7367,"Madang, Papua New Guinea",108692,move,,,,-5.2,145.8,-5.1,145.8,11.12,-5.2_145.8,-5.1_145.8,10,10,False,19_14,19_14,-5.0,140.0,False
+7291,"Malabo II, Malabo, Equatorial Guinea",119100,drop_dup_existing,"Basilé, Malabo, Equatorial Guinea","Basilé, Malabo, Equatorial Guinea",521495,3.8,8.8,3.7,8.8,11.12,3.8_8.8,3.7_8.8,1,1,False,17_0,17_0,5.0,0.0,False
+7638,"Maldonado, Uruguay",78808,move,,,,-34.9,-55.0,-34.8,-55.0,11.12,-34.9_-55.0,-34.8_-55.0,-4,-4,False,24_30,24_30,-30.0,300.0,False
+6924,"Mansinam, Manokwari, Indonesia",137056,drop_dup_existing,"Sowi, Manokwari, Indonesia","Mansinam, Manokwari, Indonesia",137056,-0.9,134.1,-0.9,134.0,11.12,-0.9_134.1,-0.9_134.0,9,9,False,18_13,18_13,0.0,130.0,False
+8551,"Mariehamn, Aland Islands",13168,move,,,,60.1,19.9,60.2,19.9,11.12,60.1_19.9,60.2_19.9,1,1,False,5_1,5_1,65.0,10.0,False
+4640,"Merrion, Dublin, Ireland",191404,drop_dup_existing,"Donaghmede, Ireland","Donaghmede, Ireland",197547,53.3,-6.2,53.4,-6.2,11.12,53.3_-6.2,53.4_-6.2,0,0,False,7_35,7_35,55.0,350.0,False
+1880,"Mersin, Turkey",399138,drop_dup_existing,"Camili, İğdir, Mersin, Turkey","Mersin, Turkey",399138,36.8,34.6,36.9,34.6,11.12,36.8_34.6,36.9_34.6,2,2,False,10_3,10_3,40.0,30.0,False
+122,"Mogadishu, Somalia",1762982,drop_dup_existing,"Afgooye District, Mogadishu, Banaadir, Somalia","Mogadishu, Somalia",1762982,2.0,45.3,2.1,45.3,11.12,2.0_45.3,2.1_45.3,3,3,False,17_4,17_4,5.0,40.0,False
+8525,"Molde, Norway",14775,move,,,,62.7,7.2,62.8,7.2,11.12,62.7_7.2,62.8_7.2,0,0,False,5_0,5_0,65.0,0.0,False
+7896,"Monaco, Monaco",56790,move,,,,43.7,7.4,43.8,7.4,11.12,43.7_7.4,43.8_7.4,0,0,False,9_0,9_0,45.0,0.0,False
+7443,"Monastir, Tunisia",99144,move,,,,35.8,10.8,35.7,10.8,11.12,35.8_10.8,35.7_10.8,1,1,False,10_1,10_1,40.0,10.0,False
+2223,"Monrovia, Liberia",355849,drop_dup_existing,"King Faro, Monrovia, Montserrado County, Liberia","Monrovia, Liberia",355849,6.3,-10.8,6.4,-10.8,11.12,6.3_-10.8,6.4_-10.8,-1,-1,False,16_34,16_34,10.0,340.0,False
+4306,"Mueang Songkhla District, Songkhla, Thailand",202767,drop_dup_existing,"Ban Klang, Songkhla, Thailand","Mueang Songkhla District, Songkhla, Thailand",202767,7.2,100.6,7.1,100.6,11.12,7.2_100.6,7.1_100.6,7,7,False,16_10,16_10,10.0,100.0,False
+7366,"Mukalla, Yemen",108835,move,,,,14.5,49.1,14.6,49.1,11.12,14.5_49.1,14.6_49.1,3,3,False,15_4,15_4,15.0,40.0,False
+3153,"Mvita, Mombasa, Kenya",272522,drop_dup_existing,"Kiembeni, Mombasa, Kenya","Kiembeni, Mombasa, Kenya",769006,-4.1,39.7,-4.0,39.7,11.12,-4.1_39.7,-4.0_39.7,3,3,False,18_3,18_3,0.0,30.0,False
+3012,"Mwambani village, Tanga, Tanzania",284584,drop_dup_existing,"Mpirani, Tanga, Tanzania","Mwambani village, Tanga, Tanzania",284584,-5.1,39.1,-5.0,39.1,11.12,-5.1_39.1,-5.0_39.1,3,3,False,19_3,19_3,-5.0,30.0,False
+6170,"Newhaven, Edinburgh, United Kingdom",151115,drop_dup_existing,"Kirkcaldy, United Kingdom","Newhaven, Edinburgh, United Kingdom",151115,56.0,-3.2,56.1,-3.2,11.12,56.0_-3.2,56.1_-3.2,0,0,False,6_35,6_35,60.0,350.0,False
+8713,"Ngerulmud, Palau",1347,move,,,,7.5,134.6,7.6,134.6,11.12,7.5_134.6,7.6_134.6,9,9,False,16_13,16_13,10.0,130.0,False
+483,"Nouakchott, Mauritania",933116,drop_dup_existing,"Tevragh Zeina, Mauritania","Nouakchott, Mauritania",933116,18.1,-16.0,18.2,-16.0,11.12,18.1_-16.0,18.2_-16.0,-1,-1,False,14_34,14_34,20.0,340.0,False
+3443,"Obisivo, Marka, Somalia",249670,drop_dup_existing,"Ceel Waregow, Marka, Somalia","Obisivo, Marka, Somalia",249670,1.7,44.8,1.8,44.8,11.12,1.7_44.8,1.8_44.8,3,3,False,17_4,17_4,5.0,40.0,False
+1667,"Odesa, Ukraine",429581,drop_dup_existing,"Luzanivka, Ukraine","Odesa, Ukraine",429581,46.5,30.7,46.6,30.7,11.12,46.5_30.7,46.6_30.7,2,2,False,8_3,8_3,50.0,30.0,False
+978,"Panama City, Panama",619381,drop_dup_existing,"San Miguelito, Panama","Panama City, Panama",619381,9.0,-79.5,9.1,-79.5,11.12,9.0_-79.5,9.1_-79.5,-5,-5,False,16_28,16_28,10.0,280.0,False
+3719,"Panjim, India",232818,move,,,,15.5,73.8,15.6,73.8,11.12,15.5_73.8,15.6_73.8,5,5,False,14_7,14_7,20.0,70.0,False
+1602,"Parroquia Cristo de Aranza, Maracaibo, Venezuela",437886,drop_dup_existing,"Parroquia Coquivacoa, Maracaibo, Venezuela","Parroquia Coquivacoa, Maracaibo, Venezuela",621963,10.6,-71.6,10.7,-71.6,11.12,10.6_-71.6,10.7_-71.6,-5,-5,False,15_28,15_28,15.0,280.0,False
+7774,"Pattani, Thailand",67254,move,,,,6.9,101.3,6.8,101.3,11.12,6.9_101.3,6.8_101.3,7,7,False,16_10,16_10,10.0,100.0,False
+564,"Pina, Recife, Brazil",860810,drop_dup_existing,"Caixa d'Água, Recife, Brazil","Caixa d'Água, Recife, Brazil",1198419,-8.1,-34.9,-8.0,-34.9,11.12,-8.1_-34.9,-8.0_-34.9,-2,-2,False,19_32,19_32,-5.0,320.0,False
+8734,"Plymouth, Montserrat",348,move,,,,16.7,-62.2,16.8,-62.2,11.12,16.7_-62.2,16.8_-62.2,-4,-4,False,14_29,14_29,20.0,290.0,False
+8488,"Ponta Delgada, Portugal",17435,move,,,,37.7,-25.7,37.8,-25.7,11.12,37.7_-25.7,37.8_-25.7,-2,-2,False,10_33,10_33,40.0,330.0,False
+944,"Port Fuad, Port Said, Egypt",633628,drop_dup_existing,"Port Fuad, Port Said, Egypt (S)","Port Fuad, Port Said, Egypt",633628,31.3,32.3,31.2,32.3,11.12,31.3_32.3,31.2_32.3,2,2,False,11_3,11_3,35.0,30.0,False
+2926,"Port Moresby District, Port Moresby, Papua New Guinea",291220,drop_dup_existing,"8 Mile, Port Moresby, Papua New Guinea","Port Moresby District, Port Moresby, Papua New Guinea",291220,-9.5,147.2,-9.4,147.2,11.12,-9.5_147.2,-9.4_147.2,10,10,False,19_14,19_14,-5.0,140.0,False
+8247,"Prachuap Khiri Khan, Thailand",32890,move,,,,11.8,99.8,11.9,99.8,11.12,11.8_99.8,11.9_99.8,7,7,False,15_9,15_9,15.0,90.0,False
+8534,"Praia, Cabo Verde",14192,move,,,,14.9,-23.5,15.0,-23.5,11.12,14.9_-23.5,15.0_-23.5,-2,-2,False,15_33,15_33,15.0,330.0,False
+7403,"Puerto Montt, Chile",103858,move,,,,-41.5,-72.9,-41.4,-72.9,11.12,-41.5_-72.9,-41.4_-72.9,-5,-5,False,26_28,26_28,-40.0,280.0,False
+7731,"Punta Arenas, Chile",70377,move,,,,-53.2,-70.9,-53.1,-70.9,11.12,-53.2_-70.9,-53.1_-70.9,-5,-5,False,28_28,28_28,-50.0,280.0,False
+7823,"Rijeka, Croatia",62382,move,,,,45.3,14.4,45.4,14.4,11.12,45.3_14.4,45.4_14.4,1,1,False,8_1,8_1,50.0,10.0,False
+8285,"Roseau, Dominica",30332,move,,,,15.3,-61.4,15.4,-61.4,11.12,15.3_-61.4,15.4_-61.4,-4,-4,False,14_29,14_29,20.0,290.0,False
+4052,"Saint-Louis, Senegal",215420,drop_dup_existing,"Ndiago, Saint-Louis, Mauritania","Saint-Louis, Senegal",215420,16.0,-16.5,16.1,-16.5,11.12,16.0_-16.5,16.1_-16.5,-1,-1,False,14_34,14_34,20.0,340.0,False
+8353,"San Pawl il-Baħar, Malta",25769,drop_dup_existing,"Mosta, Malta","Mosta, Malta",124507,36.0,14.4,35.9,14.4,11.12,36.0_14.4,35.9_14.4,1,1,False,10_1,10_1,40.0,10.0,False
+7921,"San-Pédro, Ivory Coast",54897,move,,,,4.7,-6.6,4.8,-6.6,11.12,4.7_-6.6,4.8_-6.6,0,0,False,17_35,17_35,5.0,350.0,False
+7406,"Setúbal, Portugal",103532,move,,,,38.5,-8.9,38.6,-8.9,11.12,38.5_-8.9,38.6_-8.9,-1,-1,False,10_35,10_35,40.0,350.0,False
+97,"Shatby, Alexandria, Egypt",1932650,move,,,,31.2,29.9,31.1,29.9,11.12,31.2_29.9,31.1_29.9,2,2,False,11_2,11_2,35.0,20.0,False
+5865,"Sidon, Lebanon",157623,drop_dup_existing,"Maqsabeh, Sidon, South Governorate, Lebanon","Sidon, Lebanon",157623,33.6,35.4,33.7,35.4,11.12,33.6_35.4,33.7_35.4,2,2,False,11_3,11_3,35.0,30.0,False
+438,"Singapore, Singapore",975825,drop_dup_existing,"Punggol Field West, Pasir Gudang, Johor, Malaysia","Punggol Field West, Pasir Gudang, Johor, Malaysia",1594889,1.3,103.9,1.4,103.9,11.12,1.3_103.9,1.4_103.9,7,7,False,17_10,17_10,5.0,100.0,False
+7777,"Sittwe, Myanmar",66998,move,,,,20.1,92.9,20.2,92.9,11.12,20.1_92.9,20.2_92.9,6,6,False,13_9,13_9,25.0,90.0,False
+8018,"Split, Croatia",48500,move,,,,43.5,16.4,43.6,16.4,11.12,43.5_16.4,43.6_16.4,1,1,False,9_1,9_1,45.0,10.0,False
+7499,"Stavanger, Norway",93779,move,,,,59.0,5.7,58.9,5.7,11.12,59.0_5.7,58.9_5.7,0,0,False,6_0,6_0,60.0,0.0,False
+8403,"Suai, Timor Leste",22777,move,,,,-9.3,125.3,-9.2,125.3,11.12,-9.3_125.3,-9.2_125.3,8,8,False,19_12,19_12,-5.0,120.0,False
+6933,"Thessaloníki, Greece",136901,drop_dup_existing,"Oraiokastro Community, Thessaloníki, Central Macedonia, Greece","Oraiokastro Community, Thessaloníki, Central Macedonia, Greece",285735,40.6,22.9,40.7,22.9,11.12,40.6_22.9,40.7_22.9,2,2,False,9_2,9_2,45.0,20.0,False
+7323,"Toamasina, Madagascar",114506,drop_dup_existing,"Antetezambaro, Toamasina, Atsinanana, Madagascar","Antetezambaro, Toamasina, Atsinanana, Madagascar",251176,-18.1,49.4,-18.0,49.4,11.12,-18.1_49.4,-18.0_49.4,3,3,False,21_4,21_4,-15.0,40.0,False
+7358,"Tokushima, Japan",110755,move,,,,34.1,134.6,34.2,134.6,11.12,34.1_134.6,34.2_134.6,9,9,False,11_13,11_13,35.0,130.0,False
+8574,"Umm Al Quwain City, United Arab Emirates",11118,move,,,,25.6,55.6,25.5,55.6,11.12,25.6_55.6,25.5_55.6,4,4,False,12_5,12_5,30.0,50.0,False
+7932,"Venice, Italy",53972,move,,,,45.4,12.3,45.5,12.3,11.12,45.4_12.3,45.5_12.3,1,1,False,8_1,8_1,50.0,10.0,False
+7564,"Victoria, Canada",86742,move,,,,48.4,-123.4,48.5,-123.4,11.12,48.4_-123.4,48.5_-123.4,-8,-8,False,8_23,8_23,50.0,230.0,False
+6126,"Wellington, New Zealand",151991,drop_dup_existing,"Johnsonville, Lower Hutt, New Zealand","Wellington, New Zealand",151991,-41.3,174.8,-41.2,174.8,11.12,-41.3_174.8,-41.2_174.8,12,12,False,26_17,26_17,-40.0,170.0,False
+4231,"Wenang Selatan, Manado, Indonesia",205155,drop_dup_existing,"Kairagi II, Manado, Indonesia","Kairagi II, Manado, Indonesia",256395,1.5,124.8,1.5,124.9,11.12,1.5_124.8,1.5_124.9,8,8,False,17_12,17_12,5.0,120.0,False
+7948,"Zadar, Croatia",52757,move,,,,44.1,15.2,44.2,15.2,11.12,44.1_15.2,44.2_15.2,1,1,False,9_1,9_1,45.0,10.0,False
+602,"Zaragocilla, Cartagena, Colombia",827946,drop_dup_existing,"Villa Gloria, Cartagena, Colombia","Zaragocilla, Cartagena, Colombia",827946,10.4,-75.5,10.5,-75.5,11.12,10.4_-75.5,10.5_-75.5,-5,-5,False,15_28,15_28,15.0,280.0,False
+2786,"Zerão, Macapá, Brazil",302309,move,,,,0.0,-51.1,0.0,-51.2,11.12,0.0_-51.1,0.0_-51.2,-3,-3,False,18_30,18_30,0.0,300.0,False
+453,"Zhenbei Village, Kaohsiung, Taiwan",960035,drop_dup_existing,"Yongqing Village, Kaohsiung, Taiwan","Zhenbei Village, Kaohsiung, Taiwan",960035,22.6,120.3,22.7,120.3,11.12,22.6_120.3,22.7_120.3,8,8,False,13_12,13_12,25.0,120.0,False
+8334,"Šibenik, Croatia",27411,move,,,,43.7,15.9,43.8,15.9,11.12,43.7_15.9,43.8_15.9,1,1,False,9_1,9_1,45.0,10.0,False
+7288,"Ţarţūs, Syria",119363,move,,,,34.9,35.9,35.0,35.9,11.12,34.9_35.9,35.0_35.9,2,2,False,11_3,11_3,35.0,30.0,False
+7657,"Angkasapura, Jayapura, Indonesia",77168,move,,,,-2.5,140.7,-2.5,140.6,11.11,-2.5_140.7,-2.5_140.6,9,9,False,18_14,18_14,0.0,140.0,False
+2877,"Jardim Renascença I, São Luís, Brazil",295046,drop_dup_existing,"Paço do Lumiar, São Luís, Brazil","Paço do Lumiar, São Luís, Brazil",434376,-2.5,-44.3,-2.5,-44.2,11.11,-2.5_-44.3,-2.5_-44.2,-3,-3,False,18_31,18_31,0.0,310.0,False
+8346,"Kokopo, Papua New Guinea",26401,move,,,,-4.3,152.3,-4.3,152.2,11.09,-4.3_152.3,-4.3_152.2,10,10,False,18_15,18_15,0.0,150.0,False
+8298,"Kuala Belait, Brunei",29567,move,,,,4.6,114.2,4.6,114.3,11.08,4.6_114.2,4.6_114.3,8,8,False,17_11,17_11,5.0,110.0,False
+1921,"Makassar, Indonesia",393086,drop_dup_existing,"Lantebung, Makassar, Indonesia","Lantebung, Makassar, Indonesia",581780,-5.1,119.4,-5.1,119.5,11.08,-5.1_119.4,-5.1_119.5,8,8,False,19_11,19_11,-5.0,110.0,False
+7760,"Galle, Sri Lanka",68576,move,,,,6.0,80.2,6.0,80.3,11.06,6.0_80.2,6.0_80.3,5,5,False,16_8,16_8,10.0,80.0,False
+1587,"Natal, Brazil",440993,drop_dup_existing,"São Gonçalo do Amarante, Natal, Brazil","Natal, Brazil",440993,-5.8,-35.2,-5.8,-35.3,11.06,-5.8_-35.2,-5.8_-35.3,-2,-2,False,19_32,19_32,-5.0,320.0,False
+8333,"Paramaribo, Suriname",27434,move,,,,5.9,-55.2,5.9,-55.3,11.06,5.9_-55.2,5.9_-55.3,-4,-4,False,16_30,16_30,10.0,300.0,False
+8409,"Colombo, Sri Lanka",22386,drop_dup_existing,"Ethulkotte West, Colombo, Sri Lanka","Ethulkotte West, Colombo, Sri Lanka",1108204,6.9,79.8,6.9,79.9,11.04,6.9_79.8,6.9_79.9,5,5,False,16_7,16_7,10.0,70.0,False
+288,"Seaview, Dar es Salaam, Tanzania",1229306,drop_dup_existing,"Magomeni, Dar es Salaam, Tanzania","Magomeni, Dar es Salaam, Tanzania",2472583,-6.8,39.3,-6.8,39.2,11.04,-6.8_39.3,-6.8_39.2,3,3,False,19_3,19_3,-5.0,30.0,False
+652,"Praia do Bispo, Luanda, Angola",790462,drop_dup_existing,"Mabor, Kikolo, Luanda, Angola","Mabor, Kikolo, Luanda, Angola",3120773,-8.8,13.2,-8.8,13.3,10.99,-8.8_13.2,-8.8_13.3,1,1,False,19_1,19_1,-5.0,10.0,False
+7758,"Colón, Panama",68634,move,,,,9.4,-79.9,9.4,-79.8,10.97,9.4_-79.9,9.4_-79.8,-5,-5,False,16_28,16_28,10.0,280.0,False
+8122,"Honiara, Solomon Islands",40753,move,,,,-9.4,159.9,-9.4,159.8,10.97,-9.4_159.9,-9.4_159.8,11,11,False,19_15,19_15,-5.0,150.0,False
+8139,"Limón, Costa Rica",39655,move,,,,10.0,-83.0,10.0,-83.1,10.95,10.0_-83.0,10.0_-83.1,-6,-6,False,16_27,16_27,10.0,270.0,False
+7916,"San Fernando, Trinidad and Tobago",55175,move,,,,10.3,-61.5,10.3,-61.4,10.94,10.3_-61.5,10.3_-61.4,-4,-4,False,15_29,15_29,15.0,290.0,False
+7482,"Sihanoukville, Cambodia",95367,move,,,,10.6,103.5,10.6,103.6,10.93,10.6_103.5,10.6_103.6,7,7,False,15_10,15_10,15.0,100.0,False
+1607,"Localidad 1 Cultural Tayrona - San Pedro Alejandrino, Santa Marta, Colombia",436900,drop_dup_existing,"Santa Marta, Colombia","Santa Marta, Colombia",436900,11.2,-74.2,11.2,-74.1,10.91,11.2_-74.2,11.2_-74.1,-5,-5,False,15_28,15_28,15.0,280.0,False
+6376,"Sumbe, Angola",147203,drop_dup_existing,"Chingo, Sumbe, Angola","Chingo, Sumbe, Angola",156594,-11.2,13.8,-11.2,13.9,10.91,-11.2_13.8,-11.2_13.9,1,1,False,20_1,20_1,-10.0,10.0,False
+991,"Djibouti, Djibouti",612528,drop_dup_existing,"Chabelley, Djibouti","Djibouti, Djibouti",612528,11.6,43.1,11.6,43.0,10.89,11.6_43.1,11.6_43.0,3,3,False,15_4,15_4,15.0,40.0,False
+8629,"Saint George's, Grenada",6044,move,,,,12.1,-61.8,12.1,-61.7,10.87,12.1_-61.8,12.1_-61.7,-4,-4,False,15_29,15_29,15.0,290.0,False
+7294,"Antsiranana, Madagascar",118496,move,,,,-12.3,49.3,-12.3,49.4,10.86,-12.3_49.3,-12.3_49.4,3,3,False,20_4,20_4,-10.0,40.0,False
+8548,"Darwin, Australia",13537,move,,,,-12.5,130.8,-12.5,130.7,10.86,-12.5_130.8,-12.5_130.7,9,9,False,20_13,20_13,-10.0,130.0,False
+7763,"Oranjestad, Aruba",68405,move,,,,12.5,-70.0,12.5,-69.9,10.86,12.5_-70.0,12.5_-69.9,-5,-5,False,15_29,15_29,15.0,290.0,False
+208,"Chennai, India",1413664,drop_dup_existing,"Ward 95, Ambattur, Tamil Nadu, India","Ward 95, Ambattur, Tamil Nadu, India",2489805,13.1,80.3,13.1,80.2,10.83,13.1_80.3,13.1_80.2,5,5,False,15_8,15_8,15.0,80.0,False
+418,"Salvador, Brazil",998144,drop_dup_existing,"Vera Cruz, Brazil","Salvador, Brazil",998144,-13.0,-38.5,-13.0,-38.6,10.83,-13.0_-38.5,-13.0_-38.6,-3,-3,False,20_32,20_32,-10.0,320.0,False
+8262,"Banjul, Gambia",31550,move,,,,13.5,-16.6,13.5,-16.5,10.81,13.5_-16.6,13.5_-16.5,-1,-1,False,15_34,15_34,15.0,340.0,False
+8625,"Hagåtña, Guam",6393,drop_dup_existing,"Dededo Village, Guam","Dededo Village, Guam",72401,13.5,144.7,13.5,144.8,10.81,13.5_144.7,13.5_144.8,10,10,False,15_14,15_14,15.0,140.0,False
+1478,"Calamba, Philippines",465488,drop_dup_existing,"Sirang Lupa, Calamba, Philippines","Calamba, Philippines",465488,14.2,121.2,14.2,121.1,10.78,14.2_121.2,14.2_121.1,8,8,False,15_12,15_12,15.0,120.0,False
+8462,"Sambava, Madagascar",19557,move,,,,-14.3,50.2,-14.3,50.1,10.77,-14.3_50.2,-14.3_50.1,3,3,False,20_5,20_5,-10.0,50.0,False
+7225,"Massawa, Eritrea (E)",128177,drop_dup_existing,"Massawa, Eritrea","Massawa, Eritrea",252673,15.6,39.5,15.6,39.4,10.71,15.6_39.5,15.6_39.4,3,3,False,14_3,14_3,20.0,30.0,False
+7021,"Mahajanga, Madagascar",135375,drop_dup_existing,"Betatamo, Mahajanga, Boeny, Madagascar","Mahajanga, Madagascar",135375,-15.7,46.3,-15.7,46.4,10.7,-15.7_46.3,-15.7_46.4,3,3,False,21_4,21_4,-15.0,40.0,False
+983,"Da Nang, Vietnam",617220,drop_dup_existing,"Liên Chiểu, Thanh Khê, Vietnam","Da Nang, Vietnam",617220,16.1,108.2,16.1,108.1,10.68,16.1_108.2,16.1_108.1,7,7,False,14_10,14_10,20.0,100.0,False
+7475,"Mindelo, Cabo Verde",96604,move,,,,16.9,-25.0,16.9,-24.9,10.64,16.9_-25.0,16.9_-24.9,-2,-2,False,14_33,14_33,20.0,330.0,False
+8506,"Basseterre, Saint Kitts and Nevis",16252,move,,,,17.3,-62.7,17.3,-62.8,10.62,17.3_-62.7,17.3_-62.8,-4,-4,False,14_29,14_29,20.0,290.0,False
+7635,"Belize City, Belize",79128,move,,,,17.5,-88.2,17.5,-88.3,10.6,17.5_-88.2,17.5_-88.3,-6,-6,False,14_27,14_27,20.0,270.0,False
+8159,"Maintirano, Madagascar",38512,move,,,,-18.1,44.0,-18.1,44.1,10.57,-18.1_44.0,-18.1_44.1,3,3,False,21_4,21_4,-15.0,40.0,False
+7270,"Montego Bay, Jamaica",121515,move,,,,18.5,-77.9,18.5,-77.8,10.54,18.5_-77.9,18.5_-77.8,-5,-5,False,14_28,14_28,20.0,280.0,False
+8185,"George Town, Cayman Islands",36660,move,,,,19.3,-81.4,19.3,-81.3,10.49,19.3_-81.4,19.3_-81.3,-5,-5,False,14_27,14_27,20.0,270.0,False
+8503,"Nagua, Dominican Republic",16446,move,,,,19.4,-69.8,19.4,-69.9,10.49,19.4_-69.8,19.4_-69.9,-5,-5,False,14_29,14_29,20.0,290.0,False
+8471,"Iquique, Chile",19020,drop_dup_existing,"Alto Hospicio, Iquique, Chile","Alto Hospicio, Iquique, Chile",163048,-20.2,-70.2,-20.2,-70.1,10.44,-20.2_-70.2,-20.2_-70.1,-5,-5,False,22_28,22_28,-20.0,280.0,False
+7528,"Morondava, Madagascar",91131,move,,,,-20.3,44.3,-20.3,44.4,10.43,-20.3_44.3,-20.3_44.4,3,3,False,22_4,22_4,-20.0,40.0,False
+7834,"Daman, India",61246,drop_dup_existing,"Vapi, India","Vapi, India",500459,20.4,72.8,20.4,72.9,10.42,20.4_72.8,20.4_72.9,5,5,False,13_7,13_7,25.0,70.0,False
+7615,"Nouadhibou, Mauritania",81507,move,,,,20.9,-17.0,20.9,-17.1,10.39,20.9_-17.0,20.9_-17.1,-1,-1,False,13_34,13_34,25.0,340.0,False
+8274,"Sur, Oman",31018,move,,,,22.6,59.5,22.6,59.4,10.27,22.6_59.5,22.6_59.4,4,4,False,13_5,13_5,25.0,50.0,False
+8105,"Swakopmund, Namibia",42249,move,,,,-22.7,14.5,-22.7,14.6,10.26,-22.7_14.5,-22.7_14.6,1,1,False,22_1,22_1,-20.0,10.0,False
+459,"Rio de Janeiro, Brazil",953525,drop_dup_existing,"Estácio, Brazil","Estácio, Brazil",1305415,-22.9,-43.2,-22.9,-43.3,10.24,-22.9_-43.2,-22.9_-43.3,-3,-3,False,22_31,22_31,-20.0,310.0,False
+7714,"Nassau, Bahamas",71999,move,,,,25.1,-77.3,25.1,-77.4,10.07,25.1_-77.3,25.1_-77.4,-5,-5,False,12_28,12_28,30.0,280.0,False
+8198,"Dahan, Ras Al Khaimah, United Arab Emirates",35859,drop_dup_existing,"Seih Al Ghubb, Ras Al Khaimah, United Arab Emirates","Seih Al Ghubb, Ras Al Khaimah, United Arab Emirates",137591,25.8,55.9,25.8,56.0,10.01,25.8_55.9,25.8_56.0,4,4,False,12_5,12_5,30.0,50.0,False
+635,"Manama, Bahrain",804561,drop_dup_existing,"Jidd Ḩafş, Bahrain","Manama, Bahrain",804561,26.2,50.6,26.2,50.5,9.98,26.2_50.6,26.2_50.5,3,3,False,12_5,12_5,30.0,50.0,False
+7911,"Hurghada, Egypt",55417,move,,,,27.3,33.8,27.3,33.7,9.88,27.3_33.8,27.3_33.7,2,2,False,12_3,12_3,30.0,30.0,False
+7853,"Marsá Maţrūḩ, Egypt",59453,move,,,,31.4,27.2,31.4,27.1,9.49,31.4_27.2,31.4_27.1,2,2,False,11_2,11_2,35.0,20.0,False
+7866,"Tobruk, Libya",58619,move,,,,32.1,24.0,32.1,23.9,9.42,32.1_24.0,32.1_23.9,2,2,False,11_2,11_2,35.0,20.0,False
+4599,"Valparaíso, Chile",192795,drop_dup_existing,"Viña del Mar, Chile","Viña del Mar, Chile",237301,-33.0,-71.6,-33.0,-71.5,9.33,-33.0_-71.6,-33.0_-71.5,-5,-5,False,24_28,24_28,-30.0,280.0,False
+396,"Arrondissement de Sidi Belyout ⵜⴰⴳⵥⵥⵓⵎⵜ ⵏ ⵙⵉⴷⵉ ⴱⵍⵢⵓⵟ مقاطعة سيدي بليوط, Casablanca, Morocco",1029248,drop_dup_existing,"Errahma, Casablanca, Morocco","Errahma, Casablanca, Morocco",1029248,33.6,-7.6,33.6,-7.7,9.26,33.6_-7.6,33.6_-7.7,-1,-1,False,11_35,11_35,35.0,350.0,False
+7460,"Waterfront, Cape Town, South Africa",97243,drop_dup_existing,"Cape Town Ward 55, Cape Town, South Africa","Cape Town Ward 55, Cape Town, South Africa",328642,-33.9,18.4,-33.9,18.5,9.23,-33.9_18.4,-33.9_18.5,1,1,False,24_1,24_1,-30.0,10.0,False
+3590,"Ras Masqa, Tripoli, Lebanon",240630,drop_dup_existing,"Kfar Dlaqous, Tripoli, Lebanon","Ras Masqa, Tripoli, Lebanon",240630,34.4,35.8,34.4,35.9,9.17,34.4_35.8,34.4_35.9,2,2,False,11_3,11_3,35.0,30.0,False
+8013,"Sfax, Tunisia",48818,drop_dup_existing,"Sidi Abid, Sfax, Tunisia","Sidi Abid, Sfax, Tunisia",212829,34.7,10.8,34.7,10.7,9.14,34.7_10.8,34.7_10.7,1,1,False,11_1,11_1,35.0,10.0,False
+7623,"Melilla, Spain",80608,move,,,,35.3,-2.9,35.3,-3.0,9.08,35.3_-2.9,35.3_-3.0,0,0,False,10_35,10_35,40.0,350.0,False
+8547,"Mahdia, Tunisia",13601,move,,,,35.5,11.1,35.5,11.0,9.05,35.5_11.1,35.5_11.0,1,1,False,10_1,10_1,40.0,10.0,False
+1018,"Tangier, Morocco",601584,drop_dup_existing,"Feddane Saïd فدان سعيد, Tangier, Tanger-Tetouan-Al Hoceima, Morocco","Tangier, Morocco",601584,35.8,-5.8,35.8,-5.7,9.02,35.8_-5.8,35.8_-5.7,0,0,False,10_35,10_35,40.0,350.0,False
+7632,"Ceuta, Spain",79181,move,,,,35.9,-5.3,35.9,-5.4,9.01,35.9_-5.3,35.9_-5.4,0,0,False,10_35,10_35,40.0,350.0,False
+7928,"Béjaïa, Algeria",54525,move,,,,36.8,5.1,36.8,5.0,8.9,36.8_5.1,36.8_5.0,0,0,False,10_0,10_0,40.0,0.0,False
+7587,"Vauxhall, Auckland, New Zealand",84078,drop_dup_existing,"Verrans Corner, Auckland, New Zealand","Verrans Corner, Auckland, New Zealand",169924,-36.8,174.8,-36.8,174.7,8.9,-36.8_174.8,-36.8_174.7,12,12,False,25_17,25_17,-35.0,170.0,False
+6367,"Annaba, Algeria",147278,drop_dup_existing,"Seraidi, Annaba, Algeria","Seraidi, Annaba, Algeria",232548,36.9,7.8,36.9,7.7,8.89,36.9_7.8,36.9_7.7,1,1,False,10_0,10_0,40.0,0.0,False
+5419,"Skikda District, Skikda, Algeria",168061,drop_dup_existing,"Ain Zouit, Skikda, Algeria","Skikda District, Skikda, Algeria",168061,36.9,6.9,36.9,6.8,8.89,36.9_6.9,36.9_6.8,0,0,False,10_0,10_0,40.0,0.0,False
+7293,"Bizerte, Tunisia",118610,move,,,,37.3,9.9,37.3,9.8,8.85,37.3_9.9,37.3_9.8,1,1,False,10_0,10_0,40.0,0.0,False
+8413,"Mytilene, Greece",22059,move,,,,39.1,26.6,39.1,26.5,8.63,39.1_26.6,39.1_26.5,2,2,False,10_2,10_2,40.0,20.0,False
+5741,"Altınordu, Ordu, Turkey",160557,drop_dup_existing,"Efirli Mahallesi, Ordu, Turkey","Altınordu, Ordu, Turkey",160557,41.0,37.9,41.0,37.8,8.39,41.0_37.9,41.0_37.8,3,3,False,9_3,9_3,45.0,30.0,False
+3521,"Trabzon, Turkey",245375,drop_dup_existing,"Akçaabat, Trabzon, Turkey","Trabzon, Turkey",245375,41.0,39.7,41.0,39.6,8.39,41.0_39.7,41.0_39.6,3,3,False,9_3,9_3,45.0,30.0,False
+7283,"Zonguldak, Turkey",119760,move,,,,41.5,31.8,41.5,31.9,8.33,41.5_31.8,41.5_31.9,2,2,False,9_3,9_3,45.0,30.0,False
+6045,"Airport, Batumi, Georgia",153627,drop_dup_existing,"Kheghru, Batumi, Georgia","Airport, Batumi, Georgia",153627,41.6,41.6,41.6,41.7,8.32,41.6_41.6,41.6_41.7,3,3,False,9_4,9_4,45.0,40.0,False
+8120,"Ajaccio, France",40996,move,,,,41.9,8.7,41.9,8.8,8.28,41.9_8.7,41.9_8.8,1,1,False,9_0,9_0,45.0,0.0,False
+3035,"Vladivostok City District, Vladivostok, Russia",282531,drop_dup_existing,"Vladivostok, Russia","Vladivostok, Russia",282531,43.1,131.9,43.1,132.0,8.12,43.1_131.9,43.1_132.0,9,9,False,9_13,9_13,45.0,130.0,False
+7636,"Saint Helier, Jersey",79100,move,,,,49.2,-2.1,49.2,-2.2,7.27,49.2_-2.1,49.2_-2.2,0,0,False,8_35,8_35,50.0,350.0,False
+3053,"Davidshall, Malmö, Sweden",281454,drop_dup_existing,"Limhamn, Malmö, Sweden","Davidshall, Malmö, Sweden",281454,55.6,13.0,55.6,12.9,6.28,55.6_13.0,55.6_12.9,1,1,False,6_1,6_1,60.0,10.0,False
+2127,"Frederiksstaden, Copenhagen, Denmark",365669,drop_dup_existing,"Brønshøj, Copenhagen, Denmark","Brønshøj, Copenhagen, Denmark",509685,55.7,12.6,55.7,12.5,6.27,55.7_12.6,55.7_12.5,1,1,False,6_1,6_1,60.0,10.0,False
+8568,"Kalmar, Sweden",11899,move,,,,56.7,16.4,56.7,16.5,6.1,56.7_16.4,56.7_16.5,1,1,False,6_1,6_1,60.0,10.0,False
+8562,"Jūrmala, Latvia",12198,move,,,,57.0,23.8,57.0,23.9,6.06,57.0_23.8,57.0_23.9,2,2,False,6_2,6_2,60.0,20.0,False
+8331,"Ventspils, Latvia",27798,move,,,,57.4,21.6,57.4,21.7,5.99,57.4_21.6,57.4_21.7,1,1,False,6_2,6_2,60.0,20.0,False
+8232,"Bodø, Norway",33603,move,,,,67.3,14.4,67.3,14.5,4.29,67.3_14.4,67.3_14.5,1,1,False,4_1,4_1,70.0,10.0,False
