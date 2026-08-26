@@ -96,19 +96,25 @@ def read_cells():
             yield row["name"], snap(float(row["lat"])), snap(float(row["lon"]))
 
 
-def local_src_candidates(slat: float, slon: float) -> list[Path]:
-    """Local archive filenames download_cells.py may have written for this
-    snapped cell. download_cells.py's archive_name() formats the RAW
-    (unsnapped) lat/lon straight from cells.csv, so a coordinate that snaps
-    to exactly 0.0 but was stored as -0.0 (small negative lon/lat near the
-    prime meridian/equator, e.g. Canary Wharf at 51.5,-0.0) keeps its sign in
-    the on-disk filename (archive_51.5_-0.0.csv.gz), while snap() here
-    normalizes it to 0.0 (Python's bare round() returns an int, which has no
-    negative zero). Try both signs on any axis that snapped to zero."""
+def archive_key_candidates(slat: float, slon: float) -> list[str]:
+    """`{lat}_{lon}` strings download_cells.py may have keyed this snapped
+    cell's archive under (R2 object and local file alike). Its archive_name()
+    formats the RAW (unsnapped) lat/lon straight from cells.csv, so a
+    coordinate that snaps to exactly 0.0 but was stored as -0.0 (small
+    negative lon/lat near the prime meridian/equator, e.g. Canary Wharf at
+    51.5,-0.0) keeps its sign in the key (archive_51.5_-0.0.csv.gz), while
+    snap() here normalizes it to 0.0 (Python's bare round() returns an int,
+    which has no negative zero). Try both signs on any axis that snapped to
+    zero."""
     lat_opts = ("0.0", "-0.0") if slat == 0 else (f"{slat:.1f}",)
     lon_opts = ("0.0", "-0.0") if slon == 0 else (f"{slon:.1f}",)
-    return [LOCAL_ARCHIVE_DIR / f"archive_{la}_{lo}.csv.gz"
-            for la in lat_opts for lo in lon_opts]
+    return [f"{la}_{lo}" for la in lat_opts for lo in lon_opts]
+
+
+def local_src_candidates(slat: float, slon: float) -> list[Path]:
+    """Local archive files download_cells.py may have written for this cell."""
+    return [LOCAL_ARCHIVE_DIR / f"archive_{k}.csv.gz"
+            for k in archive_key_candidates(slat, slon)]
 
 
 def trim_archive(body: bytes, start: str, end: str, full: bool) -> tuple[bytes, int]:
@@ -202,7 +208,11 @@ def main() -> int:
                 return ("nolocal", name, key, 0)  # not downloaded — expected, skip
             body = src.read_bytes()
         else:
-            body = up.get_bytes(f"{ARCHIVE_PREFIX}/archive_{key}.csv.gz")
+            body = next(
+                (b for k in archive_key_candidates(slat, slon)
+                 if (b := up.get_bytes(f"{ARCHIVE_PREFIX}/archive_{k}.csv.gz"))
+                 is not None),
+                None)
             if body is None:
                 return ("fail", name, key, 0)
         blob, kept = trim_archive(body, s, e, args.full)
