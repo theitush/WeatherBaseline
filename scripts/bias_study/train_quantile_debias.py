@@ -27,8 +27,9 @@ embargo, seed 0); early stopping uses a validation carve-out from TRAIN blocks
 PIPELINE (each step gates the next; any missing data raises):
   1. preflight   — cells.csv, cell_elevation.csv coverage (make_cell_elevation.py
                    if stale), every cell's hres_*.csv.gz + ledger meta present
-  2. era5 slice  — pull_archive_slice.py --local --overwrite (refresh the
-                   archive-overlap slices from the box's data/era5-land/archive/)
+  2. era5 slice  — pull_archive_slice.py --all-cells --overwrite (refresh the
+                   archive-overlap slices from R2, the source of truth; needs
+                   r2.env in the environment)
   3. verify      — both sides loaded for every cell; window starts 2024-03-01;
                    per-cell end within tolerance of the cohort max (stale = error)
   4. train       — 16 MultiQuantile fits, thread_count=-1; each model is saved
@@ -67,9 +68,8 @@ from catboost import CatBoostRegressor, Pool
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 CELLS_CSV = REPO / "data" / "cells.csv"
-LOCAL_ARCHIVE_DIR = REPO / "data" / "era5-land" / "archive"
 ARC_DIR = HERE / "data" / "archive-overlap"
-HRES_DIR = HERE / "data" / "hres-forecast"
+HRES_DIR = HERE / "data" / "hres-forecast-ifs-hres"
 LEDGER = HRES_DIR / ".hres_progress.json"
 ELEV_CSV = HERE / "data" / "cell_elevation.csv"
 MODELS = HERE / "models"
@@ -208,14 +208,13 @@ def preflight(limit: int | None, allow_partial: bool) -> pd.DataFrame:
 
 # ------------------------------------------------- 2. era5 slice + 3. load/verify
 def refresh_archive_slices() -> None:
-    """pull_archive_slice.py --local --overwrite: rebuild the overlap slices from
-    this box's data/era5-land/archive/. --overwrite because resume would keep
-    stale slices; --local reads disk only (no R2 auth)."""
-    if not LOCAL_ARCHIVE_DIR.exists():
-        raise DataError(f"\nDATA ERROR: {LOCAL_ARCHIVE_DIR} missing — "
-                        "run the era5 download job first (download_cells.py)")
+    """pull_archive_slice.py --all-cells --overwrite: rebuild the overlap slices
+    from R2, which is the source of truth for the archive (a box's on-disk
+    era5-land mirror can silently predate top-ups and cell-coord renames).
+    --overwrite because resume would keep stale slices. Needs r2.env in the
+    environment; a pure R2 read job, well inside the free tier."""
     cmd = [sys.executable, str(HERE / "pull_archive_slice.py"),
-           "--local", "--overwrite"]
+           "--all-cells", "--overwrite"]
     log("refreshing archive-overlap slices: " + " ".join(cmd[1:]))
     if subprocess.run(cmd, cwd=HERE).returncode != 0:
         raise DataError("pull_archive_slice.py failed — see its output above")
@@ -249,8 +248,8 @@ def load_and_verify(static: pd.DataFrame, allow_partial: bool) -> pd.DataFrame:
                 "archive slice")
         else:
             fail("no archive-overlap slice (era5 side missing/stale on disk)",
-                 no_archive, "update this box's era5 mirror (download_cells.py) "
-                 "or pull slices from R2: python pull_archive_slice.py --overwrite")
+                 no_archive,
+                 "python pull_archive_slice.py --all-cells --overwrite")
 
     ranges = pd.DataFrame(
         [(k, *r) for k, frame, r in loaded if frame is not None],
@@ -268,7 +267,8 @@ def load_and_verify(static: pd.DataFrame, allow_partial: bool) -> pd.DataFrame:
         ("archive slice stale (trails cohort)",
          pd.to_datetime(ranges.arc_end)
          < pd.to_datetime(ranges.arc_end).max() - pd.Timedelta(days=14),
-         "update the era5 mirror, then pull_archive_slice.py --local --overwrite"),
+         "top up the R2 archive, then pull_archive_slice.py --all-cells "
+         "--overwrite"),
         (f"HRES stale (before archive floor {hres_floor.date()})",
          pd.to_datetime(ranges.hres_end) < hres_floor,
          "python pull_hres_all.py --overwrite"),

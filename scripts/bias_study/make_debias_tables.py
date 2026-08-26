@@ -45,7 +45,7 @@ cell gets a file (model surface where trusted, empirical band where gated):
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
-Runs in scripts/era5_pipeline/.venv (needs the full archive-overlap + hres-forecast
+Runs in scripts/era5_pipeline/.venv (needs the full archive-overlap + hres-forecast-ifs-hres
 data the fits were trained on). Reuses train_quantile_debias.py for the data
 pipeline (preflight/load_and_verify/add_features/split/shrink) and feature layout.
 
@@ -331,7 +331,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", default=str(HERE / "data" / "debias"),
                     help="local mirror dir for the per-cell tables")
-    ap.add_argument("--model-tag", default="qn8727_s0_q9",
+    ap.add_argument("--model-tag", default="qn8620_s0_q9",
                     help="TAG of the shipped fits + per_cell CSV to bake")
     ap.add_argument("--gate-threshold", type=float, default=0.1,
                     help="drop cell x vars where mae_q50 - mae_raw exceeds this")

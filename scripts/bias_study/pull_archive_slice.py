@@ -74,7 +74,7 @@ CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
 LOCAL_ARCHIVE_DIR = HERE.parent.parent / "data" / "era5-land" / "archive"
 OUT_DIR = HERE / "data" / "archive-overlap"
 ARCHIVE_PREFIX = "archive"
-HRES_PREFIX = "hres-forecast"
+HRES_PREFIX = "hres-forecast-ifs-hres"
 SCHEMA = ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
 
 # Keep these in lockstep with pull_hres_all.py so baseline and forecast cover the
