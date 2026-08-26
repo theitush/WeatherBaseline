@@ -68,10 +68,12 @@ pulls ~a day's worth, hits the wall, stops clean; rerun tomorrow to continue.
 CONCURRENCY (--workers, default 4) — cells are processed by a small thread pool
 so one slow Open-Meteo response (cold-chunk reads can stall for a minute+)
 doesn't block the whole sweep. The --rate limiter is shared across workers, so
-total API calls/min are unchanged; workers only overlap the waiting. A stalled
-read times out at 45s and retries in place — the retry usually hits the now-
-warmed chunk cache and returns in seconds. Counters, the ledger, and progress
-lines are applied single-writer on the main thread.
+total API calls/min are unchanged; workers only overlap the waiting. Each worker
+holds its own keep-alive Session, so cells after the first reuse a warm
+connection instead of re-handshaking. A stalled read times out at 45s (connect
+at 20s) and retries in place — the retry usually hits the now-warmed chunk cache
+and returns in seconds. Counters, the ledger, and progress lines are applied
+single-writer on the main thread.
 
 Usage (from scripts/bias_study/, with the era5_pipeline venv):
   source ../era5_pipeline/.venv/bin/activate
@@ -94,6 +96,7 @@ import gzip
 import io
 import json
 import os
+import socket
 import sys
 import threading
 import time
@@ -103,6 +106,62 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import requests
+import urllib3.util.connection
+
+
+# --- connection hygiene ------------------------------------------------------
+# The two failures this job hits under a long sweep are connection-ESTABLISHMENT
+# failures, not slow API responses:
+#   * "Read timed out. (read timeout=10)" -- a stalled TLS handshake. urllib3
+#     stamps the CONNECT timeout on that message (connectionpool._make_request
+#     sets conn.timeout = connect_timeout before the handshake, and _raise_timeout
+#     reports conn.timeout); a genuine slow body read says read timeout=45.
+#   * "[Errno 101] Network is unreachable" -- the host resolves to an AAAA record
+#     but the box (WSL2, most GCP VMs) has no IPv6 route, so that candidate
+#     address dies instantly.
+# So: ask for A records only when there is no v6 route, and reuse keep-alive
+# connections instead of a fresh TCP+TLS handshake per cell.
+CONNECT_TIMEOUT = 20
+READ_TIMEOUT = 45
+
+
+def _have_ipv6() -> bool:
+    """True if this box can actually route IPv6 (UDP connect sends no packet)."""
+    try:
+        s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        try:
+            s.connect(("2001:4860:4860::8888", 53))
+            return True
+        finally:
+            s.close()
+    except OSError:
+        return False
+
+
+if not _have_ipv6():
+    urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
+
+_tls = threading.local()
+
+
+def session() -> requests.Session:
+    """One keep-alive Session per worker thread (Session isn't thread-safe).
+
+    requests.get() builds and discards a Session per call, so the sweep was
+    paying a fresh TCP+TLS handshake for every one of the 8.6k cells -- exactly
+    the step that intermittently fails. A pooled per-thread Session reuses the
+    warm connection instead.
+    """
+    s = getattr(_tls, "s", None)
+    if s is None:
+        s = requests.Session()
+        s.headers["User-Agent"] = "HowHotWasIt-biasstudy/1.0"
+        adapter = requests.adapters.HTTPAdapter(pool_connections=2,
+                                                pool_maxsize=2)
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        _tls.s = s
+    return s
 
 
 class RateLimitHit(Exception):
@@ -192,7 +251,7 @@ def _looks_like_daily_quota(text: str) -> bool:
 
 
 def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
-               max_net=3):
+               max_net=5):
     """Return (rows, meta) for the snapped point.
 
     rows: list of dicts in SCHEMA order. meta: the actual HRES cell the API used
@@ -213,22 +272,24 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
         params["apikey"] = apikey
     last = None
     n_429 = n_net = 0
-    for attempt in range(6):
+    for attempt in range(10):
         if attempt:
             time.sleep(min(2 ** attempt, 30))
         limiter.acquire()
         try:
-            r = requests.get(host, params=params, timeout=(10, 45),
-                             headers={"User-Agent": "HowHotWasIt-biasstudy/1.0"})
+            r = session().get(host, params=params,
+                              timeout=(CONNECT_TIMEOUT, READ_TIMEOUT))
         except requests.RequestException as ex:
-            # A stalled read (cold-chunk responses can hang for a minute+) or a
-            # connection blip. Retry in place: the retry usually hits the now-
-            # warmed chunk cache and returns in seconds. Note a timed-out
-            # request may still have been billed, so cap the retries.
+            # A stalled read (cold-chunk responses can hang for a minute+) or --
+            # far more often -- a connect/TLS blip that never reached the API.
+            # Retry in place, over ~30s of backoff: a blip that outlives that is
+            # a real outage. A timed-out request may still have been billed, so
+            # the retries stay capped.
             last = ex
             n_net += 1
             if n_net >= max_net:
                 raise RuntimeError(f"network failure x{n_net}: {ex}") from ex
+            session().close()  # a half-dead pooled connection stays dead
             continue
         last = r
         if r.ok:
