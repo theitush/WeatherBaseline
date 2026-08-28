@@ -12,8 +12,15 @@ archives taken before the run (a directory of archive_{lat}_{lon}.csv.gz):
   * optionally, one cell is cross-checked against an INDEPENDENT hourly pull
     (scripts/dew_point/pull_openmeteo_hourly.py: Open-Meteo's era5_land hourly
     d2m at the same 0.1deg point) aggregated by the same rule — daily mean over
-    the local solar day, whole days only. Same reanalysis, same rule: the
-    archive must match to a few thousandths of a degree.
+    the local solar day, whole days only. Same reanalysis, same rule, but NOT
+    the same precision: the EarthDataHub store stores every variable through a
+    BitRound filter (keepbits=13, and chunks from before ~2025 are coarser
+    still — hourly d2m/t2m sit on a 0.25 K grid), while Open-Meteo serves
+    0.1 degC. A 24-hour mean of 0.25 K-rounded values differs from the
+    full-precision mean by up to ~0.1 degC, with a per-cell bias of a few
+    hundredths. So the check is: |max delta| <= --hourly-tol (0.15) AND
+    |mean delta| <= --hourly-bias (0.05). Measured 2026-08-28, Singapore
+    1.3_103.8, 3,629 days: max 0.077, mean -0.025.
 
 Reads R2 (r2.env) and local files only; writes nothing.
 
@@ -75,8 +82,11 @@ def main() -> int:
     ap.add_argument("--slack", type=float, default=0.5)
     ap.add_argument("--hourly", type=Path, help="independent hourly pull (csv.gz)")
     ap.add_argument("--hourly-cell", help="lat,lon of that pull's cell")
-    ap.add_argument("--hourly-tol", type=float, default=0.05,
-                    help="max |archive - hourly-derived| allowed, degC")
+    ap.add_argument("--hourly-tol", type=float, default=0.15,
+                    help="max |archive - hourly-derived| allowed, degC (store "
+                         "quantisation, see docstring)")
+    ap.add_argument("--hourly-bias", type=float, default=0.05,
+                    help="max |mean(archive - hourly-derived)| allowed, degC")
     ap.add_argument("--workers", type=int, default=16)
     args = ap.parse_args()
 
@@ -94,6 +104,13 @@ def main() -> int:
 
     problems: list[str] = []
     shipped = [col for col in ARCHIVE_COLUMNS if col not in ("date", args.column)]
+    # pandas' default (fast) float parser can land 1 ulp off the shortest-repr
+    # double, so a read→write round trip may turn "-21.025" into
+    # "-21.025000000000002" — every archive rewrite has always done this. The
+    # stored values are 3 dp, so anything under 1e-6 is that artefact, not a
+    # change; the largest shipped-column delta is reported so this is visible.
+    SHIPPED_TOL = 1e-6
+    max_shipped_delta = 0.0
     cover_min: dict[int, int] = defaultdict(lambda: 10**9)
     n_no_column = 0
     newest = None
@@ -120,7 +137,10 @@ def main() -> int:
                 continue
             a = joined[f"{col}_base"].to_numpy(dtype="float64")
             b = joined[f"{col}_new"].to_numpy(dtype="float64")
-            same = (a == b) | (np.isnan(a) & np.isnan(b))
+            both = ~(np.isnan(a) | np.isnan(b))
+            if both.any():
+                max_shipped_delta = max(max_shipped_delta, float(np.abs(a[both] - b[both]).max()))
+            same = (np.abs(a - b) <= SHIPPED_TOL) | (np.isnan(a) & np.isnan(b))
             if not same.all():
                 bad = joined.loc[~same, "date"].head(3).tolist()
                 problems.append(f"{name}: {col} changed on {int((~same).sum())} date(s), e.g. {bad}")
@@ -141,6 +161,9 @@ def main() -> int:
             if over.any():
                 problems.append(f"{name}: {args.column} above {args.upper_bound}+{args.slack} "
                                 f"on {int(over.sum())} day(s), e.g. {new.loc[over, 'date'].head(2).tolist()}")
+
+    print(f"\nshipped columns: max |new - baseline| on shared dates = "
+          f"{max_shipped_delta:.2e} (tolerance {SHIPPED_TOL:g}; float-parser round-trip noise only)")
 
     # coverage summary: every past year should hold ~365 covered rows
     years = sorted(cover_min)
@@ -170,7 +193,9 @@ def main() -> int:
         worst = delta.abs().sort_values(ascending=False).head(5)
         print("  worst:", ", ".join(f"{d}: {v:+.3f}" for d, v in delta.loc[worst.index].items()))
         if delta.abs().max() > args.hourly_tol:
-            problems.append(f"hourly cross-check exceeds {args.hourly_tol} degC")
+            problems.append(f"hourly cross-check: max |delta| exceeds {args.hourly_tol} degC")
+        if abs(delta.mean()) > args.hourly_bias:
+            problems.append(f"hourly cross-check: mean delta exceeds {args.hourly_bias} degC")
         if len(shared) < 0.9 * len(ref):
             problems.append(f"hourly cross-check covers only {len(shared)}/{len(ref)} days")
 
