@@ -126,6 +126,17 @@ fills up as it goes, and `<prefix>/.hres_progress.json` is the ledger.
 
 ---
 
+## Adding one variable to an existing dataset — `--fill-column`
+
+When a NEW variable joins `VARS` (2026-08: `dew_point_2m_mean` → `dewpt_mean_C`),
+don't re-pull the grid. `--fill-column dewpt_mean_C` visits every cell, reads its
+current R2 object, skips it if the header already carries the column, and
+otherwise requests JUST that variable over the cell's own date range and merges
+it in by column — every other value stays byte-identical. ~6.4 weighted calls
+per cell (~55k for the grid ≈ 5–6 free-tier days, ~1 h on Standard). Resumable
+by construction (present column ⇒ skip). Run it in the same retry loop as a
+normal pull (`~/run_hres_fill.sh` on the VM: exit 2 ⇒ sleep 1 h ⇒ rerun).
+
 ## Why not a Lambda / Cloud Function?
 Serverless functions hard-cap at 15–60 min; this run is hours (Standard) to weeks
 (free). It needs a long-lived, resumable process — a VM (or your laptop), not a

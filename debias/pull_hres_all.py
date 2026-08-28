@@ -359,12 +359,16 @@ def write_local_gz(path: Path, rows) -> None:
         f.write(buf.getvalue())
 
 
-def read_existing(gz: Path, r2_key: str, up: R2Uploader) -> list[dict]:
+def read_existing(gz: Path, r2_key: str, up: R2Uploader,
+                  prefer_local: bool = True) -> list[dict]:
     """Return a cell's already-pulled rows — from the local mirror if it's there,
     else from R2 (one Class B GET) so --append works on a fresh box. Empty list
     when the cell has no data yet or its object is unreadable: the caller then
-    falls back to a full-window pull, which is the correct repair either way."""
-    raw = gz.read_bytes() if gz.exists() else up.get_bytes(r2_key)
+    falls back to a full-window pull, which is the correct repair either way.
+    `prefer_local=False` always reads R2: a --fill-column run merges onto and
+    re-uploads whatever it reads, so a stale local mirror would be shipped over
+    the newer R2 object (R2 is the source of truth)."""
+    raw = gz.read_bytes() if (prefer_local and gz.exists()) else up.get_bytes(r2_key)
     if not raw:
         return []
     try:
@@ -590,7 +594,7 @@ def main() -> int:
         # both the first pull and the repair.
         have, cell_start, cell_end, fields, n_vars = [], s, e, None, len(VARS)
         if fill_fields and not args.dry_run:
-            have = read_existing(gz, r2_key, up)
+            have = read_existing(gz, r2_key, up, prefer_local=False)
             if have and args.fill_column in have[0]:
                 return {**res, "kind": "current", "end": have[-1]["date"]}
             if have:

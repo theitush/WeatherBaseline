@@ -119,6 +119,26 @@ rerun the same command — already-uploaded archives are simply overwritten
 > check (which reads *local* disk) will refetch everything. Keep the local dir
 > for cheap resume, or pull it back from R2 first.
 
+### 5a. Adding a NEW COLUMN to shipped archives — `--vars`
+
+A new archive column derived from one stored variable (2026-08: `dewpt_mean_C`
+from `d2m`) is backfilled with a **single-variable** run, which costs 1/5 of a
+full pull and leaves every other column untouched:
+```bash
+python download_cells.py --start-year 1950 --vars d2m \
+  --batch-years 20 --var-workers 1 --parallel-tiles 3 --upload-r2
+```
+Frames then carry only `date` + the new column; `write_archive` merges per
+COLUMN (`combine_first`), so shipped tmax/tmin/precip/wind are byte-identical
+afterwards. Resume counts only rows carrying `COMPLETENESS_COLUMN` (the newest
+column), so every pre-existing archive reads 0% complete and is refetched
+exactly once, and a crash resumes at the first unfinished (tile, span) with no
+ledger. Gate a test tile first with `verify_column_backfill.py` (baseline
+snapshot → run → byte-identical shipped columns + an independent hourly
+cross-check). Once the grid is backfilled, routine top-ups run the 5-var
+default; the VM needs a **Python ≥3.11 venv with zarr ≥3** for the v3 store
+(`.venv312`, built with `uv venv --python 3.12`).
+
 ### 5b. Correcting already-built data — `--overwrite`
 
 The archive buckets each day by the cell's **local solar day** (offset by

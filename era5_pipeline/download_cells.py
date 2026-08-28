@@ -824,7 +824,13 @@ def process_span(
         if col == "dewpt_mean_C":
             # Accumulate in float64: a float32 running sum over 24 values of
             # ~290 K carries ~1e-3 K of noise, visible at the archive's 3 dp.
-            return grouped.mean(dtype="float64")
+            # Ocean gridpoints are all-NaN and numpy warns "Mean of empty
+            # slice" for each — expected (they never reach an archive), so
+            # keep the warning out of a log that is hours long.
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Mean of empty slice")
+                return grouped.mean(dtype="float64")
         raise KeyError(col)
 
     frames: dict[tuple[float, float], pd.DataFrame] = {}
