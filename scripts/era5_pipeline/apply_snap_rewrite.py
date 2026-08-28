@@ -44,6 +44,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from cell_keys import tier_key
 from r2_upload import R2Uploader
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -69,7 +70,11 @@ OPTIONAL_TIERS = {"recent", "forecast"}  # Worker writes these on demand
 
 
 def key_for(tier: str, base: str) -> str:
-    return f"{tier}/{tier}_{base}.csv.gz"
+    """Object key for a plan row's `{lat}_{lon}` base — re-derived from the
+    floats through cell_keys, so a base is normalised exactly like every other
+    key (a "-0.0" axis in a hand-edited plan can't reach R2)."""
+    lat, lon = (float(p) for p in base.split("_"))
+    return tier_key(tier, lat, lon)
 
 
 def load_plan() -> list[dict]:
@@ -82,6 +87,9 @@ def load_plan() -> list[dict]:
     # ocean-snapped origins, but assert rather than assume.
     old_bases = {r["old_base"] for r in plan}
     dest_bases = [r["new_base"] for r in movers]
+    # Bases are the key-normalised form (cell_keys.cell_base): never "-0.0".
+    assert not any("-0.0" in b for b in old_bases | set(dest_bases)), \
+        "plan holds a -0.0 base — rebuild it with build_snap_rewrite_plan.py"
     assert not old_bases & set(dest_bases), "mover destination collides with a vacated key"
     assert len(dest_bases) == len(set(dest_bases)), "two movers share a destination"
     return plan
@@ -246,6 +254,14 @@ def do_deprecate(up: R2Uploader, plan: list[dict], yes: bool) -> int:
         if r["action"] in ("move", "move_repull") or r["action"].startswith("drop"):
             for tier in TIERS:
                 targets.append((r["name"], key_for(tier, r["old_base"])))
+    return deprecate_keys(up, targets, yes)
+
+
+def deprecate_keys(up: R2Uploader, targets: list[tuple[str, str]], yes: bool) -> int:
+    """Retire explicit (label, key) objects into deprecated/{key}: server-side
+    copy, ETag-verified, then delete the original. Never a bare delete — the
+    bytes stay recoverable by copying back out. Missing keys are skipped.
+    Reused outside the plan too (the 2026-08-28 -0.0 archive-key rename)."""
     existing = [(n, k, head_etag(up, k)) for n, k in targets]
     existing = [(n, k, e) for n, k, e in existing if e is not None]
     print(f"[deprecate] {len(existing)} object(s) to move under deprecated/")

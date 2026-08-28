@@ -14,7 +14,9 @@ Auth — set these env vars (an R2 "Object Read & Write" S3 API token):
 The endpoint is https://<account-id>.r2.cloudflarestorage.com . Objects are
 written with Content-Type: text/csv and Content-Encoding: gzip so the public
 r2.dev URL serves a browser-gunzippable file — matching how the Worker/Express
-static route sets the same headers. Keys mirror the tier layout: {tier}/{name}.
+static route sets the same headers. Keys mirror the tier layout: {tier}/{name},
+with {name} = {tier}_{lat}_{lon}.csv.gz built ONLY via cell_keys.py (it drops
+the sign of a -0.0 axis so Python keys match the JS readers' `toFixed(1)`).
 
 CLI usage (local test, from scripts/era5_pipeline/):
   source .venv/bin/activate

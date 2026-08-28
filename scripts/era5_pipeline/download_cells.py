@@ -64,6 +64,8 @@ from pathlib import Path
 
 import numpy as np
 
+from cell_keys import coord_str, tier_name
+
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 CELLS_CSV = REPO / "data" / "cells.csv"
@@ -759,14 +761,17 @@ def whole_day_mask(time_values, off_h: int, bucket_dates) -> np.ndarray:
 
 
 def archive_name(lat: float, lon: float) -> str:
-    """v2 archive filename for a snapped 0.1deg cell centre."""
-    return f"archive_{lat:.1f}_{lon:.1f}.csv.gz"
+    """v2 archive filename for a snapped 0.1deg cell centre — the R2 key minus
+    its `archive/` prefix. Formatted by cell_keys (the one sign-normalising
+    formatter, so a cell stored as lon -0.0 names as `_0.0`, the key the
+    Worker/frontend actually request)."""
+    return tier_name("archive", lat, lon)
 
 
 def recent_name(lat: float, lon: float) -> str:
     """v2 `recent` tier filename for a snapped 0.1deg cell centre — same lat/lon
     formatting as archive_name, matching worker/src/cellStore.js's objectKey."""
-    return f"recent_{lat:.1f}_{lon:.1f}.csv.gz"
+    return tier_name("recent", lat, lon)
 
 
 # Writes share OUT_DIR across tile threads; serialise the read-merge-write so two
@@ -824,13 +829,15 @@ class OverwriteLedger:
         self._dirty_r2 = False
         self._load()
 
+    # Same coordinate formatting as the object keys (cell_keys.coord_str), so
+    # a -0.0 cell is one entry, not one per sign.
     @staticmethod
     def _cell_key(lat: float, lon: float) -> str:
-        return f"{lat:.1f},{lon:.1f}"
+        return f"{coord_str(lat)},{coord_str(lon)}"
 
     @staticmethod
     def _span_key(lat: float, lon: float, s: int, e: int) -> str:
-        return f"{lat:.1f},{lon:.1f}@{s}-{e}"
+        return f"{coord_str(lat)},{coord_str(lon)}@{s}-{e}"
 
     def _adopt(self, data: dict) -> bool:
         """Load state from a parsed ledger dict if its signature matches."""

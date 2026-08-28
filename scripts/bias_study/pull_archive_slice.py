@@ -63,9 +63,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
 
-# Reuse the era5 pipeline's R2 client (get_bytes + list_sizes).
+# Reuse the era5 pipeline's R2 client (get_bytes + list_sizes) and its one
+# key formatter (cell_keys), so archive keys here match what it uploads.
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "era5_pipeline"))
+from cell_keys import cell_base  # noqa: E402
 from r2_upload import R2Uploader  # noqa: E402
 
 CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
@@ -96,25 +98,19 @@ def read_cells():
             yield row["name"], snap(float(row["lat"])), snap(float(row["lon"]))
 
 
-def archive_key_candidates(slat: float, slon: float) -> list[str]:
-    """`{lat}_{lon}` strings download_cells.py may have keyed this snapped
-    cell's archive under (R2 object and local file alike). Its archive_name()
-    formats the RAW (unsnapped) lat/lon straight from cells.csv, so a
-    coordinate that snaps to exactly 0.0 but was stored as -0.0 (small
-    negative lon/lat near the prime meridian/equator, e.g. Canary Wharf at
-    51.5,-0.0) keeps its sign in the key (archive_51.5_-0.0.csv.gz), while
-    snap() here normalizes it to 0.0 (Python's bare round() returns an int,
-    which has no negative zero). Try both signs on any axis that snapped to
-    zero."""
-    lat_opts = ("0.0", "-0.0") if slat == 0 else (f"{slat:.1f}",)
-    lon_opts = ("0.0", "-0.0") if slon == 0 else (f"{slon:.1f}",)
-    return [f"{la}_{lo}" for la in lat_opts for lo in lon_opts]
+def archive_key(slat: float, slon: float) -> str:
+    """`{lat}_{lon}` this cell's archive is keyed under — R2 object and local
+    file alike — via the pipeline's one formatter (cell_keys.cell_base), which
+    drops the sign of a -0.0 axis. Until 2026-08-28 download_cells.py kept it
+    (archive_51.5_-0.0.csv.gz for Canary Wharf) and this script had to try
+    both signs; those objects/files have since been renamed to `_0.0`, so a
+    -0.0 name is never looked for again — it would only hide a regression."""
+    return cell_base(slat, slon)
 
 
-def local_src_candidates(slat: float, slon: float) -> list[Path]:
-    """Local archive files download_cells.py may have written for this cell."""
-    return [LOCAL_ARCHIVE_DIR / f"archive_{k}.csv.gz"
-            for k in archive_key_candidates(slat, slon)]
+def local_src(slat: float, slon: float) -> Path:
+    """The local archive file download_cells.py writes for this cell."""
+    return LOCAL_ARCHIVE_DIR / f"archive_{archive_key(slat, slon)}.csv.gz"
 
 
 def trim_archive(body: bytes, start: str, end: str, full: bool) -> tuple[bytes, int]:
@@ -180,7 +176,7 @@ def main() -> int:
             for k in up.list_sizes(f"{HRES_PREFIX}/")
             if k.endswith(".csv.gz")
         }
-        cells = [c for c in cells if f"{c[1]:.1f}_{c[2]:.1f}" in hres_keys]
+        cells = [c for c in cells if archive_key(c[1], c[2]) in hres_keys]
         print(f"{len(hres_keys)} HRES cells in R2 -> {len(cells)} matched in cells.csv")
 
     if args.limit:
@@ -197,22 +193,17 @@ def main() -> int:
 
     def fetch(cell):
         name, slat, slon = cell
-        key = f"{slat:.1f}_{slon:.1f}"
+        key = archive_key(slat, slon)
         dest = OUT_DIR / f"archive_{key}.csv.gz"
         if dest.exists() and not args.overwrite:
             return ("skip", name, key, 0)
         if args.local:
-            src = next((p for p in local_src_candidates(slat, slon) if p.exists()),
-                       None)
-            if src is None:
+            src = local_src(slat, slon)
+            if not src.exists():
                 return ("nolocal", name, key, 0)  # not downloaded — expected, skip
             body = src.read_bytes()
         else:
-            body = next(
-                (b for k in archive_key_candidates(slat, slon)
-                 if (b := up.get_bytes(f"{ARCHIVE_PREFIX}/archive_{k}.csv.gz"))
-                 is not None),
-                None)
+            body = up.get_bytes(f"{ARCHIVE_PREFIX}/archive_{key}.csv.gz")
             if body is None:
                 return ("fail", name, key, 0)
         blob, kept = trim_archive(body, s, e, args.full)

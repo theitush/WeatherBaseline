@@ -176,9 +176,10 @@ def _r2_year_frame(lat, lon, year):
 
     import pandas as pd
 
+    from cell_keys import tier_key
     from r2_upload import R2Uploader
     up = R2Uploader()
-    key = f"archive/archive_{lat:.1f}_{lon:.1f}.csv.gz"
+    key = tier_key("archive", lat, lon)
     body = up.client.get_object(Bucket=up.bucket, Key=key)["Body"].read()
     with gzip.open(io.BytesIO(body), "rt") as fh:
         df = pd.read_csv(fh)

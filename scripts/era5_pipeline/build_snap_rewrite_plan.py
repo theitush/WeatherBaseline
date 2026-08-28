@@ -48,6 +48,8 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
+from cell_keys import cell_base
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 AUDIT_CSV = SCRIPT_DIR / "snap_audit.csv"
 CELLS_CSV = SCRIPT_DIR.parent.parent / "data" / "cells.csv"
@@ -111,8 +113,9 @@ def tile_of(lat: float, lon: float) -> tuple[str, float, float]:
 
 
 def base(lat: float, lon: float) -> str:
-    """R2 key base: `{lat:.1f}_{lon:.1f}` — object key is {tier}/{tier}_{base}.csv.gz."""
-    return f"{lat:.1f}_{lon:.1f}"
+    """R2 key base: `{lat}_{lon}` — object key is {tier}/{tier}_{base}.csv.gz.
+    Via cell_keys so a -0.0 axis becomes "0.0" like every other key."""
+    return cell_base(lat, lon)
 
 
 def main() -> int:
