@@ -37,11 +37,18 @@ heavy-rain days (~27% coverage at the top-1% forecast) while the conditional one
 holds ~90% across regimes. Same schema as the model tables, so the client applies
 every cell identically with NO gating logic. Validity: cqr_per_level_validity.ipynb.
 
-OUTPUT (one gzip per cell, --out-dir, mirrors the R2 `debias/` key) — now EVERY
-cell gets a file (model surface where trusted, empirical band where gated):
+OUTPUT (one gzip per cell, --out-dir) — EVERY cell gets a file (model surface
+where trusted, empirical band where gated):
   debias_{lat}_{lon}.csv.gz
     columns: var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99
-  (deltas, 2 dp)  ~4 x 53 x 13 ~= 2.7K rows ~= 20-40 KB/cell.
+  (deltas, 2 dp)  ~4 x 53 x 15 ~= 3K rows ~= 48 KB/cell, ~415 MB for the grid.
+
+The R2 prefix is VERSIONED — never rebake into a dir that already shipped.
+Each regen goes to a NEW `data/debias-vN/`, is uploaded under that same prefix
+(add it to r2_upload.DEBIAS_TIERS, `r2_upload.py --dir data --tiers debias-vN`,
+prove it with r2_verify_prefix.py), and is promoted by flipping the one-line
+default of DEBIAS_PREFIX in frontend/src/services/ci.ts + a Pages deploy. Rollback
+is the previous build. debias-v9 = this 9-level qn8620_s0_q9 bake (2026-08-26).
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
@@ -49,7 +56,8 @@ Runs in scripts/era5_pipeline/.venv (needs the full archive-overlap + hres-forec
 data the fits were trained on). Reuses train_quantile_debias.py for the data
 pipeline (preflight/load_and_verify/add_features/split/shrink) and feature layout.
 
-  cd scripts/bias_study && ../era5_pipeline/.venv/bin/python make_debias_tables.py
+  cd scripts/bias_study && ../era5_pipeline/.venv/bin/python make_debias_tables.py \
+      --out-dir data/debias-v10
 Debug: --limit N (random cells) --allow-partial (warn+drop stale) --self-check-cells N
 """
 from __future__ import annotations
@@ -329,8 +337,10 @@ def self_check(model, static, anchors_by_key, tables_by_key, name, col,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out-dir", default=str(HERE / "data" / "debias"),
-                    help="local mirror dir for the per-cell tables")
+    ap.add_argument("--out-dir", required=True,
+                    help="local mirror dir for the per-cell tables — a NEW "
+                         "data/debias-vN (the prefix is versioned; never rebake "
+                         "into one that already shipped)")
     ap.add_argument("--model-tag", default="qn8620_s0_q9",
                     help="TAG of the shipped fits + per_cell CSV to bake")
     ap.add_argument("--gate-threshold", type=float, default=0.1,
@@ -449,7 +459,8 @@ def main() -> int:
             cell_table.to_csv(f, index=False, float_format="%.2f")
         written += 1
     log(f"wrote {written} per-cell tables -> {out_dir}  "
-        f"(upload step: r2_upload.py, key debias/<name>)")
+        f"(next: r2_upload.py --tiers {out_dir.name}, r2_verify_prefix.py, "
+        f"then flip DEBIAS_PREFIX in ci.ts)")
     return 0
 
 

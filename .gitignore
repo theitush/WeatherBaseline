@@ -29,9 +29,12 @@ __pycache__/
 /data/era5_deprecated/
 /data/era5-land/
 
-# Debias tables — 191MB local mirror of the R2 debias/ tier (regenerable via
-# scripts/bias_study/make_debias_tables.py; the canonical copy lives on R2)
-/scripts/bias_study/data/debias/
+# Debias tables — ~400MB local mirrors of the versioned R2 debias-vN/ tiers
+# (regenerable via scripts/bias_study/make_debias_tables.py; the canonical copy
+# lives on R2). Covers debias/, debias-v9/, debias-v10/, … and retired copies.
+/scripts/bias_study/data/debias*/
+# Kept pre-flip frontend build = one-command rollback (wrangler pages deploy dist-v7)
+/dist-v*/
 
 # Retired v1 per-location cache (cacheManager.js, superseded by v2 tiered serving)
 /cache/

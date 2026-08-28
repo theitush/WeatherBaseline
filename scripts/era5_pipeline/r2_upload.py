@@ -40,11 +40,23 @@ from botocore.config import Config
 
 DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
-# Tiers this CLI can upload but that aren't part of the default era5-land set.
-# `debias/` holds the static M3_base bias-correction tables (one .csv.gz per
-# cell); it lives under scripts/bias_study/data/, not data/era5-land/, so you
-# upload it explicitly with `--dir .../bias_study/data --tiers debias`.
-EXTRA_TIERS = ("debias",)
+# Tiers this CLI can upload but that aren't part of the default era5-land set:
+# the static M3_base bias-correction tables (one .csv.gz per cell), which live
+# under scripts/bias_study/data/, not data/era5-land/, so you upload them
+# explicitly with `--dir .../bias_study/data --tiers debias-v9`.
+#
+# The debias prefix is VERSIONED. A regen (IFS cycle cutover, cells.csv change,
+# retrain) is baked into a NEW `debias-vN/` dir, uploaded under that same
+# prefix, and the frontend's pointer flips to it in one line
+# (frontend/src/services/ci.ts DEBIAS_PREFIX). A prefix is never overwritten,
+# so shipping and rolling back are both a frontend redeploy — no R2 writes to
+# the live set, no edge-cache purge, no mixed-schema window. Add the next
+# version here before uploading it; leave the retired ones until they are
+# moved to deprecated/.
+#   debias     7-level qn8727_s0 bake (2026-07-05), retired 2026-08-28
+#   debias-v9  9-level qn8620_s0_q9 bake (2026-08-26)
+DEBIAS_TIERS = ("debias", "debias-v9")
+EXTRA_TIERS = DEBIAS_TIERS
 UPLOADABLE_TIERS = TIERS + EXTRA_TIERS
 
 # Cache-Control per tier, stored as object metadata so R2 serves it as the
@@ -61,16 +73,16 @@ UPLOADABLE_TIERS = TIERS + EXTRA_TIERS
 # `no-cache` -> the browser/edge may keep the (large) body but must revalidate it
 # via ETag on each use, so a freshly-extended archive is picked up immediately
 # while an unchanged one costs only a 304. Keep in sync with worker/src/cellStore.js.
-# The debias tier is unlike archive: those tables change ONLY on a manual regen
-# (an IFS cycle cutover or a cells.csv change), never on the monthly archive
-# top-up, so they're safe to cache hard. max-age=86400 lets the edge/browser
-# hold them for a day; purge the zone cache on the rare regen (same as archive
-# re-uploads). See make_debias_tables.py.
+# The debias tiers are unlike archive: a versioned prefix is written once and
+# never rewritten (a regen gets a new prefix, see DEBIAS_TIERS), so they're safe
+# to cache hard. max-age=86400 lets the edge/browser hold them for a day; a
+# pointer flip in the frontend changes the URL, so no purge is ever needed.
+# See make_debias_tables.py.
 CACHE_CONTROL = {
     "archive": "public, no-cache",
     "recent": "no-store",
     "forecast": "no-store",
-    "debias": "public, max-age=86400",
+    **{tier: "public, max-age=86400" for tier in DEBIAS_TIERS},
 }
 
 
@@ -208,8 +220,8 @@ def main() -> int:
     )
     ap.add_argument(
         "--tiers", nargs="+", default=list(TIERS), choices=UPLOADABLE_TIERS,
-        help="which tiers to upload (default: the era5-land tiers; 'debias' is "
-             "opt-in and lives under a different --dir)",
+        help="which tiers to upload (default: the era5-land tiers; the "
+             "debias-vN tiers are opt-in and live under a different --dir)",
     )
     ap.add_argument("--bucket", default=None, help="override R2_BUCKET")
     ap.add_argument("--workers", type=int, default=16, help="parallel uploads")

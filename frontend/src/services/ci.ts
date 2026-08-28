@@ -4,15 +4,16 @@
 // serves raw HRES-derived values for forecast/recent days while the archive (and
 // all percentile math) is on the ERA5-Land scale; the M3_base fits correct that
 // mismatch. Those fits are ~1 GB — never Worker-runnable — so we bake them into
-// static per-cell tables on R2 (`debias/debias_{lat}_{lon}.csv.gz`, one gzip of
-// `var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99` deltas on a doy×hres grid —
-// a full per-level one-sided CQR-calibrated 9-quantile CDF, at levels .01/.05/.10/
-// .25/.50/.75/.90/.95/.99). Here we fetch that table and bilinearly interpolate
-// the delta for each (date, forecast value), returning a corrected quantile set
-// per (date, metric). All nine heads are TRAINED — the .25/.75 shoulders used to
-// be interpolated client-side by a probit split-normal rule; they got real heads
-// in the q9 retrain, so a table predating it (7 columns, no d25/d75) is NOT
-// readable here.
+// static per-cell tables on R2 (`{DEBIAS_PREFIX}/debias_{lat}_{lon}.csv.gz`, one
+// gzip of `var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99` deltas on a
+// doy×hres grid — a full per-level one-sided CQR-calibrated 9-quantile CDF, at
+// levels .01/.05/.10/.25/.50/.75/.90/.95/.99). Here we fetch that table and
+// bilinearly interpolate the delta for each (date, forecast value), returning a
+// corrected quantile set per (date, metric). All nine heads are TRAINED — the
+// .25/.75 shoulders used to be interpolated client-side by a probit split-normal
+// rule; they got real heads in the q9 retrain. A table predating it (7 columns,
+// no d25/d75) still parses: buildTable falls back to that probit rule, so one
+// bundle serves both table generations.
 //
 // A missing table, a 404, or a var absent from the table (gated at generation
 // time because the correction demonstrably hurt that cell) yields no band and the
@@ -95,11 +96,17 @@ function dayOfYear(dateStr: string): number {
   return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
 }
 
-// R2 key prefix holding the tables. Overridable ONLY so a regenerated table set
-// can be staged under a separate prefix (e.g. VITE_DEBIAS_PREFIX=debias-q9) and
-// exercised end-to-end against live R2 while production keeps reading `debias/`
-// untouched. Unset everywhere except a local staging run — the default IS prod.
-const DEBIAS_PREFIX = import.meta.env.VITE_DEBIAS_PREFIX ?? 'debias';
+// R2 key prefix holding the tables — THE production pointer. The prefix is
+// versioned: a regenerated table set (retrain, IFS cycle cutover, cells.csv
+// change) is uploaded under a NEW `debias-vN/` prefix (r2_upload.DEBIAS_TIERS)
+// and promoted by changing this one default, so shipping and rolling back are
+// both a frontend redeploy — the live set on R2 is never rewritten, no edge
+// purge, no mixed-schema window (the retired 7-level set stays at `debias/`).
+// The env override exists ONLY to exercise a not-yet-promoted prefix against
+// live R2 from a local dev server; leave it unset for every real build.
+//   debias     7-level qn8727_s0 (2026-07-05 → 2026-08-28)
+//   debias-v9  9-level qn8620_s0_q9 (2026-08-26 bake)
+const DEBIAS_PREFIX = import.meta.env.VITE_DEBIAS_PREFIX ?? 'debias-v9';
 
 /** URL of a cell's debias table, mirroring tieredData.fileUrl conventions. */
 function debiasUrl(lat: number, lon: number): string {
@@ -135,9 +142,9 @@ function buildTable(rows: Record<string, string>[]): CellTable | null {
       d01: parseFloat(row.d01),
       dlo: parseFloat(row.dlo),
       d10,
-      // The live R2 tables still ship the 7-level schema (no d25/d75 — those
-      // arrive with the 9-level retrain). Fall back to the probit shoulder
-      // rule the 7-level bundle always used: interior weight z(.75)/z(.90) =
+      // Tables from before the 9-level retrain (the retired `debias/` set)
+      // have no d25/d75. Fall back to the probit shoulder rule the 7-level
+      // bundle always used: interior weight z(.75)/z(.90) =
       // 0.526307 places q25/q75 on the Φ⁻¹(τ)-linear CDF the .10/.50/.90
       // anchors define (validated ≤1.7pp, q25_q75_interp_check.ipynb). The
       // hres base cancels, so the same relation holds on deltas. Parsing the

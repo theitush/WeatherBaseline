@@ -62,7 +62,9 @@ PLAN_CSV = SCRIPT_DIR / "snap_rewrite_plan.csv"
 CELLS_CSV = SCRIPT_DIR.parent.parent / "data" / "cells.csv"
 FRONTEND_CELLS_CSV = SCRIPT_DIR.parent.parent / "frontend" / "public" / "cells.csv"
 
-TIERS = ("archive", "recent", "forecast", "debias")
+# The debias prefix is versioned (r2_upload.DEBIAS_TIERS); rewrite keys in the
+# LIVE one only — keep in sync with frontend/src/services/ci.ts DEBIAS_PREFIX.
+TIERS = ("archive", "recent", "forecast", "debias-v9")
 OPTIONAL_TIERS = {"recent", "forecast"}  # Worker writes these on demand
 
 
