@@ -9,10 +9,12 @@
 //   - cellStore calls take the bucket as their first arg.
 //
 // Recap of the source split (unchanged, intentional per the 2026-06-03 grid
-// decision): recent temp comes from models=era5_land (exact 0.1° archive grid),
-// recent precip/wind from the historical-forecast API (IFS family — era5_land
-// returns null for p/w), forecast from ecmwf_ifs. cell_selection=nearest pins
-// each model to its nearest cell to the same canonical 0.1° point.
+// decision): recent temp AND dew point come from models=era5_land (exact 0.1°
+// archive grid — era5_land serves a real daily dew_point_2m_mean, so the dew
+// point stays on the archive's own model across archive and recent), recent
+// precip/wind from the historical-forecast API (IFS family — era5_land returns
+// null for p/w), forecast from ecmwf_ifs. cell_selection=nearest pins each
+// model to its nearest cell to the same canonical 0.1° point.
 import * as store from './cellStore.js';
 
 // past_days wider than the ~6-day ERA5-Land lag so forecast overlaps recent.
@@ -33,7 +35,7 @@ const FORECAST_DAYS = 6;
 const FORECAST_MODEL = 'ecmwf_ifs'; // IFS HRES 9km, O1280 (not ifs025/aifs).
 const CELL_SELECTION = 'nearest';
 
-const TEMP_FIELDS = 'temperature_2m_max,temperature_2m_min';
+const TEMP_FIELDS = 'temperature_2m_max,temperature_2m_min,dew_point_2m_mean';
 const PRECIP_WIND_FIELDS = 'precipitation_sum,wind_speed_10m_max';
 const DAILY_FIELDS = `${TEMP_FIELDS},${PRECIP_WIND_FIELDS}`;
 
@@ -56,6 +58,7 @@ function dailyToRows(daily) {
       tmin_C: numOrEmpty(daily.temperature_2m_min?.[i]),
       precip_mm: numOrEmpty(daily.precipitation_sum?.[i]),
       wind_max_ms: numOrEmpty(daily.wind_speed_10m_max?.[i]),
+      dewpt_mean_C: numOrEmpty(daily.dew_point_2m_mean?.[i]),
     });
   }
   return rows;
@@ -101,9 +104,16 @@ function indexByDate(daily) {
  * little short of today. All math in UTC for stable date strings.
  */
 async function firstMissingRecentDate(bucket, lat, lon, archiveEnd) {
-  const have = new Set((await store.readRows(bucket, 'recent', lat, lon)).map((r) => r.date));
+  const rows = await store.readRows(bucket, 'recent', lat, lon);
   const day = new Date(`${archiveEnd}T00:00:00Z`);
   day.setUTCDate(day.getUTCDate() + 1); // archive_end + 1
+  // Schema upgrade: an object written before a column joined SCHEMA (e.g.
+  // dewpt_mean_C, 2026-08) has every date but not every column, and a
+  // date-only gap scan would call it complete forever. Refetch the whole seam
+  // instead — one era5_land call — so every row carries the new column. Rows
+  // from before archive_end+1 are dead weight (archive wins on shared dates).
+  if (rows.length && !store.SCHEMA.every((col) => col in rows[0])) return fmtDate(day);
+  const have = new Set(rows.map((r) => r.date));
   const today = fmtDate(new Date());
   while (fmtDate(day) <= today) {
     const iso = fmtDate(day);

@@ -34,7 +34,10 @@ const CACHE_CONTROL = {
   forecast: 'no-store',
 };
 
-const SCHEMA = ['date', 'tmax_C', 'tmin_C', 'precip_mm', 'wind_max_ms'];
+// Keep in sync with scripts/era5_pipeline/download_cells.py ARCHIVE_COLUMNS.
+// serializeCsv writes exactly these columns, so a column missing here is
+// silently dropped on the next rewrite of a recent/forecast object.
+const SCHEMA = ['date', 'tmax_C', 'tmin_C', 'precip_mm', 'wind_max_ms', 'dewpt_mean_C'];
 
 /** Snap a coordinate to the fixed 0.1° ERA5-Land grid: round(coord*10)/10. */
 function snap(coord) {

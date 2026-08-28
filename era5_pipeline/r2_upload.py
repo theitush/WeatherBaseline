@@ -175,7 +175,7 @@ class R2Uploader:
                 sizes[obj["Key"]] = obj["Size"]
         return sizes
 
-    def read_coverage(self, key: str):
+    def read_coverage(self, key: str, column: str | None = None):
         """Download one archive object; return (per-year row counts, newest date).
 
         Used by the producer's resume to decide which years still need fetching.
@@ -184,22 +184,37 @@ class R2Uploader:
         present but nearly empty: e.g. a lone stray 2025 row left by old code, which
         a year-set check wrongly reads as "have 2025" and never refills. It also
         still distinguishes a tiny-but-complete desert cell from a genuinely partial
-        one, and a caught-up trailing year from one lagging the store. Reads just
-        the date column out of the gzip, so the parse stays cheap. Returns
-        ({year: row_count}, datetime.date | None); ({}, None) if the archive is empty.
+        one, and a caught-up trailing year from one lagging the store.
+
+        `column` (download_cells.COMPLETENESS_COLUMN) narrows "present" to rows
+        carrying that column — an archive that predates it reads as empty, which
+        is what makes a column backfill resumable from R2 on a fresh box. Reads
+        only the needed columns out of the gzip, so the parse stays cheap. Returns
+        ({year: row_count}, datetime.date | None); ({}, None) if nothing is covered.
         """
-        import gzip
-        import io
-
-        import pandas as pd
-
         body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
-        with gzip.open(io.BytesIO(body), "rt") as fh:
-            dates = pd.to_datetime(pd.read_csv(fh, usecols=["date"])["date"])
-        if dates.empty:
-            return {}, None
-        counts = {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
-        return counts, dates.max().date()
+        return coverage_from_archive_bytes(body, column)
+
+
+def coverage_from_archive_bytes(body: bytes, column: str | None = None):
+    """(per-year covered-row counts, newest date) for one gzip archive body.
+
+    The parsing half of `R2Uploader.read_coverage`, separated so it can be tested
+    without R2. Delegates the "which rows count" rule to download_cells'
+    covered_dates so the R2 and local halves of the resume can never disagree.
+    """
+    import gzip
+    import io
+
+    from download_cells import covered_dates
+
+    with gzip.open(io.BytesIO(body), "rt") as fh:
+        text = fh.read()
+    dates = covered_dates(io.StringIO(text), column)
+    if dates.empty:
+        return {}, None
+    counts = {int(y): int(n) for y, n in dates.dt.year.value_counts().items()}
+    return counts, dates.max().date()
 
 
 def _iter_tier_files(data_dir: Path, tiers):

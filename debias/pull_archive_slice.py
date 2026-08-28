@@ -77,7 +77,10 @@ LOCAL_ARCHIVE_DIR = HERE.parent.parent / "data" / "era5-land" / "archive"
 OUT_DIR = HERE / "data" / "archive-overlap"
 ARCHIVE_PREFIX = "archive"
 HRES_PREFIX = "hres-forecast-ifs-hres"
-SCHEMA = ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
+# Archive columns the slice keeps — the full download_cells.py ARCHIVE_COLUMNS.
+# Anything not listed here is dropped by the DictWriter below, so a new archive
+# column must be added HERE before it can reach the trainer.
+SCHEMA = ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms", "dewpt_mean_C"]
 
 # Keep these in lockstep with pull_hres_all.py so baseline and forecast cover the
 # exact same window. The HRES native-9km archive only starts here; END_LAG keeps

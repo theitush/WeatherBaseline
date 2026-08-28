@@ -61,6 +61,15 @@ recent days are still firming up as later runs land — re-fetching the tail
 overwrites those seam days with settled values instead of freezing the first
 value we happened to see.
 
+FILL A COLUMN (--fill-column) — add ONE new variable to an existing dataset
+without re-pulling the rest. For each cell it reads the existing series (local
+file, else the R2 object); a cell whose header already carries the column is
+skipped with no API call; otherwise it requests just that variable over the
+cell's own date range (1 var = 0.1 of a weighted call per 14 days, ~6 calls/cell
+for the full HRES window) and merges it in BY COLUMN — every other column of
+every row is left byte-for-byte as it was. A cell with no data at all falls
+back to a full pull. Added 2026-08 for dewpt_mean_C (dew_point_2m_mean).
+
 STOPS GRACEFULLY on rate-limit exhaustion: a 429 / daily-quota error saves the
 ledger and exits 2 ("resume later") instead of hammering. On the free tier it
 pulls ~a day's worth, hits the wall, stops clean; rerun tomorrow to continue.
@@ -87,6 +96,8 @@ Usage (from debias/, with the era5_pipeline venv):
                                                # price a top-up to a fixed day
   python pull_hres_all.py --r2-prefix hres-forecast-ifs-hres --years 99
                                                # fresh, full, resumable rebuild
+  python pull_hres_all.py --r2-prefix hres-forecast-ifs-hres \
+      --fill-column dewpt_mean_C --rate 6      # add one column to every cell
 """
 from __future__ import annotations
 
@@ -182,9 +193,12 @@ VARS = {
     "temperature_2m_min": "tmin_C",
     "precipitation_sum": "precip_mm",
     "wind_speed_10m_max": "wind_max_ms",
+    # Daily-mean 2 m dew point (2026-08, the dew-point metric). Verified to
+    # return real values under models=ecmwf_ifs on the historical-forecast API.
+    "dew_point_2m_mean": "dewpt_mean_C",
 }
 HRES_FIELDS = ",".join(VARS)
-SCHEMA = ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
+SCHEMA = ["date"] + list(VARS.values())
 # Must match the live forecast tier; omitting this makes Open-Meteo select its
 # location-dependent "Best Match" model instead of IFS HRES.
 HRES_MODEL = "ecmwf_ifs"
@@ -208,13 +222,15 @@ QUOTA_CHUNK_DAYS = 14
 QUOTA_VARS_PER_CALL = 10
 
 
-def quota_units(days: int, locations: int = 1) -> float:
-    """Weighted API calls one request costs. Fractional: our 4-variable request
-    over <=14 days is 0.4 calls, so a tail top-up is ~60x cheaper than the
-    full-window re-pull (0.4 vs ~25 calls/cell)."""
+def quota_units(days: int, locations: int = 1, n_vars: int | None = None) -> float:
+    """Weighted API calls one request costs. Fractional: our 5-variable request
+    over <=14 days is 0.5 calls, so a tail top-up is ~60x cheaper than the
+    full-window re-pull (0.5 vs ~31 calls/cell). `n_vars` prices a request for
+    a subset of the variables (--fill-column fetches one)."""
+    n_vars = len(VARS) if n_vars is None else n_vars
     return (locations
             * max(days, QUOTA_CHUNK_DAYS) / QUOTA_CHUNK_DAYS
-            * len(VARS) / QUOTA_VARS_PER_CALL)
+            * n_vars / QUOTA_VARS_PER_CALL)
 
 
 def snap(coord: float) -> float:
@@ -251,20 +267,23 @@ def _looks_like_daily_quota(text: str) -> bool:
 
 
 def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
-               max_net=5):
+               max_net=5, fields=None):
     """Return (rows, meta) for the snapped point.
 
     rows: list of dicts in SCHEMA order. meta: the actual HRES cell the API used
     (its center lat/lon + DEM elevation) — recorded as a bias-model feature.
+    `fields` (Open-Meteo daily name -> column) restricts the request to a subset
+    of VARS; the rows then carry only those columns (plus date).
 
     Raises RateLimitHit when the daily quota is exhausted (caller stops the run);
     transient per-minute 429s are retried with backoff up to max_429, and network
     errors (read timeouts, connection resets) up to max_net.
     """
+    fields = dict(VARS) if fields is None else dict(fields)
     params = {
         "latitude": slat, "longitude": slon,
         "start_date": start, "end_date": end,
-        "daily": HRES_FIELDS, "wind_speed_unit": "ms",
+        "daily": ",".join(fields), "wind_speed_unit": "ms",
         "models": HRES_MODEL,
         "timezone": "auto", "cell_selection": "nearest",
     }
@@ -299,7 +318,7 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
             rows = []
             for i, d in enumerate(times):
                 row = {"date": d}
-                for fld, col in VARS.items():
+                for fld, col in fields.items():
                     v = daily.get(fld, [None] * len(times))[i]
                     row[col] = "" if v is None else v
                 rows.append(row)
@@ -331,7 +350,9 @@ def fetch_hres(host, apikey, slat, slon, start, end, limiter, max_429=3,
 def write_local_gz(path: Path, rows) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=SCHEMA)
+    # restval: a row that predates a column (or a fill that hasn't reached it)
+    # writes that column empty rather than raising.
+    w = csv.DictWriter(buf, fieldnames=SCHEMA, restval="", extrasaction="ignore")
     w.writeheader()
     w.writerows(rows)
     with gzip.open(path, "wt", newline="") as f:
@@ -358,6 +379,19 @@ def merge_rows(old: list[dict], new: list[dict]) -> list[dict]:
     the re-fetched tail carries settled values that supersede what we first saw."""
     by_date = {r["date"]: r for r in old}
     by_date.update({r["date"]: r for r in new})
+    return [by_date[d] for d in sorted(by_date)]
+
+
+def merge_columns(old: list[dict], new: list[dict], cols: list[str]) -> list[dict]:
+    """Add/overwrite only `cols` from `new` onto `old`, matched by date; every
+    other column of an existing row is left exactly as it was. Dates only `new`
+    has are appended with the rest of their columns empty (the caller will not
+    normally produce any: a fill requests the cell's own date range)."""
+    by_date = {r["date"]: dict(r) for r in old}
+    for r in new:
+        row = by_date.setdefault(r["date"], {"date": r["date"]})
+        for col in cols:
+            row[col] = r.get(col, "")
     return [by_date[d] for d in sorted(by_date)]
 
 
@@ -404,6 +438,11 @@ def main() -> int:
     ap.add_argument("--append", action="store_true",
                     help="top-up mode: fetch only each cell's missing tail and "
                          "merge by date (~10x cheaper than --overwrite)")
+    ap.add_argument("--fill-column", choices=SCHEMA[1:], default=None,
+                    help="add ONE column to every existing cell: fetch only "
+                         "that variable over each cell's own date range and "
+                         "merge it in by column (cells already carrying the "
+                         "column are skipped, no API call). See docstring.")
     ap.add_argument("--r2-prefix", default=DEFAULT_R2_PREFIX,
                     help="R2 folder for cell files and the resume ledger "
                          f"(default {DEFAULT_R2_PREFIX!r}); use a new prefix "
@@ -432,8 +471,11 @@ def main() -> int:
                          "unchanged — workers only keep one slow response "
                          "from stalling the whole sweep")
     args = ap.parse_args()
-    if args.append and args.overwrite:
-        sys.exit("--append and --overwrite are mutually exclusive")
+    if sum(bool(x) for x in (args.append, args.overwrite, args.fill_column)) > 1:
+        sys.exit("--append, --overwrite and --fill-column are mutually exclusive")
+    fill_fields = None
+    if args.fill_column:
+        fill_fields = {f: c for f, c in VARS.items() if c == args.fill_column}
     r2_prefix = args.r2_prefix.strip("/")
     if not r2_prefix or ".." in Path(r2_prefix).parts:
         sys.exit("--r2-prefix must be a non-empty relative R2 folder")
@@ -480,6 +522,11 @@ def main() -> int:
     if args.append:
         print(f"APPEND: per-cell tail only, re-fetching the last "
               f"{args.resettle_days} days for settling  @ {rate:.0f}/min")
+    elif fill_fields:
+        print(f"FILL {args.fill_column} ({','.join(fill_fields)}): "
+              f"{len(cells)} cells x ~{quota_units(days, n_vars=1):.2f} weighted "
+              f"calls = ~{len(cells) * quota_units(days, n_vars=1):,.0f} API calls "
+              f"at most (cells already carrying it cost nothing)  @ {rate:.0f}/min")
     else:
         print(f"{len(cells)} cells x ~{quota_units(days):.2f} weighted calls = "
               f"~{len(cells) * quota_units(days):,.0f} API calls  @ {rate:.0f}/min")
@@ -502,12 +549,12 @@ def main() -> int:
         skip = set()
         print(f"OVERWRITE: re-pulling all selected cells "
               f"({len(in_r2)} currently in R2 will be replaced)\n")
-    elif args.append:
-        # Every selected cell is visited; the per-cell tail check (not this set)
-        # decides whether it needs an API call at all.
+    elif args.append or fill_fields:
+        # Every selected cell is visited; the per-cell tail/column check (not
+        # this set) decides whether it needs an API call at all.
         skip = set()
-        print(f"APPEND: topping up all selected cells "
-              f"({len(in_r2)} currently in R2)\n")
+        print(f"{'APPEND: topping up' if args.append else 'FILL: visiting'} all "
+              f"selected cells ({len(in_r2)} currently in R2)\n")
     else:
         skip = set(done) | in_r2
         print(f"resume: {len(in_r2)} cells already in R2, {len(done)} in ledger "
@@ -541,7 +588,19 @@ def main() -> int:
         # --append: fetch this cell's tail only. No existing data (new cell, or
         # an unreadable object) => fall through to the full window, which is
         # both the first pull and the repair.
-        have, cell_start = [], s
+        have, cell_start, cell_end, fields, n_vars = [], s, e, None, len(VARS)
+        if fill_fields and not args.dry_run:
+            have = read_existing(gz, r2_key, up)
+            if have and args.fill_column in have[0]:
+                return {**res, "kind": "current", "end": have[-1]["date"]}
+            if have:
+                # Only the new column, over exactly the dates the cell holds.
+                fields, n_vars = fill_fields, 1
+                cell_start = min(r["date"] for r in have)
+                cell_end = max(r["date"] for r in have)
+            # else: no data at all -> full-window, all-variable pull (the repair)
+        elif fill_fields:
+            n_vars = 1  # dry-run prices the fill without reading R2 per cell
         if args.append:
             have = read_existing(gz, r2_key, up)
             have_end = max((r["date"] for r in have), default=None)
@@ -551,25 +610,31 @@ def main() -> int:
                 tail = date.fromisoformat(have_end) - timedelta(
                     days=max(0, args.resettle_days - 1))
                 cell_start = max(tail, start).isoformat()
-        res["days"] = (date.fromisoformat(e)
+        res["days"] = (date.fromisoformat(cell_end)
                        - date.fromisoformat(cell_start)).days + 1
+        res["n_vars"] = n_vars
         if args.dry_run:
             return {**res, "kind": "dry", "start": cell_start}
         # single-write print (text+newline in one string): worker threads share
         # stdout, and print()'s separate newline write could interleave lines
         print(f"  [{'…':^4}] {name[:28]:28s} {key:14s} "
-              f"fetching {cell_start}..{e}…\n", end="", flush=True)
+              f"fetching {cell_start}..{cell_end}"
+              f"{' (' + args.fill_column + ' only)' if fields else ''}…\n",
+              end="", flush=True)
         t_cell = time.time()
         try:
-            rows, meta = fetch_hres(host, apikey, slat, slon, cell_start, e,
-                                    limiter)
+            rows, meta = fetch_hres(host, apikey, slat, slon, cell_start,
+                                    cell_end, limiter, fields=fields)
         except RateLimitHit as ex:
             stop.set()  # queued workers bail at the top instead of hammering
             return {**res, "kind": "ratelimit", "err": str(ex)}
         except Exception as ex:  # noqa: BLE001 - log, keep going, retry on rerun
             return {**res, "kind": "fail", "err": str(ex)}
         n_new = len(rows)
-        rows = merge_rows(have, rows) if have else rows
+        if fields:
+            rows = merge_columns(have, rows, list(fields.values()))
+        elif have:
+            rows = merge_rows(have, rows)
         write_local_gz(gz, rows)
         up.upload_file(gz, r2_key)
         return {**res, "kind": "ok", "rows": len(rows), "n_new": n_new,
@@ -594,9 +659,10 @@ def main() -> int:
                 print(f"  {tag} up to date ({r['end']})", flush=True)
             elif r["kind"] == "dry":
                 n_ok += 1
-                units += quota_units(r["days"])
+                units += quota_units(r["days"], n_vars=r["n_vars"])
                 print(f"  {tag} would fetch {r['start']}..{e}  ({r['days']} "
-                      f"days, {quota_units(r['days']):.2f} calls)", flush=True)
+                      f"days, {quota_units(r['days'], n_vars=r['n_vars']):.2f} "
+                      f"calls)", flush=True)
             elif r["kind"] == "ratelimit":
                 print(f"\n  rate/quota limit reached at {r['key']}: {r['err']}")
                 print("  stopping cleanly — rerun the same command to continue.")
@@ -605,10 +671,13 @@ def main() -> int:
                 n_fail += 1
                 print(f"  {tag} FAIL: {r['err']}", flush=True)
             else:  # ok
-                units += quota_units(r["days"])
+                units += quota_units(r["days"], n_vars=r["n_vars"])
                 meta = r["meta"]
-                done[r["key"]] = {"name": r["name"], "rows": r["rows"],
-                                  "end": r["end"], **meta}
+                # A fill re-reads the same HRES cell; keep the ledger's meta
+                # (identical) and its recorded end/rows, which the fill doesn't change.
+                if r["key"] not in done or not fill_fields:
+                    done[r["key"]] = {"name": r["name"], "rows": r["rows"],
+                                      "end": r["end"], **meta}
                 skip.add(r["key"])
                 n_ok += 1
                 cmin = n_ok / max(1e-9, (time.time() - t_start) / 60)
@@ -635,7 +704,7 @@ def main() -> int:
         save_ledger(up, ledger, ledger_key, local_ledger)
     print(f"\n{'DRY RUN — nothing written. ' if args.dry_run else ''}"
           f"done. ok={n_ok} skip={n_skip} fail={n_fail}"
-          f"{f' up-to-date={n_current}' if args.append else ''}  "
+          f"{f' up-to-date={n_current}' if (args.append or fill_fields) else ''}  "
           f"~{units:,.1f} weighted API calls  "
           f"({(time.time() - t_start) / 60:.1f} min)")
     remaining = len(cells) - n_skip - n_ok - n_current

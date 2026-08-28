@@ -113,6 +113,7 @@ def store():
         {
             "t2m": (dims, t2m),
             "tp": (dims, tp),
+            "d2m": (dims, t2m - np.float32(5.0)),
             "u10": (dims, np.full((n_t, n_la, n_lo), 3.0, dtype="float32")),
             "v10": (dims, np.full((n_t, n_la, n_lo), 4.0, dtype="float32")),
         },

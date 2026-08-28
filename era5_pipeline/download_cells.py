@@ -2,8 +2,8 @@
 
 Batched, parallel, resumable. Inputs (data/cells.csv) and outputs
 (data/era5-land/archive/archive_{lat}_{lon}.csv.gz, schema
-date,tmax_C,tmin_C,precip_mm,wind_max_ms) are unchanged; archives merge by date.
-Design notes:
+date,tmax_C,tmin_C,precip_mm,wind_max_ms,dewpt_mean_C) — archives merge by date
+AND by column. Design notes:
 
 1. BATCHED TIME SPANS (was: one .compute() per year).
    The store's time chunks are 1440 h = 60 days, NOT aligned to calendar years.
@@ -13,8 +13,13 @@ Design notes:
    --batch-years bounds the span so memory stays sane (a span's t2m array is
    span_years * 8760 * 50 * 100 * 4 bytes; ~20 yr ≈ 3.5 GB/var per tile).
 
-2. PARALLEL FETCHES. The 4 stored vars (t2m, tp, u10, v10) are independent
-   network-bound .compute()s, so we fetch them concurrently (thread pool).
+2. PARALLEL FETCHES. The 5 stored vars (t2m, tp, d2m, u10, v10) are
+   independent network-bound .compute()s, so we fetch them concurrently (thread
+   pool). Everything else is derived for free: tmax/tmin from t2m, wind speed
+   from u10+v10, the daily-mean dew point from d2m. --vars restricts a run to a
+   SUBSET of the stored variables — the backfill of one new column fetches only
+   the variable that column derives from; its frames then carry only that
+   column and the merge keeps everything else the archive already holds.
    --parallel-tiles additionally runs whole tiles concurrently. The store drops
    connections under load, so keep the worker count modest; the per-step retry
    covers the occasional drop.
@@ -25,8 +30,12 @@ Design notes:
    written — a partial day merges over a complete one and silently corrupts it.
 
 4. RESUME + MONTHLY TOP-UP. Before fetching, we compute how COMPLETE each year
-   already is for each tile — its daily-ROW count, not merely whether the year is
-   present — and fetch only the years still short of a full year of days. That one
+   already is for each tile — its count of rows carrying COMPLETENESS_COLUMN
+   (the newest archive column), not merely whether the year is present — and
+   fetch only the years still short of a full year of days. Counting only rows
+   that carry the newest column is what makes a column backfill resumable: an
+   archive written before that column existed reads as 0% complete and is
+   refetched exactly once, then behaves as before. That one
    rule catches a wholly-absent year, an interior gap (a hole from an interrupted
    run), AND a year that's present but nearly empty (e.g. a lone stray row old code
    left behind — a bare year-set check wrongly treated that as "have"). The source
@@ -48,6 +57,7 @@ Usage:
   python download_cells.py --tile 11_26 --year 2020          # one span, one year
   python download_cells.py --tile 17_10,6_3 --start-year 1950 # resume missing yrs
   python download_cells.py --start-year 1950 --batch-years 20 --parallel-tiles 2
+  python download_cells.py --start-year 1950 --vars d2m    # dew-point backfill
 """
 from __future__ import annotations
 
@@ -78,8 +88,44 @@ OUT_DIR = REPO / "data" / "era5-land" / "archive"
 ZARR_URL = "https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr"
 
 # Stored variables we need. Derived metrics (tmax/tmin from t2m, wind speed from
-# u10+v10) cost nothing extra — the cost is per stored variable fetched.
-ZARR_VARS = ["t2m", "tp", "u10", "v10"]
+# u10+v10, daily-mean dew point from d2m) cost nothing extra — the cost is per
+# stored variable fetched. `d2m` (2 m dewpoint, kelvin) arrived 2026-08 for the
+# dew-point metric; verified present in the v3 store by the preflight in main().
+ZARR_VARS = ["t2m", "tp", "d2m", "u10", "v10"]
+
+# Canonical archive column order. New columns are appended AFTER the shipped
+# ones, and every reader (frontend tieredData.ts, worker cellStore.js, the bias
+# study, the analytics notebooks) parses by header NAME, so widening the schema
+# is inert for anything that doesn't ask for the new column.
+ARCHIVE_COLUMNS = [
+    "date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms", "dewpt_mean_C",
+]
+
+# Which stored variables each archive column needs. A run whose --vars lacks a
+# column's inputs simply doesn't produce that column.
+COLUMN_INPUTS = {
+    "tmax_C": ("t2m",),
+    "tmin_C": ("t2m",),
+    "precip_mm": ("tp",),
+    "wind_max_ms": ("u10", "v10"),
+    "dewpt_mean_C": ("d2m",),
+}
+
+# Store units -> archive units, per daily column. Temperatures arrive in kelvin,
+# precipitation in metres; wind is already m/s.
+_TO_ARCHIVE_UNITS = {
+    "tmax_C": lambda v: v - 273.15,
+    "tmin_C": lambda v: v - 273.15,
+    "precip_mm": lambda v: v * 1000.0,
+    "wind_max_ms": lambda v: v,
+    "dewpt_mean_C": lambda v: v - 273.15,
+}
+
+# Resume counts a year as covered only through rows that carry THIS column —
+# the newest one — so an archive from before it existed reads as empty and is
+# refetched once (the column backfill's crash-resume, no ledger needed). Passed
+# to r2_upload.read_coverage for the R2-sourced half of the same check.
+COMPLETENESS_COLUMN = "dewpt_mean_C"
 
 # The store chunks 50 (lat) x 100 (lon) cells per spatial chunk. tile_id
 # encodes the chunk index, so one tile == one 5x10deg chunk. Must match
@@ -154,8 +200,12 @@ def _available_ram_gb() -> float | None:
         return None
 
 
-def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int) -> None:
+def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int,
+             n_vars: int | None = None) -> None:
     """Estimate peak RAM for the chosen settings and warn if it's tight.
+
+    `n_vars` is the number of variables actually fetched (--vars); no more than
+    that many fetches can be in flight, however many --var-workers were asked.
 
     `batch_years` is the SPAN actually fetched — min(--batch-years, years asked
     for) — not the flag, so a single-year top-up isn't costed as a 20-year pull.
@@ -165,6 +215,8 @@ def warn_ram(batch_years: int, var_workers: int, parallel_tiles: int) -> None:
     transient resample/sqrt copies. Compared against MemAvailable so it's loud on
     a small remote box, where an OOM would silently kill the run mid-fetch.
     """
+    if n_vars is not None:
+        var_workers = max(1, min(var_workers, n_vars))
     per_var_gb = (HOURS_PER_YEAR * batch_years
                   * TILE_LAT_CELLS * TILE_LON_CELLS * 4 / 1e9)
     peak_gb = per_var_gb * var_workers * parallel_tiles * _RAM_OVERHEAD
@@ -370,13 +422,21 @@ class R2Resume:
                 smallest_size, smallest_key = size, key
         if smallest_key is None:
             return {}, None
-        return self.up.read_coverage(smallest_key)
+        return self.up.read_coverage(smallest_key, COMPLETENESS_COLUMN)
 
 
 def local_coverage_for_tile(
     tile_cells: list[dict],
 ) -> tuple[dict[int, int], date | None]:
-    """(per-year row counts across the tile, newest date) on local disk.
+    """(per-year covered-row counts across the tile, newest date) on local disk.
+
+    A row counts only if it carries COMPLETENESS_COLUMN. That is what makes a
+    column backfill resumable without an --overwrite ledger: an archive written
+    before the column existed has no such rows, so it reads as 0% complete and is
+    refetched exactly once, while a crash mid-backfill resumes at the first
+    year-span that never landed. Once the grid is backfilled the rule is
+    invisible — every row a top-up writes carries the column, so the counts are
+    the plain daily-row counts they always were.
 
     For each year we take the MIN row count across the tile's cells: a year is only
     as complete as its least-covered cell, so a year fully present in some cells but
@@ -388,18 +448,15 @@ def local_coverage_for_tile(
     year are all caught — not just the trailing tail. The newest date is the MIN of
     the cells' max dates — the tile is only as caught-up as its least-complete cell.
 
-    Returns ({}, None) if any cell file is absent or empty.
+    Returns ({}, None) if any cell file is absent, empty, or predates the column.
     """
-    import pandas as pd
-
     per_cell_counts: list[dict[int, int]] = []
     max_dates: list[date] = []
     for c in tile_cells:
         path = OUT_DIR / archive_name(c["lat"], c["lon"])
         if not path.exists():
             return {}, None  # a missing cell file means nothing is safely done
-        # Only need the date column; parse years cheaply.
-        dates = pd.to_datetime(pd.read_csv(path, usecols=["date"])["date"])
+        dates = covered_dates(path, COMPLETENESS_COLUMN)
         if dates.empty:
             return {}, None
         per_cell_counts.append(
@@ -411,6 +468,32 @@ def local_coverage_for_tile(
     all_years = set().union(*(set(d) for d in per_cell_counts))
     min_counts = {y: min(d.get(y, 0) for d in per_cell_counts) for y in all_years}
     return min_counts, min(max_dates)
+
+
+def covered_dates(source, column: str | None, **read_kwargs):
+    """The dates of an archive's rows that carry `column` (all rows if None).
+
+    `source` is anything pandas.read_csv accepts (a path, a text handle) plus
+    optional read kwargs (e.g. compression). Reads the header first: `usecols`
+    on an archive that predates the column would raise rather than report
+    "nothing covered here", which is the answer we want. Shared by the local
+    resume here and the R2 resume in r2_upload.read_coverage so both halves
+    apply the identical rule.
+    """
+    import pandas as pd
+
+    if column is None:
+        frame = pd.read_csv(source, usecols=["date"], **read_kwargs)
+        return pd.to_datetime(frame["date"])
+    if hasattr(source, "seek"):
+        source.seek(0)
+    header = pd.read_csv(source, nrows=0, **read_kwargs).columns
+    if column not in header:
+        return pd.to_datetime(pd.Series([], dtype="object"))
+    if hasattr(source, "seek"):
+        source.seek(0)
+    covered = pd.read_csv(source, usecols=["date", column], **read_kwargs)
+    return pd.to_datetime(covered.loc[covered[column].notna(), "date"])
 
 
 def _complete_years(year_counts: dict[int, int], latest_date: date | None,
@@ -459,9 +542,10 @@ def missing_years(tile_cells: list[dict], years: list[int], resume: bool,
     already COMPLETE in the tile (source of truth = R2 when `r2_resume` is given,
     since the VM's disk is ephemeral, else the local disk).
 
-    Completeness is row-count based, not mere presence (see `_complete_years`): a
-    past year needs ~365/366 rows, the trailing (current) store year needs rows up
-    to the store's newest day. This catches three cases with one rule — a
+    Completeness is row-count based, not mere presence (see `_complete_years`), and
+    only rows carrying COMPLETENESS_COLUMN count: a past year needs ~365/366 such
+    rows, the trailing (current) store year needs them up to the store's newest
+    day. This catches three cases with one rule — a
     wholly-absent year, an interior hole, AND a year that's present but nearly empty
     (e.g. a lone stray 2025 row a year-set check would wrongly accept). Because the
     trailing year reads as incomplete until it catches up to the store, ERA5-Land's
@@ -551,14 +635,29 @@ def process_span(
     start_year: int,
     end_year: int,
     var_workers: int,
+    zarr_vars: list[str] | None = None,
 ) -> dict[tuple[float, float], "object"]:
     """Fetch one tile's hourly data for [start_year, end_year], return per-cell
     daily frames. Reads exactly the tile's one 50x100 spatial chunk and the
-    time-chunks spanning the year range — each chunk fetched once. The 4 vars
-    are computed concurrently across a thread pool of size var_workers.
+    time-chunks spanning the year range — each chunk fetched once. The vars are
+    computed concurrently across a thread pool of size var_workers.
+
+    `zarr_vars` is the ACTIVE variable list (default: all of ZARR_VARS). The
+    returned frames carry exactly the ARCHIVE_COLUMNS whose inputs were fetched
+    (see COLUMN_INPUTS) — a `--vars d2m` backfill yields date + dewpt_mean_C and
+    nothing else; write_archive merges per column, so the rest of the archive
+    survives untouched.
     """
     import pandas as pd
     import xarray as xr
+
+    zarr_vars = list(ZARR_VARS if zarr_vars is None else zarr_vars)
+    active_columns = [
+        col for col in ARCHIVE_COLUMNS if col != "date"
+        and all(v in zarr_vars for v in COLUMN_INPUTS[col])
+    ]
+    if not active_columns:
+        raise ValueError(f"no archive column derives from {zarr_vars}")
 
     lat_name = "latitude" if "latitude" in ds.coords else "lat"
     lon_name = "longitude" if "longitude" in ds.coords else "lon"
@@ -588,7 +687,7 @@ def process_span(
     # aggregate from a partial handful of hours. The halo is clamped by the store
     # itself (a slice past either end just yields what exists), and costs at most
     # one extra 60-day time-chunk per variable per span end.
-    sub = ds[ZARR_VARS].sel({
+    sub = ds[zarr_vars].sel({
         time_name: slice(f"{start_year - 1}-12-31", f"{end_year + 1}-01-01"),
     }).isel({
         lat_name: slice(lat_i0, lat_i1),
@@ -599,20 +698,20 @@ def process_span(
     var_mb = (n_steps or 0) * (n_lat or 0) * (n_lon or 0) * 4 / 1e6
     log(f"  tile {tile_id} | years {span}: window {n_lat}x{n_lon} cells x "
         f"{n_steps} hourly steps, ~{var_mb:.0f} MB/var "
-        f"(~{var_mb * len(ZARR_VARS):.0f} MB total)")
+        f"(~{var_mb * len(zarr_vars):.0f} MB total)")
 
     if not n_steps:
         log(f"  tile {tile_id} | years {span}: no steps in range — skipping")
         return {}
 
-    # --- fetch the 4 vars concurrently ---------------------------------------
-    log(f"  tile {tile_id} | years {span}: fetching {len(ZARR_VARS)} vars "
-        f"({var_workers} concurrent)")
+    # --- fetch the active vars concurrently ----------------------------------
+    log(f"  tile {tile_id} | years {span}: fetching {len(zarr_vars)} var(s) "
+        f"({', '.join(zarr_vars)}; {var_workers} concurrent)")
     c0 = time.time()
     raw: dict[str, object] = {}
     with ThreadPoolExecutor(max_workers=var_workers) as ex:
         futs = {ex.submit(_compute_step, f"{v} hourly", sub[v]): v
-                for v in ZARR_VARS}
+                for v in zarr_vars}
         for fut in as_completed(futs):
             raw[futs[fut]] = fut.result()  # re-raises on permanent failure
 
@@ -635,27 +734,45 @@ def process_span(
     # increments over the shifted local day per offset group. Increment[h] =
     # tp[h]-tp[h-1], except at the 01:00 reset where tp[01:00] IS the increment
     # (it resets from 0). Verified to reproduce the old 00:00-step UTC totals.
-    tp_hourly = raw["tp"]
-    tp_prev = tp_hourly.shift({time_name: 1})
-    tp_incr = tp_hourly - tp_prev
-    is_reset = tp_hourly[time_name].dt.hour == 1
-    tp_incr = xr.where(is_reset, tp_hourly, tp_incr)
-    # First step has no predecessor; tiny negatives from float noise → 0.
-    tp_incr = tp_incr.fillna(0.0).clip(min=0.0)
+    # Skipped entirely when `tp` is not an active variable: the frame then has
+    # no precip_mm and the per-column merge keeps what the archive holds.
+    hourly: dict[str, object] = {}  # archive column -> hourly DataArray input
+    if "tp" in raw:
+        tp_hourly = raw.pop("tp")
+        tp_prev = tp_hourly.shift({time_name: 1})
+        tp_incr = tp_hourly - tp_prev
+        is_reset = tp_hourly[time_name].dt.hour == 1
+        tp_incr = xr.where(is_reset, tp_hourly, tp_incr)
+        # First step has no predecessor; tiny negatives from float noise → 0.
+        hourly["precip_mm"] = tp_incr.fillna(0.0).clip(min=0.0)
+        del tp_hourly, tp_prev, tp_incr, is_reset  # increments are all we need
 
-    wind_hourly = np.sqrt(raw["u10"] ** 2 + raw["v10"] ** 2)
-    t2m_hourly = raw["t2m"]
+    if "u10" in raw and "v10" in raw:
+        hourly["wind_max_ms"] = np.sqrt(raw.pop("u10") ** 2 + raw.pop("v10") ** 2)
+    if "t2m" in raw:
+        hourly["tmax_C"] = hourly["tmin_C"] = raw["t2m"]
+    if "d2m" in raw:
+        # The dew-point metric is the daily MEAN of hourly d2m (kelvin here,
+        # degC in the archive): dewpoint_telaviv.ipynb found the daily max to be
+        # a night-time value bunching against the marine ceiling, while the mean
+        # ranks days the way a daytime reading does.
+        hourly["dewpt_mean_C"] = raw["d2m"]
+
+    # Reference array for the land mask, the time axis and the day buckets: t2m
+    # when fetched, else whichever variable was. ERA5-Land is land-only in every
+    # variable alike (ocean is NaN across the board), so the mask is the same.
+    ref_hourly = raw["t2m"] if "t2m" in raw else next(iter(raw.values()))
 
     # --- nearest-LAND snap (Finding F1) ---------------------------------------
     # ERA5-Land is land-only (ocean cells are NaN). A coastal cell's nearest
     # gridpoint can be just offshore — the old per-cell .sel(method="nearest")
-    # then extracted an all-blank archive. Build a land mask (any finite t2m over
-    # the span — a cell that's ever finite is land) and resolve each target cell
-    # to a real land gridpoint index, snapping off ocean. We then select by
+    # then extracted an all-blank archive. Build a land mask (any finite value
+    # over the span — a cell that's ever finite is land) and resolve each target
+    # cell to a real land gridpoint index, snapping off ocean. We then select by
     # INTEGER index (.isel) below instead of coordinate-nearest .sel.
-    land_mask = np.isfinite(t2m_hourly).any(dim=time_name).values
-    win_lats = t2m_hourly[lat_name].values
-    win_lons = t2m_hourly[lon_name].values
+    land_mask = np.isfinite(ref_hourly).any(dim=time_name).values
+    win_lats = ref_hourly[lat_name].values
+    win_lons = ref_hourly[lon_name].values
     targets = [(c["lat"], float(slon)) for c, slon in zip(tile_cells, sel_lons)]
     cell_idx = resolve_land_indices(land_mask, win_lats, win_lons, targets)
     n_snapped = sum(
@@ -696,18 +813,32 @@ def process_span(
             {time_name: da[time_name] + np.timedelta64(off_h, "h")}
         )
 
+    # How each archive column reduces its hourly input over the local day.
+    def reduce_daily(col: str, grouped):
+        if col in ("tmax_C", "wind_max_ms"):
+            return grouped.max()
+        if col == "tmin_C":
+            return grouped.min()
+        if col == "precip_mm":
+            return grouped.sum()
+        if col == "dewpt_mean_C":
+            # Accumulate in float64: a float32 running sum over 24 values of
+            # ~290 K carries ~1e-3 K of noise, visible at the archive's 3 dp.
+            return grouped.mean(dtype="float64")
+        raise KeyError(col)
+
     frames: dict[tuple[float, float], pd.DataFrame] = {}
     for off_h, members in groups.items():
-        t2m_g = shift_time(t2m_hourly, off_h).resample({time_name: "1D"})
-        t2m_max = t2m_g.max()
-        t2m_min = t2m_g.min()
-        wind_max = shift_time(wind_hourly, off_h).resample({time_name: "1D"}).max()
-        tp_sum = shift_time(tp_incr, off_h).resample({time_name: "1D"}).sum()
-        dates = pd.to_datetime(t2m_max[time_name].values).date
+        daily: dict[str, object] = {}
+        for col in active_columns:
+            grouped = shift_time(hourly[col], off_h).resample({time_name: "1D"})
+            daily[col] = reduce_daily(col, grouped)
+        ref_daily = next(iter(daily.values()))
+        dates = pd.to_datetime(ref_daily[time_name].values).date
         # Drop the partial local days at the span's edges (see whole_day_mask).
         # With the halo above, the only buckets that fail are the ones the store
         # genuinely cannot complete — the newest day, mid-accumulation.
-        whole = whole_day_mask(t2m_hourly[time_name].values, off_h, dates)
+        whole = whole_day_mask(ref_hourly[time_name].values, off_h, dates)
         if not whole.all():
             dropped = [str(d) for d, ok in zip(dates, whole) if not ok]
             log(f"  tile {tile_id} | years {span}: offset {off_h:+d}h — "
@@ -722,17 +853,15 @@ def process_span(
                 # archive (that's the very F1 symptom). Skip; the cell stays
                 # absent and is logged above.
                 continue
-            row, col = idx
-            sel = {lat_name: row, lon_name: col}
-            frame = pd.DataFrame({
-                "date": dates,
-                "tmax_C": np.round(t2m_max.isel(sel).values[whole] - 273.15, 3),
-                "tmin_C": np.round(t2m_min.isel(sel).values[whole] - 273.15, 3),
-                "precip_mm": np.round(tp_sum.isel(sel).values[whole] * 1000.0, 3),
-                "wind_max_ms": np.round(wind_max.isel(sel).values[whole], 3),
-            }).sort_values("date")
+            row, col_i = idx
+            sel = {lat_name: row, lon_name: col_i}
+            columns = {"date": dates}
+            for col in active_columns:
+                values = daily[col].isel(sel).values[whole]
+                columns[col] = np.round(_TO_ARCHIVE_UNITS[col](values), 3)
+            frame = pd.DataFrame(columns).sort_values("date")
             frames[(c["lat"], c["lon"])] = frame[
-                ["date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms"]
+                [name for name in ARCHIVE_COLUMNS if name in frame.columns]
             ]
 
     return frames
@@ -1069,12 +1198,41 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader,
         return base
 
 
+def merge_archive_frames(base, frame):
+    """Merge a freshly-fetched frame onto a cell's existing archive, per COLUMN.
+
+    Not row-wise last-wins, which is what this used to be. A column backfill
+    (`--vars d2m`) fetches ONE variable, so its frames carry only the column it
+    derives — and replacing whole rows would blank every shipped column for each
+    date it rewrites. `combine_first` keeps every value the new frame HAS and
+    falls back to the archive for the rest: columns the frame lacks, and dates
+    outside the fetched span alike. A full-column frame — every routine top-up —
+    has a value everywhere and so degrades to exactly the old last-wins rule.
+
+    Duplicate dates on either side (legacy archives from before the merge was
+    de-duplicated) collapse last-wins first: combine_first aligns on the index
+    and would otherwise refuse to reindex.
+    """
+    left = frame.drop_duplicates(subset="date", keep="last").set_index("date")
+    right = base.drop_duplicates(subset="date", keep="last").set_index("date")
+    return left.combine_first(right).reset_index()
+
+
+def canonical_columns(frame):
+    """`frame` with ARCHIVE_COLUMNS first, in order; anything else appended."""
+    known = [c for c in ARCHIVE_COLUMNS if c in frame.columns]
+    return frame[known + [c for c in frame.columns if c not in known]]
+
+
 def write_archive(lat: float, lon: float, frame, *, ledger=None,
                   span=None, uploader=None, require_base: bool = False) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
 
     Merge-by-date makes re-running an overlapping span idempotent: existing dates
-    are overwritten last-wins, new dates appended. When `ledger` is given
+    are overwritten last-wins, new dates appended — per COLUMN, so a frame that
+    carries only some columns leaves the others intact (see
+    `merge_archive_frames`); the file is written in ARCHIVE_COLUMNS order.
+    When `ledger` is given
     (--overwrite), the FIRST write of a cell this run REPLACES the existing file
     (so a recompute drops stale rows the new run no longer produces); subsequent
     span-writes for that cell merge as usual. `span` (s, e) records completion so
@@ -1087,8 +1245,6 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
     With `require_base` (a partial-history run) an unreadable R2 base raises
     MergeBaseUnavailable instead — nothing is written, so R2 keeps its history.
     """
-    import pandas as pd
-
     with _WRITE_LOCK:
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / archive_name(lat, lon)
@@ -1096,13 +1252,10 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
         base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader,
                            require_base=require_base)
         if base is not None:
-            merged = (
-                pd.concat([base, frame])
-                .drop_duplicates(subset="date", keep="last")
-                .sort_values("date")
-            )
+            merged = merge_archive_frames(base, frame).sort_values("date")
         else:
             merged = frame.sort_values("date")
+        merged = canonical_columns(merged)
         # Atomic write: never leave a half-written .csv.gz that the next merge
         # (or the frontend) can't read if this process is killed mid-write.
         tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1135,7 +1288,8 @@ def run_tile_guarded(*args, **kwargs) -> int:
 
 def run_tile(ds, tile_id, tile_cells, years, batch_years,
              var_workers, resume, latest_date=None, r2_resume=None,
-             uploader=None, ledger=None, require_base=False) -> int:
+             uploader=None, ledger=None, require_base=False,
+             zarr_vars=None) -> int:
     """Fetch all missing year-spans for one tile; return archives written.
 
     If `uploader` is given, each cell's archive is pushed to R2 right after it's
@@ -1144,8 +1298,10 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
     `r2_resume`, when set, makes the resume check read coverage from R2 (the VM's
     disk is ephemeral) instead of the local archives. `ledger` (--overwrite)
     rebuilds every year from scratch and resumes via its own (cell, span) index.
-    `require_base` marks a partial-history run: a cell whose R2 archive can't be
-    read is skipped (and recorded) rather than overwritten with this span alone.
+    `require_base` marks a partial run (a slice of the years, or a subset of the
+    variables): a cell whose R2 archive can't be read is skipped (and recorded)
+    rather than overwritten with this span alone. `zarr_vars` restricts the
+    fetch to a subset of ZARR_VARS (see process_span).
 
     When a written span reaches the store's newest year (`latest_date.year`) — a
     fresh backfill catching up, or the automatic trailing-year top-up — the cell's
@@ -1184,7 +1340,8 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
                     "(ledger) — skipping")
                 continue
 
-        frames = process_span(ds, tile_id, tile_cells, s, e, var_workers)
+        frames = process_span(ds, tile_id, tile_cells, s, e, var_workers,
+                              zarr_vars)
         for (lat, lon), frame in frames.items():
             if ledger is not None and ledger.span_done(lat, lon, s, e):
                 continue  # already landed before a crash
@@ -1222,6 +1379,34 @@ def run_tile(ds, tile_id, tile_cells, years, batch_years,
     return written
 
 
+def parse_vars(spec: str | None) -> list[str]:
+    """The active variable list for a run: `--vars` as a subset of ZARR_VARS, in
+    ZARR_VARS order; None ⇒ all of them. Unknown names raise ValueError."""
+    if spec is None:
+        return list(ZARR_VARS)
+    wanted = {v.strip() for v in spec.split(",") if v.strip()}
+    unknown = sorted(wanted - set(ZARR_VARS))
+    if unknown:
+        raise ValueError(f"unknown --vars {unknown}; stored vars are {ZARR_VARS}")
+    if not wanted:
+        raise ValueError("--vars is empty")
+    return [v for v in ZARR_VARS if v in wanted]
+
+
+def needs_merge_base(uploading: bool, start_year: int,
+                     active_vars: list[str]) -> bool:
+    """Whether an unreadable R2 base must SKIP the cell rather than write fresh.
+
+    True for any upload run whose frames can't reproduce the whole archive on
+    their own: one starting after ARCHIVE_FIRST_YEAR (a slice of the years) or
+    one fetching a subset of ZARR_VARS (a slice of the columns). A full run —
+    every year, every variable — keeps the best-effort fresh write.
+    """
+    if not uploading:
+        return False
+    return start_year > ARCHIVE_FIRST_YEAR or set(active_vars) != set(ZARR_VARS)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tile", help="tile_id(s), comma-separated; default: all")
@@ -1239,6 +1424,13 @@ def main() -> int:
     ap.add_argument("--parallel-tiles", type=int, default=1,
                     help="tiles fetched concurrently (default 1); the store "
                     "drops connections under load, so keep this small")
+    ap.add_argument("--vars", default=None,
+                    help="comma-separated subset of the stored variables to "
+                    f"fetch (default: all of {','.join(ZARR_VARS)}). A backfill "
+                    "of ONE new column — `--vars d2m` for dewpt_mean_C — fetches "
+                    "only that variable; the frames then carry only the "
+                    "column(s) it derives and the merge keeps every other "
+                    "column the archive already holds.")
     ap.add_argument("--no-resume", action="store_true",
                     help="refetch everything, ignoring existing archives")
     ap.add_argument("--upload-r2", action="store_true",
@@ -1259,6 +1451,11 @@ def main() -> int:
     if args.year is not None:
         args.start_year = args.end_year = args.year
     years = list(range(args.start_year, args.end_year + 1))
+    try:
+        active_vars = parse_vars(args.vars)
+    except ValueError as exc:
+        print(f"!! {exc}")
+        return 1
     # --overwrite recomputes from scratch, so every requested year must be
     # refetched — a resume that skipped present years would leave them stale.
     # It carries its own crash-resume via the ledger instead.
@@ -1316,7 +1513,10 @@ def main() -> int:
     n_cells = sum(len(v) for v in tiles.values())
     print("ERA5-Land cell download (v2: batched + parallel + resumable)")
     print(f"  store : {ZARR_URL}")
-    print(f"  vars  : {ZARR_VARS}")
+    print(f"  vars  : {active_vars}"
+          + ("" if active_vars == ZARR_VARS else
+             f"  (subset of {ZARR_VARS}; columns: "
+             f"{[c for c in ARCHIVE_COLUMNS if c != 'date' and all(v in active_vars for v in COLUMN_INPUTS[c])]})"))
     print(f"  scope : {len(tiles)} tile(s), {n_cells} cell(s), "
           f"years {args.start_year}-{args.end_year}")
     print(f"  batch : up to {args.batch_years} yr/fetch, {args.var_workers} "
@@ -1340,7 +1540,7 @@ def main() -> int:
     # holds one year of hourly data, not --batch-years' worth. Estimating from
     # the flag alone made a 1 GB top-up print a 21 GB OOM warning.
     warn_ram(min(args.batch_years, len(years)), args.var_workers,
-             args.parallel_tiles)
+             args.parallel_tiles, n_vars=len(active_vars))
     print()
 
     log("opening zarr store...")
@@ -1355,7 +1555,7 @@ def main() -> int:
         return 1
     log("store opened")
 
-    missing = [v for v in ZARR_VARS if v not in ds]
+    missing = [v for v in active_vars if v not in ds]
     if missing:
         print(f"!! variables not in store: {missing}; have {list(ds.data_vars)}")
         return 1
@@ -1370,14 +1570,18 @@ def main() -> int:
         "ending before this get their trailing year topped up")
 
     # A run that doesn't start at ARCHIVE_FIRST_YEAR fetches only a slice of the
-    # record (the monthly top-up: --year 2026). Uploading such a span over an
-    # archive whose R2 copy we failed to read would delete every earlier year, so
-    # in that mode an unreadable base skips the cell instead. Full-history runs
-    # keep the old best-effort behaviour: the span they hold IS the history.
-    require_base = uploader is not None and args.start_year > ARCHIVE_FIRST_YEAR
+    # record (the monthly top-up: --year 2026), and a --vars run only some of its
+    # columns. Uploading such a frame over an archive whose R2 copy we failed to
+    # read would delete every earlier year / every other column, so in either
+    # mode an unreadable base skips the cell instead. Full runs keep the old
+    # best-effort behaviour: the frame they hold IS the archive.
+    require_base = needs_merge_base(uploader is not None, args.start_year,
+                                    active_vars)
     if require_base:
-        log(f"partial-history run (from {args.start_year}): a cell whose R2 "
-            "archive can't be read is SKIPPED, not overwritten")
+        what = ("partial-history" if args.start_year > ARCHIVE_FIRST_YEAR
+                else "partial-variable")
+        log(f"{what} run (from {args.start_year}, vars {active_vars}): a cell "
+            "whose R2 archive can't be read is SKIPPED, not overwritten")
 
     total_written = 0
     if args.parallel_tiles > 1:
@@ -1385,7 +1589,7 @@ def main() -> int:
             futs = {
                 ex.submit(run_tile_guarded, ds, t, c, years, args.batch_years,
                           args.var_workers, resume, latest_date, r2_resume,
-                          uploader, ledger, require_base): t
+                          uploader, ledger, require_base, active_vars): t
                 for t, c in tiles.items()
             }
             for fut in as_completed(futs):
@@ -1395,7 +1599,7 @@ def main() -> int:
             total_written += run_tile_guarded(
                 ds, tile_id, tile_cells, years, args.batch_years,
                 args.var_workers, resume, latest_date, r2_resume,
-                uploader, ledger, require_base)
+                uploader, ledger, require_base, active_vars)
 
     # Clean finish: drop the resume ledger so the NEXT overwrite run starts fresh
     # rather than treating this run's completed spans as already-done.

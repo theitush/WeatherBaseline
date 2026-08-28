@@ -79,6 +79,9 @@ VARS = [
     {"name": "tmin", "col": "tmin_C", "unit": "degC", "nonneg": False},
     {"name": "precip", "col": "precip_mm", "unit": "mm", "nonneg": True},
     {"name": "wind", "col": "wind_max_ms", "unit": "m/s", "nonneg": True},
+    # Daily-MEAN 2 m dew point (2026-08): archive side from ERA5-Land d2m, HRES
+    # side from Open-Meteo's daily dew_point_2m_mean under models=ecmwf_ifs.
+    {"name": "dewpt", "col": "dewpt_mean_C", "unit": "degC", "nonneg": False},
 ]
 VALUE_COLS = [v["col"] for v in VARS]
 

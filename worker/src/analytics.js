@@ -150,7 +150,7 @@ export function behaviouralHumans(rows) {
 // The metric is the last path segment of page (/lat,lon/date/metric).
 function deriveMetric(page) {
   if (!page) return null;
-  const m = String(page).match(/\/(tmax|tmin|precip|wind)(?:[/?#]|$)/);
+  const m = String(page).match(/\/(tmax|tmin|precip|wind|dew)(?:[/?#]|$)/);
   return m ? m[1] : null;
 }
 
