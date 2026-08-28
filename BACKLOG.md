@@ -317,3 +317,87 @@ premise that the gap reads as humidity.
 Heat index wins on being the most widely recognised of the four, an actual
 temperature rather than an index number, and computable from variables we are
 already pulling.
+
+---
+
+## Tier-conditional confidence (the "p-remap")
+
+**Status:** TABLED 2026-08-28 — **what ships today is good enough.** The card's
+"~C% chance this day will be …" number is honest in aggregate: ECE ≤ 3 pp on
+every variable (1.19 / 2.14 / 2.43 / 2.55 tmax / tmin / wind / precip on the q9
+claims) and the bulk of claims hug the diagonal. The residual below is confined
+to the tail tiers, is bounded, and has been measured twice with the same shape.
+Maybe worth doing if the tail tiers ever become the headline feature (share
+cards, confetti as a product moment); otherwise leave it. Nothing here blocks or
+is blocked by anything else.
+
+### What is actually wrong
+
+The tier is chosen by ranking the *corrected median* in the ±window climatology
+(`forecastReference.ts`: past p5 → `extreme`, p10 → `mid`, p20 → `notable`),
+then the confidence is the mass of the row's own 9-point band past that tier's
+cutoff (`confidence.ts`). Saying "extreme" therefore *selects* the days whose
+forecast erred in the extreme direction, and conditional on that selection the
+whole band sits too far out in the tail — regression to the mean. CQR cannot see
+this: it is one shift per (var, level) pooled over all days, so marginal rung
+coverage holds (worst rung +0.44 pp) while tier-conditional coverage does not.
+
+Measured on `data/nb_confidence/claims_reliability_qn8620_s0_q9.feather`
+(143,416 claims, 400 cells), claimed → realized:
+
+| tier | tmax | tmin | wind | precip |
+|---|---|---|---|---|
+| extreme | 76% → 66% (−9.2 pp) | 72 → 63 (−9.9) | 66 → 52 (−14.8) | 70 → 58 (−12.1) |
+| mid | −5.3 | −6.8 | −6.7 | −11.1 |
+| notable | −1.5 | −4.6 | −5.2 | −7.5 |
+| mildOff / mildDead | +2.6 / +0.9 | +3.8 / +2.1 | +2.5 / +1.6 | +4.5 / +1.7 |
+
+Tail tiers over-promise, mild tiers under-promise, and since mild is ~70% of
+claims the two cancel in aggregate — which is exactly why ECE passes while the
+tier that fires confetti runs 10–15 pp generous. The sag is p-dependent (shrinks
+at high p for temps) and low-side claims sag ~2× worse than high-side, so a flat
+haircut is the wrong shape. `alltime` is n = 4–60 per var: too small to fit.
+
+### Closed routes — do not re-propose
+
+- **Retraining does not touch it.** The 9-level retrain moved the extreme gap
+  tmax −8.2 → −9.2, tmin −8.6 → −9.9, wind −16.0 → −14.8, precip −13.3 → −12.1:
+  noise. Extra marginally-calibrated heads cannot fix conditional-on-selection
+  bias — predicted before the retrain, confirmed after.
+- **Climatology rank as a model feature** — tried and rejected (lookahead /
+  expanding-window regime change; see the retrain plan's rejected list).
+- **Baking it into the R2 tables** — the tier is only known client-side (±window
+  pool from the archive, `rankValue`, the all-time rank). Replicating that ladder
+  in the bake is fragile lockstep with the frontend, puts a discontinuity at the
+  tier boundary that gets linearly interpolated across 15 hres anchors, and costs
+  a 414 MB reship + edge purge for ~24 constants.
+
+### If it is ever picked up: Mondrian conformal by tier × side, client-side
+
+Group-conditional (Mondrian) conformal is the textbook version of this — a
+separate shift per (var, level, group), where tier × side is a legal group
+because it is a function of the forecast, not the truth. Two places to apply it,
+both a couple dozen frontend constants, no retrain, no table reship:
+
+- **A — band shifts in `ci.ts`** (preferred, untested). After the tier resolves,
+  shift the 9 rungs toward the mean by tier × side × level constants; the
+  confidence then falls out of the shifted band. Coherent: number, histogram
+  band and shown median all move together, and a constant shift naturally
+  reproduces the p-dependent sag (a claim just past the cutoff loses a lot of p,
+  one far past barely moves). Wrinkle: the shifted median may drop back under
+  the cutoff — either re-resolve the tier (demotes the marginal days, which is
+  the honest outcome; the guarantee becomes approximate) or accept words ≠ band
+  on the margin. Needs the per-day bands: `eval_bands_{var}_qn8620_s0_q9.feather`
+  in `data/nb_confidence/` (the claims feather only carries `est/truth/claimed_p`).
+- **B — p-remap in `confidence.ts`** (fallback, dry-run validated). Per
+  (tier ∈ extreme/mid/notable) × var monotone logit-linear map on the displayed
+  p, fit on half the cells and validated on the other half; mild untouched (it
+  under-claims, harmless), `alltime` borrows extreme's map. Dry run on the
+  7-level feather closed the extreme gap out-of-sample to tmax 0.0, tmin −3.9,
+  precip −3.4, wind −8.0 pp. Must be refit on the q9 feather before shipping.
+  Cost: on the days it haircuts, the histogram band and median stay
+  outward-biased, so the picture and the number disagree slightly.
+
+Validation either way = regenerate `card_claim_reliability.ipynb` tier table
+above and check the extreme/mid/notable rows sit within the ±3 pp bar on the
+held-out half.
