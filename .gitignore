@@ -61,3 +61,6 @@ __pycache__/
 
 # Local config backups (Claude Code state, not project files)
 /backups/
+
+# Hourly dew-point pulls behind the daily-aggregate study.
+/dew_point/data/
