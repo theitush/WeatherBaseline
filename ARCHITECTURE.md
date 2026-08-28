@@ -136,9 +136,11 @@ convention. Per cell:
 - `recent_{lat}_{lon}.csv.gz`   — append-only; ~daily writes; short TTL.
 - `forecast_{lat}_{lon}.csv.gz` — rewritten; 12h TTL; smallest, most volatile.
 
-Schema (all tiers): `date,tmax_C,tmin_C,precip_mm,wind_max_ms` (keep all 4
-metrics). `.csv.gz` — browsers
-auto-gunzip via `Content-Encoding: gzip`.
+Schema (all tiers): `date,tmax_C,tmin_C,precip_mm,wind_max_ms,dewpt_mean_C`
+(the 5 metrics; `dewpt_mean_C` = daily MEAN 2 m dew point, added 2026-08 —
+ERA5-Land `d2m` in archive/recent, IFS daily mean in forecast; readers parse by
+header name, so rows from before a column shipped simply lack it). `.csv.gz` —
+browsers auto-gunzip via `Content-Encoding: gzip`.
 
 Three files instead of one so the **immutable archive is cached forever** and
 only the tiny volatile files get rewritten — minimizing both R2 writes and
