@@ -1,0 +1,91 @@
+# Mirror this repo's source into the COO repo (coo/mirror/<name>/).
+#
+# INSTALL (per project repo):
+#   1. Copy this file to .github/workflows/mirror-sync.yml in the project repo.
+#   2. In the project repo: Settings → Secrets and variables → Actions →
+#      New repository secret, name COO_SYNC_TOKEN.
+#      Value: a fine-grained PAT scoped to ONLY the coo repo, with
+#      Repository permissions → Contents: Read and write. (One PAT can be
+#      reused as the secret in every project repo.)
+#   3. Adjust COO_REPO / branches / excludes below if needed, then push.
+#      The mirror lands in coo/mirror/<repo-name-lowercased>/ on every push.
+
+name: Mirror source to COO
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: mirror-to-coo
+  cancel-in-progress: true
+
+env:
+  COO_REPO: theitush/coo
+  # Mirror directory name; defaults to the repo name, lowercased.
+  MIRROR_NAME: ""
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout COO repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.COO_REPO }}
+          token: ${{ secrets.COO_SYNC_TOKEN }}
+          path: coo
+
+      - name: Sync, commit, push
+        run: |
+          set -euo pipefail
+          NAME="${MIRROR_NAME:-$(basename "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')}"
+          mkdir -p "coo/mirror/$NAME"
+
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'node_modules/' \
+            --exclude 'dist/' \
+            --exclude 'build/' \
+            --exclude 'out/' \
+            --exclude '.next/' \
+            --exclude 'target/' \
+            --exclude 'coverage/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pyc' \
+            --exclude '.venv/' \
+            --exclude 'venv/' \
+            --exclude '.cache/' \
+            --exclude 'data/' \
+            --exclude 'datasets/' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude '*.sqlite' \
+            --exclude '*.db' \
+            --exclude '.DS_Store' \
+            src/ "coo/mirror/$NAME/"
+
+          cd coo
+          git config user.name "mirror-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A "mirror/$NAME"
+          if git diff --cached --quiet; then
+            echo "Mirror already up to date."
+            exit 0
+          fi
+          git commit -m "mirror: sync $NAME from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+
+          # The board and COO sessions also push to this repo; retry around races.
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            git pull --rebase
+          done
+          echo "Failed to push mirror after 3 attempts" >&2
+          exit 1
