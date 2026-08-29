@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
-import { comparablePool } from '../utils/dataProcessor';
+import { comparablePool, observedPool } from '../utils/dataProcessor';
 import {
   bandQuantilePoints,
   valueAtTailFraction,
@@ -161,9 +161,11 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     const tooltip = d3.select(tooltipRef.current);
 
-    // Drop forecasts past the selected target date; forecast rows at/before it
-    // are recent reanalysis-quality and kept. Shared with the prose verdict via
-    // comparablePool so both percentages run off the identical pool.
+    // Values for the BARS: everything the chart may draw, i.e. the comparable
+    // pool (forecasts past the selected target date dropped; rows at/before it
+    // kept). The bracket PERCENTAGES deliberately run off a narrower pool —
+    // histRowsNative below, which is observation-only — because a bar is a day
+    // shown, while a percentage is a day counted.
     const values = comparablePool(filteredData, currentDate)
       .map((d) => d[currentMetric])
       .filter((v): v is number => v !== undefined)
@@ -343,12 +345,13 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     };
 
     // Historical climatology pool (display units) for the bracket %s and the
-    // forecast reference line. EXCLUDES look-ahead forecast rows so a future
-    // target's own forecast days can't inflate the counts (that's what made the
-    // two brackets sum to >100%); on a settled past target there are none, so
-    // this is the old pool unchanged.
-    const histRowsNative = comparablePool(filteredData, currentDate)
-      .filter((d) => d.data_type !== 'forecast')
+    // forecast reference line. EXCLUDES model rows — every forecast row (so a
+    // future target's own forecast days can't inflate the counts, which is what
+    // made the two brackets sum to >100%) and recent-tier precip/wind, which is
+    // IFS output rather than era5_land. observedPool is THE pool the card's rank
+    // and the chart's record star count on too, so a bracket %, an "Nth wettest"
+    // and a star can't be reading different days.
+    const histRowsNative = observedPool(filteredData, currentMetric)
       .map((d) => d[currentMetric])
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     const histValues = histRowsNative.map((v) => convert(v, currentMetric, system));
@@ -567,8 +570,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         // threshold the confidence test checks against (= the confidence-shade
         // edge below); mild tiers are two-sided and use loT/hiT instead, so
         // refValue is unused there.
-        const allHistNative = comparablePool(yearTimeline, currentDate)
-          .filter((d) => d.data_type !== 'forecast')
+        const allHistNative = observedPool(yearTimeline, currentMetric)
           .map((d) => d[currentMetric])
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
         const marker = resolveForecastMarker(band.mid, histRowsNative, allHistNative, true);

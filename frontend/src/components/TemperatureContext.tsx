@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey, MetricBand } from '../types';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, unitLabelBare, valueDecimals } from '../utils/units';
-import { comparablePool, findRecords } from '../utils/dataProcessor';
+import { comparablePool, findRecords, observedPool } from '../utils/dataProcessor';
 import { resolveForecastMarker } from '../utils/forecastReference';
 import { recordScaleFraction } from '../utils/recordScale';
 import {
@@ -207,7 +207,9 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   });
 
   // Records via the shared findRecords() — the SAME call the chart star uses, so
-  // "the record" is one definition site, not a loop duplicated per component.
+  // "the record" is one definition site, not a loop duplicated per component. It
+  // drops model rows itself, so the rail ends are measured ERA days even when the
+  // window contains a hotter forecast.
   const { hiRow, loRow } = findRecords(valid, currentMetric);
   const recordLow = loRow ? (loRow[currentMetric] as number) : null;
   const recordHigh = hiRow ? (hiRow[currentMetric] as number) : null;
@@ -274,22 +276,20 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   // verdict bank AND the confetti burst below. Stays false on historical rows.
   let isVeryExtremeForecast = false;
   {
-    // Tier + rarity run off the SAME climatology pool the histogram brackets use:
-    // comparablePool at/before the target with FORECAST ROWS EXCLUDED — the target's
-    // own forecast row plus recent reanalysis-quality rows. Including them (as this
-    // card used to) ranks the value against near-copies of itself and lands it a tier
+    // Tier + rarity run off the SAME observed-only climatology pool the histogram
+    // brackets and the record star use — MODEL ROWS EXCLUDED, i.e. the target's own
+    // forecast row and any recent-tier precip/wind. Including them (as this card
+    // used to) ranks the value against near-copies of itself and lands it a tier
     // MILDER than the histogram, which excludes them — the "card says top 20% / chart
-    // says top 10%" bug. resolveForecastMarker is THE shared tier resolver
+    // says top 10%" bug; and it let a model row be ranked #1 while the star sat on a
+    // real one. resolveForecastMarker is THE shared tier resolver
     // (utils/forecastReference) the histogram calls too, so the card headline and the
     // bracket can no longer disagree about which tier fired. Ranking is unit-agnostic,
     // so the marker runs on NATIVE pools; display-unit copies below feed only the
     // confidence cutoff VALUES.
-    const isForecastRow = (d: WeatherDataPoint) => d.data_type === 'forecast';
-    const windowNative = valid
-      .filter((d) => !isForecastRow(d))
+    const windowNative = observedPool(valid, currentMetric)
       .map((d) => d[currentMetric] as number);
-    const allTimeNative = comparablePool(yearTimeline, currentDate)
-      .filter((d) => !isForecastRow(d))
+    const allTimeNative = observedPool(yearTimeline, currentMetric)
       .map((d) => d[currentMetric])
       .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     const bucketed = !!band;
@@ -441,10 +441,10 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
         // the band is a single point, so restate it against the majority the day
         // actually resembles: "…like 99% of days…". The share is COMPUTED (never
         // hardcoded) on the SAME pool the histogram's dry bracket counts — the
-        // comparable climatology days with forecast rows excluded — so the card
-        // number and the bracket always agree.
+        // observed climatology days, model rows excluded — so the card number and
+        // the bracket always agree.
         if (tierTwoSided && Math.abs(hiT - loT) < 1e-6) {
-          const climatology = valid.filter((d) => d.data_type !== 'forecast');
+          const climatology = observedPool(valid, currentMetric);
           const atValue = climatology.filter(
             (d) => convert(d[currentMetric] as number, currentMetric, system) <= loT + 1e-9
           ).length;

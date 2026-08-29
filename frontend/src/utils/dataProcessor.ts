@@ -1,7 +1,7 @@
 // Data processing utilities
 import * as d3 from 'd3';
-import CONFIG from './config';
-import type { MetricKey } from './config';
+import CONFIG from './config.ts';
+import type { MetricKey } from './config.ts';
 import type { WeatherDataPoint, YearlyAggregate, TemperatureContext, DataExtents } from '../types';
 
 // Parse a YYYY-MM-DD target date as LOCAL midnight. A bare `new Date("YYYY-MM-DD")`
@@ -37,11 +37,54 @@ export function comparablePool(
 }
 
 /**
+ * Is this row a MODEL figure rather than a settled ERA observation? THE one
+ * definition, so the dot that looks like a guess is exactly the row the records
+ * and the climatology throw out.
+ *   - `forecast` tier: always a model guess.
+ *   - `recent` tier precip/wind: also model output — the recent seam pulls those
+ *     two from the IFS historical-forecast API because era5_land returns null for
+ *     them. Recent-tier TEMPERATURE is era5_land, so it counts as observed.
+ * MainChart styles hollow dots off this, and observedPool() below filters on it.
+ */
+export function isModelRow(d: WeatherDataPoint, metric: MetricKey): boolean {
+  const recentIsModel = metric === 'precipitation_sum' || metric === 'wind_speed_10m_max';
+  return d.data_type === 'forecast' || (recentIsModel && d.data_type === 'recent');
+}
+
+/**
+ * THE observed-only pool: real ERA data for `metric` and nothing else (archive
+ * tier, plus recent-tier temperature). No date cutoff is needed — every forecast
+ * row is gone regardless of when it is dated, so this is already a subset of
+ * comparablePool() for any cutoff.
+ *
+ * DECIDED (issue #2): the rarity/percentile pool runs off THIS pool too, not just
+ * the records. The prose rank, the histogram brackets and the record star must
+ * never disagree, and they can only guarantee that by counting the same days — if
+ * the ranking pool kept a model row the star pool rejects, a recent-tier precip
+ * guess could be ranked #1 ("Record-breaker!") with the star sitting on a lower
+ * archive day. comparablePool() stays the pool for what the chart DRAWS — dots,
+ * histogram bins, axis extent, yearly bands — where model rows are shown, marked
+ * hollow, rather than counted.
+ */
+export function observedPool(
+  data: WeatherDataPoint[],
+  metric: MetricKey
+): WeatherDataPoint[] {
+  return data.filter((d) => !isModelRow(d, metric));
+}
+
+/**
  * THE one way to find the record high/low rows in a pool. Both the chart's star
  * markers (MainChart) and the prose verdict (TemperatureContext) call this, so a
  * day is "the record" in exactly one place. Pass an already-scoped pool (e.g.
  * comparablePool(data, currentDate)); rows missing the metric are skipped.
  * Returns null rows when the pool has no valid value.
+ *
+ * A record is an OBSERVATION by definition, so model rows are dropped here rather
+ * than left to each caller: a forecast is a guess that hasn't happened, and a
+ * recent-tier precip/wind row is IFS output, not era5_land (see isModelRow). The
+ * filter lives inside this function so no caller can hand in a pool that puts the
+ * star on a number nobody measured.
  */
 export function findRecords(
   pool: WeatherDataPoint[],
@@ -50,6 +93,7 @@ export function findRecords(
   let hiRow: WeatherDataPoint | null = null;
   let loRow: WeatherDataPoint | null = null;
   for (const d of pool) {
+    if (isModelRow(d, metric)) continue;
     const v = d[metric];
     if (typeof v !== 'number' || !Number.isFinite(v)) continue;
     if (hiRow === null || v > (hiRow[metric] as number)) hiRow = d;

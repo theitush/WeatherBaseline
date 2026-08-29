@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint, YearlyAggregate } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
-import { comparablePool, findRecords } from '../utils/dataProcessor';
+import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
@@ -352,17 +352,15 @@ const MainChart: React.FC<MainChartProps> = ({
     // was it on <date>", not a look-ahead at the rest of the forecast horizon.
     const targetDay = new Date(currentDate + 'T12:00:00');
 
-    // Recent-tier precip/wind aren't ERA5-Land: the recent seam pulls those two
-    // from the IFS historical-forecast API (era5_land returns null for p/w), so
-    // for these metrics a `recent` row is model output, not settled reanalysis —
-    // mark it exactly like a forecast point (hollow dot + "Forecast" tooltip).
-    // Temperature in the recent tier IS era5_land, so it stays a normal point.
-    // Note: only the forecast *tier* is dropped past the target day below; recent
-    // rows are settled past data (never look-ahead), so they're always plotted.
-    const recentIsModel =
-      currentMetric === 'precipitation_sum' || currentMetric === 'wind_speed_10m_max';
-    const isForecastLike = (d: WeatherDataPoint) =>
-      d.data_type === 'forecast' || (recentIsModel && d.data_type === 'recent');
+    // Model rows — forecast tier, plus recent-tier precip/wind, which come from
+    // the IFS historical-forecast API rather than era5_land — are marked like a
+    // forecast point (hollow dot + "Forecast" tooltip). The rule itself lives in
+    // dataProcessor.isModelRow, the SAME predicate that keeps these rows out of
+    // the records and the climatology, so a hollow dot can never be counted as a
+    // measured day. Note: only the forecast *tier* is dropped past the target day
+    // below; recent rows are settled past data (never look-ahead), so they're
+    // always plotted.
+    const isForecastLike = (d: WeatherDataPoint) => isModelRow(d, currentMetric);
 
     const dotData = filteredData.filter(
       (d) =>
@@ -420,10 +418,12 @@ const MainChart: React.FC<MainChartProps> = ({
     };
 
     // Record high (red) and record low (blue) markers. Use the SAME pool and the
-    // SAME findRecords() the prose verdict uses (comparablePool drops look-ahead
-    // forecast past the target day), so the star and the "Nth Xest" text can
-    // never disagree about which day is the record. Reused below to test whether
-    // the TARGET day IS the record — then it's a shining star, not the plain dot.
+    // SAME findRecords() the prose verdict uses, so the star and the "Nth Xest"
+    // text can never disagree about which day is the record. findRecords itself
+    // drops model rows (forecast tier + recent-tier precip/wind), so a star only
+    // ever lands on an ERA observation — a hollow dot can't win one. Reused below
+    // to test whether the TARGET day IS the record — then it's a shining star,
+    // not the plain dot.
     const { hiRow: recordHiRow, loRow: recordLoRow } = findRecords(
       comparablePool(filteredData, currentDate),
       currentMetric
