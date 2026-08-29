@@ -122,6 +122,32 @@
   );
 }
 
+/* Zero-spread window (in practice a bone-dry precip window: every comparable day
+   is 0mm, so record low === record high). The blue→white→red gradient reads as
+   "cold end … hot end"; with nothing between the ends there is no scale to
+   colour, so the rail goes flat and neutral and the marker just sits on it. */
+.record-scale-gradient-flat {
+  background: var(--border-strong);
+}
+
+/* Replaces the two (identical, uninformative) end labels in that flat state:
+   one caption naming the pool and its single value — "every day within ±3 days
+   of Jul 12th: 0 mm". Absolutely positioned inside the track so the flex row and
+   the marker readout above it keep their existing geometry. */
+.record-scale-flat-note {
+  position: absolute;
+  /* Clears the 16px marker tick (rail centre ±8px) and still fits inside the
+     48px track, so the flex row's height is unchanged. */
+  top: calc(50% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 100%;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .record-scale-marker {
   position: absolute;
   top: 50%;

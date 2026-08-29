@@ -4,6 +4,7 @@ import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, unitLabelBare, valueDecimals } from '../utils/units';
 import { comparablePool, findRecords } from '../utils/dataProcessor';
 import { resolveForecastMarker } from '../utils/forecastReference';
+import { recordScaleFraction } from '../utils/recordScale';
 import {
   bandQuantilePoints,
   probabilityOneSided,
@@ -27,8 +28,6 @@ interface TemperatureContextProps {
   currentDate: string;
   cityName: string;
 }
-
-const BIN_COUNT = 10;
 
 // Metric phrase for the lead line — mirrors the metric buttons.
 const METRIC_LEAD_LABEL: Record<MetricKey, string> = {
@@ -215,18 +214,41 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
   const recordLowDate = loRow ? loRow.date : null;
   const recordHighDate = hiRow ? hiRow.date : null;
 
+  // A window with NO spread at all: every comparable day carries the identical
+  // value, so record low === record high. In practice this is a bone-dry precip
+  // window (every day within ±N days of the date, across all years, is 0mm). It
+  // used to blank the bar out entirely: the position is a (v - lo) / (hi - lo)
+  // normalisation, i.e. 0/0 here, so the old strict `hi > lo` guard left
+  // binnedPct null and the card fell back to a bare number with no scale at all.
+  // We still draw the bar now (recordScaleFraction centres the marker); it just
+  // stops claiming a range it doesn't have — flat rail, and the two identical end
+  // labels collapse into one caption. See the render below.
+  const flatScale = recordLow !== null && recordHigh !== null && recordHigh === recordLow;
+
   let binnedPct: number | null = null;
   let markerColor = '#222';
-  if (recordLow !== null && recordHigh !== null && recordHigh > recordLow) {
-    const raw = (displayTemp - recordLow) / (recordHigh - recordLow);
-    const clamped = Math.max(0, Math.min(1, raw));
-    const bin = Math.round(clamped * BIN_COUNT);
-    const binT = bin / BIN_COUNT;
+  if (recordLow !== null && recordHigh !== null) {
+    const binT = recordScaleFraction(displayTemp, recordLow, recordHigh);
     binnedPct = binT * 100;
     markerColor = interpolateGradient(binT);
   }
 
   const hasScale = binnedPct !== null && recordLow !== null && recordHigh !== null;
+
+  // Name the actual comparison pool: every day within a ±seasonalWindowDays
+  // calendar window of the target date, across all years back to 1950. Spell out
+  // the window and date ("within ±N days of June 6th") rather than the vaguer
+  // "this time of year". Hoisted above the verdict block because the flat-scale
+  // caption in the render names the very same pool.
+  const win = CONFIG.chart.seasonalWindowDays;
+  const td = new Date(currentDate + 'T12:00:00');
+  const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const tDay = td.getDate();
+  const since = ` within ±${win} days of ${shortMonths[td.getMonth()]} ${tDay}${ordinalSuffix(tDay)}`;
+  // Min temp is always the overnight low, so describe the pool as nights.
+  const noun = currentMetric === 'min_temperature' ? 'night' : 'day';
+  const nounP = noun + 's';
 
   // Verdict (bold line) + rarity line, both keyed off how far into the day's own
   // tail it sits. HISTORICAL rows tier by rank/rarity on the value's side:
@@ -285,21 +307,8 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       const tierPool = marker.tierUsesAllTime ? allVals : values;
       const tierCutoff = marker.tierCutoff;
       const tierTwoSided = marker.tierTwoSided;
-      // Name the actual comparison pool: every day within a ±seasonalWindowDays
-      // calendar window of the target date, across all years back to 1950. Spell
-      // out the window and date ("within ±N days of June 6th") rather than the
-      // vaguer "this time of year".
-      const win = CONFIG.chart.seasonalWindowDays;
-      const td = new Date(currentDate + 'T12:00:00');
-      const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const tDay = td.getDate();
-      const since = ` within ±${win} days of ${shortMonths[td.getMonth()]} ${tDay}${ordinalSuffix(tDay)}`;
       const dir = METRIC_DIRECTION[currentMetric];
       const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
-      // Min temp is always the overnight low, so describe the pool as nights.
-      const noun = currentMetric === 'min_temperature' ? 'night' : 'day';
-      const nounP = noun + 's';
       // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
       const seed = `${currentMetric}:${displayTemp}:${rank}`;
 
@@ -493,16 +502,37 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
       <div className="context-verdict context-verdict-lead">{verdict}</div>
 
       {hasScale ? (
-        <div className="record-scale" aria-label="Temperature vs records">
-          <div className="record-scale-label record-scale-low">
-            <span className="record-scale-temp">{fmt(recordLow!)}</span>
-            <span className="record-scale-name">record low</span>
-            {recordLowDate && (
-              <span className="record-scale-date">{formatDate(recordLowDate)}</span>
-            )}
-          </div>
+        <div
+          className="record-scale"
+          aria-label={
+            flatScale
+              ? 'Value against a record with no variation'
+              : 'Temperature vs records'
+          }
+        >
+          {/* Zero-spread window: the two end labels would be the same number under
+              two contradictory names ("record low" / "record high"), each dated to
+              whichever row happened to be scanned first — meaningless. Drop them and
+              state the single value once, under the rail. */}
+          {!flatScale && (
+            <div className="record-scale-label record-scale-low">
+              <span className="record-scale-temp">{fmt(recordLow!)}</span>
+              <span className="record-scale-name">record low</span>
+              {recordLowDate && (
+                <span className="record-scale-date">{formatDate(recordLowDate)}</span>
+              )}
+            </div>
+          )}
           <div className="record-scale-track">
-            <div className="record-scale-gradient" />
+            {/* Flat window: the blue→white→red gradient would be advertising a
+                spread that isn't there, so the rail goes neutral. */}
+            <div
+              className={
+                flatScale
+                  ? 'record-scale-gradient record-scale-gradient-flat'
+                  : 'record-scale-gradient'
+              }
+            />
             <div
               className="record-scale-marker"
               style={{ left: `${binnedPct}%` }}
@@ -521,14 +551,21 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
                 style={{ background: markerColor }}
               />
             </div>
-          </div>
-          <div className="record-scale-label record-scale-high">
-            <span className="record-scale-temp">{fmt(recordHigh!)}</span>
-            <span className="record-scale-name">record high</span>
-            {recordHighDate && (
-              <span className="record-scale-date">{formatDate(recordHighDate)}</span>
+            {flatScale && (
+              <span className="record-scale-flat-note">
+                every {noun}{since}: {fmt(recordLow!)}
+              </span>
             )}
           </div>
+          {!flatScale && (
+            <div className="record-scale-label record-scale-high">
+              <span className="record-scale-temp">{fmt(recordHigh!)}</span>
+              <span className="record-scale-name">record high</span>
+              {recordHighDate && (
+                <span className="record-scale-date">{formatDate(recordHighDate)}</span>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="temp-value">{fmt(currentTemp)}</div>
