@@ -8,7 +8,10 @@
 # once) and Node 22 active (the project builds on 22).
 set -euo pipefail
 cd "$(dirname "$0")/.."            # repo root
-WORKER_API="https://howhotwasit.yajna-auth.workers.dev"
+
+# No VITE_API_BASE: the Worker is routed on the site's own origin at
+# /api/* (a dashboard-managed route, see DEPLOY.md), so the frontend calls
+# /api/* same-origin. Setting it would only pin the bundle to workers.dev.
 
 node_major="$(node -v | sed 's/v\([0-9]*\).*/\1/')"
 if [ "$node_major" != "22" ]; then
@@ -22,7 +25,7 @@ echo "▶ 1/2  Deploying the Worker…"
 
 echo
 echo "▶ 2/2  Building the frontend and deploying to Cloudflare Pages…"
-( cd frontend && VITE_API_BASE="$WORKER_API" npm run build )
+( cd frontend && npm run build )
 # pages deploy runs from the repo root so it picks up functions/ (link previews);
 # `npm run build` writes to repo-root dist/ (vite outDir is ../dist).
 npx wrangler pages deploy dist --project-name weather-baseline --branch main --commit-dirty=true
@@ -31,4 +34,6 @@ echo
 echo "============================================================"
 echo "✅ Deployed — Worker + frontend are live with metric capture."
 echo "============================================================"
-echo "Try it: open your site, switch a metric, then check the private /dashboard."
+echo "Smoke-test: https://www.weatherbaseline.com — chart draws, console clean."
+echo "            curl -s https://www.weatherbaseline.com/api/health   # JSON, not HTML"
+echo "Then switch a metric and check the private /dashboard."

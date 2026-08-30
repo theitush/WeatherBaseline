@@ -6,7 +6,9 @@
           "http://localhost:3000",
           "http://localhost:5173",
           "https://weather-baseline.pages.dev",
-          "https://weatherbaseline.pages.dev"
+          "https://weatherbaseline.pages.dev",
+          "https://www.weatherbaseline.com",
+          "https://weatherbaseline.com"
         ],
         "methods": ["GET", "HEAD"],
         "headers": ["*"]
