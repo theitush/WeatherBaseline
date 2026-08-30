@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
+import { observedPool } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, tickCount } from '../utils/units';
@@ -77,11 +78,16 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 
     // --- radius scale: raw value, padded 10% below min / above max ----------
-    // Dial shows ONLY the settled long-run archive — no 'recent' (live-model
-    // topped-up) days and no 'forecast'.
-    const pts = fullData.filter(
-      (d) => d[currentMetric] !== undefined && d.data_type === 'historical'
-    );
+    // The dial shows OBSERVED days only — every settled ERA reading, model rows
+    // out. That's dataProcessor.observedPool, the same predicate the records and
+    // the climatology use, so the heading's "x% of all days since 1950" counts
+    // exactly the dots drawn here. (It keeps recent-tier temperature, which is
+    // settled ERA5-Land, where the old data_type === 'historical' test dropped
+    // it — the section's sentence is about this cloud, so the two must agree.)
+    const pts = observedPool(fullData, currentMetric).filter((d) => {
+      const v = d[currentMetric];
+      return typeof v === 'number' && Number.isFinite(v);
+    });
     if (pts.length === 0) return;
 
     const vals = pts.map((d) => cv(d[currentMetric] as number));
@@ -127,6 +133,78 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .attr('fill', 'var(--text-h)')
       .attr('opacity', 0.07);
 
+    // --- percentile envelope (per day-of-year, ±WINDOW_DAYS) ----------------
+    // Each ring point pools the days within ±WINDOW_DAYS of that day of the
+    // year, across every year — which is EXACTLY the pool the top card's "is
+    // this unusual for the date?" question runs on. So the band at the target
+    // marker's angle is the card's comparison set, drawn; the dashed ring at the
+    // marker's radius is the whole-year question this section's heading asks.
+    // Bucketing by day-of-year first keeps this to one pass over the cloud plus
+    // 365 merges of 2·WINDOW_DAYS+1 small buckets.
+    const valuesByDoy = new Map<number, number[]>();
+    for (const d of pts) {
+      const doy = Math.floor(dayFraction(d.date) * 365);
+      const v = cv(d[currentMetric] as number);
+      const bucket = valuesByDoy.get(doy);
+      if (bucket) bucket.push(v);
+      else valuesByDoy.set(doy, [v]);
+    }
+    type RadialBand = { frac: number; lo: number; hi: number };
+    const band1090: RadialBand[] = [];
+    const band2575: RadialBand[] = [];
+    const medianPath: Array<{ frac: number; val: number }> = [];
+    for (let doy = 0; doy < 365; doy++) {
+      const pool: number[] = [];
+      for (let off = -WINDOW_DAYS; off <= WINDOW_DAYS; off++) {
+        // The year wraps: late December's window reaches into early January.
+        const bucket = valuesByDoy.get((doy + off + 365) % 365);
+        if (bucket) for (const v of bucket) pool.push(v);
+      }
+      if (pool.length === 0) continue;
+      pool.sort(d3.ascending);
+      const frac = doy / 365;
+      band1090.push({
+        frac,
+        lo: d3.quantileSorted(pool, 0.1) as number,
+        hi: d3.quantileSorted(pool, 0.9) as number,
+      });
+      band2575.push({
+        frac,
+        lo: d3.quantileSorted(pool, 0.25) as number,
+        hi: d3.quantileSorted(pool, 0.75) as number,
+      });
+      // The median comes off the SAME windowed pool as the band around it — a
+      // bare per-day median (one value per year) is noisy enough to wander
+      // outside its own 25th–75th ribbon, which reads as a drawing bug.
+      medianPath.push({ frac, val: d3.quantileSorted(pool, 0.5) as number });
+    }
+
+    if (band1090.length > 8) {
+      const bandArea = d3
+        .areaRadial<RadialBand>()
+        // areaRadial measures angle from 12 o'clock clockwise — Jan 1 anchored
+        // at top, matching the rest of the dial.
+        .angle((d) => d.frac * 2 * Math.PI)
+        .innerRadius((d) => rScale(d.lo))
+        .outerRadius((d) => rScale(d.hi))
+        .curve(d3.curveCardinalClosed);
+      // Palest 10–90 underneath, 25–75 over it — the main chart's nesting and,
+      // via getColorForElement, its exact two band colours.
+      for (const [datum, element, cls] of [
+        [band1090, 'percentileBand90', 'radial-band-1090'],
+        [band2575, 'percentileBand75', 'radial-band-2575'],
+      ] as const) {
+        g.append('path')
+          .datum(datum)
+          .attr('class', `radial-band ${cls}`)
+          .attr('fill', CONFIG.getColorForElement(currentMetric, element))
+          .attr('d', bandArea as never)
+          .style('opacity', 0)
+          .transition()
+          .duration(500)
+          .style('opacity', 1);
+      }
+    }
 
     // --- the day cloud on CANVAS -------------------------------------------
     // ~27k dots (75 years × 365) are far too many SVG nodes to rebuild on every
@@ -225,19 +303,9 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
         .text(MONTHS[m]);
     }
 
-    // --- median ring (day-of-year median across all years) ------------------
-    // Bucket by day-of-year, take the median value in each bucket, draw a closed
-    // radial curve. Smooths the seasonal cycle the day-cloud only hints at.
-    const byDoy = d3.rollup(
-      pts,
-      (rows) => d3.median(rows, (d) => cv(d[currentMetric] as number)) as number,
-      (d) => Math.floor(dayFraction(d.date) * 365)
-    );
-    const medianPath: Array<{ frac: number; val: number }> = Array.from(byDoy, ([doy, val]) => ({
-      frac: doy / 365,
-      val,
-    })).sort((a, b) => a.frac - b.frac);
-
+    // --- median ring --------------------------------------------------------
+    // The centre line of the envelope built above, drawn over both bands.
+    // Smooths the seasonal cycle the day-cloud only hints at.
     if (medianPath.length > 8) {
       const radialLine = d3
         .lineRadial<{ frac: number; val: number }>()
