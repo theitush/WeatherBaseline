@@ -19,6 +19,9 @@
 //     surprise words would fire all summer (~18 days a year are top-5% days), so
 //     the dial states what the day is instead of reacting to it. An all-time
 //     top-10 is rare on any pool, so that tier keeps the card's bank.
+// The style also picks how a FORECAST row states itself: the card gives the
+// probability ("~C% chance …"), the dial gives the range the band's extreme ends
+// cover ("in the top 3–5% hottest days since 1950") — see bandSpreadPredicate.
 //
 // Ranking is unit-agnostic, so the pools come in NATIVE units; only the
 // confidence cutoff VALUES are converted for display.
@@ -31,6 +34,7 @@ import {
   bandQuantilePoints,
   probabilityOneSided,
   probabilityBetween,
+  traceClamp,
   valueAtTailFraction,
 } from './confidence.ts';
 
@@ -155,6 +159,90 @@ export interface VerdictProseInput {
   style: VerdictStyle;
 }
 
+// Tail share as a percent, for the dial's band-spread line. Whole numbers at 1%
+// and above; one decimal below it, so a near-record end reads "top 0.2%" instead
+// of rounding away to "top 0%". Floored at 0.1 — the printed number is a bound,
+// and no pool resolves finer than that.
+const formatTailPercent = (fraction: number): string => {
+  const pct = fraction * 100;
+  return pct < 0.95 ? Math.max(0.1, Math.round(pct * 10) / 10).toFixed(1) : String(Math.round(pct));
+};
+
+interface BandSpreadInput {
+  band: MetricBand;
+  metric: MetricKey;
+  /** The pool the sentence names, NATIVE units. */
+  poolNative: number[];
+  isHighSide: boolean;
+  /** 'hottest' — the superlative for this metric and side. */
+  sup: string;
+  /** 'days since 1950' — the pool, unquantified, for the top-N% form. */
+  tierDays: string;
+  /** 'warmer' — the comparative for this metric and side. */
+  mildWord: string;
+  /** 'all days since 1950' — the pool as the mild form names it. */
+  manyDays: string;
+  /** A middle-60% tier, where "top X%" would only mean "above average". */
+  mildTier: boolean;
+}
+
+/**
+ * The DIAL's forecast claim, in words: where each extreme end of the row's band
+ * — q05/q95, `lo`/`hi` — lands in the historical pool. Same claim the card's
+ * "~C% chance" line makes, said as a percentile RANGE instead of integrated
+ * into one probability: "in the top 3–5% hottest days since 1950". q05/q95 is a
+ * 90% range, deliberately WIDER than the q10–q90 ring the dial fills (see
+ * YearRadialChart) — the sentence quotes the forecast's extreme ends, so it
+ * can't undersell how far the day could still land.
+ *
+ * Two forms:
+ *   • a TAIL tier whose band stays on the day's own side of the median ->
+ *     "in the top 3–5% hottest days since 1950".
+ *   • anything else -> "warmer than about 54–72% of all days since 1950", the
+ *     same strict "beyond" count the settled mild line uses, so a forecast and a
+ *     settled day word the middle of the pack identically. Two cases land here:
+ *     a mild tier, where "the top 47% hottest days" would only be a laboured way
+ *     to say "above average"; and a band wide enough to reach past the middle,
+ *     as a precip band spanning "dry" to "soaking" does — there "top X%" has no
+ *     meaning left to carry.
+ */
+function bandSpreadPredicate(input: BandSpreadInput): string {
+  const { band, metric, poolNative, isHighSide, sup, tierDays, mildWord, manyDays, mildTier } = input;
+  const n = Math.max(1, poolNative.length);
+  // The band's extreme ends (q05/q95), native units, trace-clamped so a sub-trace
+  // precip tail isn't counted as rain the archive's climatology never records.
+  const ends = [traceClamp(band.lo, metric), traceClamp(band.hi, metric)];
+  // Share of the pool at-or-beyond each end, counted on the day's own side. The
+  // more extreme end has the smaller share, whichever side that is.
+  const tails = ends.map((v) => {
+    const r = rankValue(v, poolNative, isHighSide ? 'high' : 'low');
+    return (isHighSide ? r.rankHigh : r.rankLow) / n;
+  });
+  // An end past every day on record ranks 0; floor it at the rarest slot the
+  // pool can actually resolve (1/n), so the bound never claims more than #1 is.
+  const near = Math.max(Math.min(...tails), 1 / n);
+  const far = Math.max(...tails);
+
+  if (!mildTier && far <= 0.5) {
+    const a = formatTailPercent(near);
+    const b = formatTailPercent(far);
+    return a === b
+      ? `in the top ${a}% ${sup} ${tierDays}`
+      : `in the top ${a}–${b}% ${sup} ${tierDays}`;
+  }
+  // Past the middle, "top X%" stops meaning anything, so state the share of the
+  // pool each end beats instead — strictly beyond, the tie convention the
+  // settled mild line and the histogram brackets already count on.
+  // Capped at 99: an end past every day on record rounds to "about 100% of all
+  // days", and this ladder never claims a whole pool (see the settled mild line's
+  // tie note) — "about 99%" is both readable and still true of it.
+  const lo = Math.min(99, Math.round((1 - far) * 100));
+  const hi = Math.min(99, Math.round((1 - near) * 100));
+  return lo === hi
+    ? `${mildWord} than about ${lo}% of ${manyDays}`
+    : `${mildWord} than about ${lo}–${hi}% of ${manyDays}`;
+}
+
 /**
  * Resolve the verdict + rarity sentence for one value against one pool.
  * Returns null on an empty pool (no tier, so nothing to say).
@@ -170,10 +258,16 @@ export interface VerdictProseInput {
  * FORECAST/recent-model rows (`band` present) NEVER show a rank/ordinal — a point
  * estimate can't stand behind one. They resolve on the quantile tiers only
  * (all-time, extreme=5%, a bucketed-only mid=10%, notable=20%, mild), and the whole
- * rarity line becomes one plain-English confidence statement — "There's a ~C%
- * chance this day will be <predicate>" — where C is a real CQR exceedance
- * probability from the row's own 9-quantile band against the historical threshold
- * VALUE the tier claims (see utils/confidence). No verdict prefix, no (Pr>…) suffix.
+ * rarity line restates the tier as one plain-English sentence about the band:
+ *   • 'surprise' (the card) — the CONFIDENCE: "There's a ~C% chance this day will
+ *     be <predicate>", where C is a real CQR exceedance probability from the row's
+ *     own 9-quantile band against the historical threshold VALUE the tier claims
+ *     (see utils/confidence).
+ *   • 'descriptive' (the dial) — the RANGE: "This day will be in the top 3–5%
+ *     hottest days since 1950", read off the band's extreme q05/q95 ends
+ *     (bandSpreadPredicate). Same claim, stated as spread rather than as a
+ *     probability, because the dial shows that spread as a ring.
+ * Either way: no verdict prefix, no (Pr>…) suffix.
  */
 export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | null {
   const { displayValue, band, windowNative, allTimeNative, metric, system, pool, style } = input;
@@ -378,7 +472,8 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
     // hardcoded) on the SAME pool the histogram's dry bracket counts — the
     // observed climatology days, model rows excluded — so the card number and
     // the bracket always agree.
-    if (tierTwoSided && Math.abs(hiT - loT) < 1e-6) {
+    const degenerateBand = tierTwoSided && Math.abs(hiT - loT) < 1e-6;
+    if (degenerateBand) {
       const atValue = values.filter((v) => v <= loT + 1e-9).length;
       const share = Math.round((atValue / Math.max(1, values.length)) * 100);
       forecastPredicate = `like ${share}% of ${manyDays}`;
@@ -390,8 +485,32 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
     // "~100%") — the "~" already says approximate, and a wide forecast band
     // can't support a to-the-point figure.
     if (forecastPredicate !== null) {
-      const chance = Math.min(95, Math.round(p * 20) * 5);
-      rarityLine = `There's a ~${chance}% chance that this ${noun} will be ${forecastPredicate}.`;
+      if (descriptive) {
+        // The dial says WHERE the forecast lands, not how sure we are it lands
+        // there: the reader is looking at the band ring, so the sentence reads
+        // it off (bandSpreadPredicate). The degenerate dry band keeps its own
+        // predicate — with the climatology collapsed to a point there is no
+        // range to state. The card (style 'surprise') keeps the chance line
+        // below: its pool is one date's window, where a probability is the
+        // sharper thing to say.
+        const spread = degenerateBand
+          ? forecastPredicate
+          : bandSpreadPredicate({
+              band,
+              metric,
+              poolNative: windowNative,
+              isHighSide,
+              sup,
+              tierDays,
+              mildWord,
+              manyDays,
+              mildTier: tier === 'mildDead' || tier === 'mildOff',
+            });
+        rarityLine = `This ${noun} will be ${spread}.`;
+      } else {
+        const chance = Math.min(95, Math.round(p * 20) * 5);
+        rarityLine = `There's a ~${chance}% chance that this ${noun} will be ${forecastPredicate}.`;
+      }
     }
   }
 

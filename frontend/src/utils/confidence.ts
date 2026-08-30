@@ -23,6 +23,14 @@ interface QuantilePoint {
 // every such value clamped to 0.
 const PRECIP_TRACE_MM = 1;
 
+/** One band quantile in NATIVE units, trace-clamped for precip. The single
+ *  place that clamp lives, so the display CDF below and the dial's native-unit
+ *  band-spread line (utils/verdictProse) can't disagree about what counts as a
+ *  dry day. */
+export function traceClamp(value: number, metric: MetricKey): number {
+  return metric === 'precipitation_sum' && value < PRECIP_TRACE_MM ? 0 : value;
+}
+
 /** The row's own 9-point predictive CDF, in display units, ascending by v
  *  (guaranteed monotonic by the debias generator's isotonic pinning, which runs
  *  over all nine trained heads). The two shoulder points sit where the density is
@@ -34,9 +42,7 @@ export function bandQuantilePoints(
   metric: MetricKey,
   system: UnitSystem
 ): QuantilePoint[] {
-  const trace = metric === 'precipitation_sum';
-  const cv = (x: number) =>
-    convert(trace && x < PRECIP_TRACE_MM ? 0 : x, metric, system);
+  const cv = (x: number) => convert(traceClamp(x, metric), metric, system);
   return [
     { p: 0.01, v: cv(band.q01) },
     { p: 0.05, v: cv(band.lo) },

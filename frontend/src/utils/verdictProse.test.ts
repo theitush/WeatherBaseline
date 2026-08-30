@@ -151,7 +151,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
 
 // --- Case 4: a forecast row states the confidence, in both pools -------------
 {
-  console.log('Case 4: forecast row — the ~C% chance line');
+  console.log('Case 4: forecast row — the card states a chance, the dial a range');
   const tight = resolveVerdictProse({
     displayValue: 385, band: bandAround(385, 1), windowNative: RECORD_400, allTimeNative: RECORD_400,
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
@@ -161,8 +161,8 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(tight.verdict, 'Among the hottest days', 'confident forecast keeps the plain phrase');
   assertEq(
     tight.rarityLine,
-    "There's a ~95% chance that this day will be in the top 5% hottest days since 1950.",
-    'forecast rarity is the plain-English confidence statement'
+    'This day will be in the top 3–4% hottest days since 1950.',
+    "the dial states where the band's q05/q95 ends land, not a probability"
   );
 
   // A band wide enough to straddle the cutoff softens the same phrase.
@@ -172,6 +172,13 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   })!;
   assert(!loose.isVeryExtremeForecast, 'a wide band misses the 80% bar');
   assertEq(loose.verdict, 'Probably among the hottest days', 'hedged forecast verdict');
+  // Same day, a band 20x wider: the range widens with it, and the q95 end past
+  // every day on record is floored at the rarest slot the pool resolves (1/400).
+  assertEq(
+    loose.rarityLine,
+    'This day will be in the top 0.3–13% hottest days since 1950.',
+    'a wide band widens the stated range'
+  );
 
   // Same forecast, the card's pool: identical shape, its own scope clause.
   const card = resolveVerdictProse({
@@ -182,6 +189,37 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     card.rarityLine,
     "There's a ~95% chance that this day will be in the top 5% hottest days within ±3 days of Aug 30th.",
     'the card names its own window in the same sentence'
+  );
+}
+
+// --- Case 4b: the dial's range when "top X%" says nothing ---------------------
+{
+  console.log('Case 4b: mild + straddling forecasts fall back to the pack form');
+  // A mild forecast: "the top 47% hottest days" would only mean "above average",
+  // so the dial says where in the pack it sits, exactly as a settled mild day does.
+  const mild = resolveVerdictProse({
+    displayValue: 250, band: bandAround(250, 20), windowNative: RECORD_400, allTimeNative: RECORD_400,
+    metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
+  })!;
+  assertEq(mild.tier, 'mildOff', 'a forecast median at the 63rd percentile is off-centre mild');
+  assertEq(
+    mild.rarityLine,
+    'This day will be warmer than about 53–72% of all days since 1950.',
+    'the mild tier states the pack share, both ends'
+  );
+
+  // A tail tier whose band is wide enough to reach past the middle: "top X%" has
+  // nothing left to carry, so the same pack form takes over. The high end is past
+  // every day on record and prints 99%, never "about 100%".
+  const straddle = resolveVerdictProse({
+    displayValue: 385, band: bandAround(385, 120), windowNative: RECORD_400, allTimeNative: RECORD_400,
+    metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
+  })!;
+  assertEq(straddle.tier, 'extreme', 'the median is still in the top 5%');
+  assertEq(
+    straddle.rarityLine,
+    'This day will be warmer than about 42–99% of all days since 1950.',
+    'a band reaching past the middle drops the top-N% frame'
   );
 }
 
@@ -201,7 +239,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(dial.tier, 'mildOff', 'a dry day sits in the middle 60% of a dry record');
   assertEq(
     dial.rarityLine,
-    "There's a ~95% chance that this day will be like 90% of all days since 1950.",
+    'This day will be like 90% of all days since 1950.',
     'the degenerate band restates the majority, with a computed share'
   );
   assertEq(dial.verdict, 'A shade drier than the typical day here', 'dry-side mild verdict');
