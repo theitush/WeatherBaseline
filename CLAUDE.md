@@ -25,6 +25,5 @@ Working one:
    gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id bef6703c
    ```
    Blocked instead: Status `d50a3e21`, the blocker written into the body, issue left open.
-5. If `../coo/projects/howhotwasit/DIGEST.md` exists on this machine, regenerate it — a full rewrite (architecture, key decisions, current state, gotchas), not a patch note; it is the COO's picture of this repo. Skip if the path is absent.
 
 New tasks that come out of the work become issues here and go on the project: `gh issue create ...`, then `gh project item-add 2 --owner theitush --url <issue url>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `item-edit` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
