@@ -1,19 +1,20 @@
 // forecastReference — THE one place that decides, for a forecast target day, which
-// verdict tier fires and which CLIMATOLOGY reference value the UI shows in place of
-// the raw forecast median.
+// verdict tier fires, plus the CLIMATOLOGY reference value that tier is pinned to.
 //
-// On a forecast row the top card, the main-chart target marker, and the histogram
-// line/brackets all stop showing the forecast's own median and instead show the
-// historical value the verdict is pinned to — "the bar the forecast has to clear":
+// Every place a forecast VALUE is displayed — the top card's big number, the
+// main-chart and dial target markers, the histogram's target line — shows the
+// row's own bias-corrected median (`band.mid`). The reference value below is the
+// bar that median has to clear, "how hot a day has to be to count":
 //   • tail tiers  -> the climatology threshold the one-sided test checks against
 //                    (hot day p95/p90/p80, cold day p05/p10/p20, all-time top-10
 //                    its own tiny cutoff).
 //   • off-centre mild (p20–40 / p60–80) -> the MIDDLE of that band: p30 / p70.
 //   • dead-centre mild (p40–60)         -> the historical MEDIAN (p50).
-// The verdict PROSE and the CQR confidence stay computed from the forecast itself
-// (its snapped median + own 9-quantile band) — only the displayed value becomes a
-// climatology anchor, so the number the card headlines is the reference the words
-// claim, not a point forecast we can't stand behind.
+// Nothing headlines that reference value as a number any more — the histogram
+// draws the same threshold as its own faint pivot line, recomputed from
+// `tierCutoff` — and the verdict PROSE and the CQR confidence are computed from
+// the forecast itself (its snapped median + own 9-quantile band) against exactly
+// that threshold.
 //
 // The tier decision is rank-based and therefore UNIT-AGNOSTIC (a monotone °C→°F
 // conversion can't change a rank), so this runs entirely on native-unit pools and
