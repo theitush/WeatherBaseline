@@ -1,6 +1,6 @@
 # HowHotWasIt
 
-This file is deliberately thin: writing the full CLAUDE.md is task #9 (what a "task" is, below). Until it lands, orient by reading the repo. One standing rule already applies: **nothing deploys to prod without Ita's explicit green light** — never run `scripts/deploy_prod.sh` on your own judgement.
+This file is thin on purpose: it grows a line at a time, when something proves worth writing down. Otherwise orient by reading the repo. One standing rule: **nothing deploys to prod without Ita's explicit green light** — never run `scripts/deploy_prod.sh` on your own judgement.
 
 ## Tasks
 
