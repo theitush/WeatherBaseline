@@ -467,7 +467,7 @@ const AppContent: React.FC = () => {
                   {` (1950–${new Date().getFullYear()})`}
                 </div>
               )}
-              <RadialLegend metric={currentMetric} currentDate={currentDate} />
+              <RadialLegend metric={currentMetric} currentDate={currentDate} isForecast={getCurrentBand() != null} />
               <div className="radial-chart-row">
                 <YearRadialChart
                   fullData={yearTimeline}

@@ -21,16 +21,30 @@ const ordinal = (n: number): string => {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
-// Legend for the radial dial: only the marks it actually draws. The wedge label
-// names the actual window, e.g. "Jun 6th ±3 days".
-export const getRadialLegendData = (metric: MetricKey, currentDate: string): LegendItem[] => {
+// Legend for the radial dial: only the marks it actually draws. The band labels
+// are the main chart's, word for word — they are the same two percentiles in the
+// same two colours, so a reader shouldn't have to re-learn them one section down.
+// The wedge label names the actual window, e.g. "Jun 6th ±3 days".
+export const getRadialLegendData = (
+  metric: MetricKey,
+  currentDate: string,
+  isForecast?: boolean,
+): LegendItem[] => {
   const dt = new Date(currentDate + 'T00:00:00');
   const windowLabel = `${MONTHS[dt.getMonth()]} ${ordinal(dt.getDate())} ±${CONFIG.chart.seasonalWindowDays} days`;
-  return [
+  const items: LegendItem[] = [
     { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
+    { type: 'wave', color: CONFIG.getColorForElement(metric, 'percentileBand90'), label: '10th–90th pct', op: 1 },
+    { type: 'wave', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 1 },
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
     { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
   ];
+  // A forecast target draws its own hollow marker + uncertainty segment on the
+  // dial; same swatch and label as the main chart's.
+  if (isForecast) {
+    items.push({ type: 'forecast', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Forecast' });
+  }
+  return items;
 };
 
 export const getLegendData = (
@@ -170,8 +184,8 @@ export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForec
   );
 };
 
-export const RadialLegend: React.FC<{ metric: MetricKey; currentDate: string }> = ({ metric, currentDate }) => {
-  const items = getRadialLegendData(metric, currentDate);
+export const RadialLegend: React.FC<{ metric: MetricKey; currentDate: string; isForecast?: boolean }> = ({ metric, currentDate, isForecast }) => {
+  const items = getRadialLegendData(metric, currentDate, isForecast);
   return (
     <div className="chart-legend">
       {items.map((item) => (
