@@ -18,8 +18,10 @@ import { Legend, RadialLegend } from './components/Legend';
 import FreshnessBanner from './components/FreshnessBanner';
 import SettingsMenu from './components/SettingsMenu';
 import ShareButton from './components/ShareButton';
-import { UnitsContext, useUnitsState } from './hooks/useUnits';
+import { UnitsContext, useUnits, useUnitsState } from './hooks/useUnits';
 import { usePermutationTest } from './hooks/usePermutationTest';
+import { observedPool } from './utils/dataProcessor';
+import { resolveVerdictProse } from './utils/verdictProse';
 import type { MetricKey } from './utils/config';
 import './App.css';
 
@@ -55,6 +57,10 @@ const AppContent: React.FC = () => {
     dismissForecastWarning,
     refreshData,
   } = useApp();
+
+  // The dial's verdict formats its own confidence cutoffs, so this section needs
+  // the display system the rest of the page renders in.
+  const { system } = useUnits();
 
   const handleLocationChange = (info: { name: string; lat: number; lon: number }) => {
     setLocation({ lat: info.lat, lon: info.lon, name: info.name });
@@ -164,6 +170,61 @@ const AppContent: React.FC = () => {
     );
     return row?.band?.[currentMetric] ?? null;
   };
+
+  // Section 3.5's heading answers the DIAL's question — "is this unusual for
+  // this place, full stop?" — where the card at the top of the page answers "is
+  // this unusual for the date?". Same two-line shape, same prose ladder
+  // (utils/verdictProse); the only difference is the pool it is handed and how
+  // that pool is named. Here the pool is the WHOLE record — every observed day,
+  // all years — which is exactly the cloud of dots the dial draws, so the
+  // sentence is about what the reader is looking at, and the dashed target ring
+  // is literally the boundary the percentage counts outside of.
+  //
+  // The ladder's two pool arguments are the same array on purpose: with the
+  // window pool == the all-time pool the ladder degenerates correctly on its
+  // own. The rank-based top-5 tier can't fire (a rank of 5 in the whole record
+  // is already an all-time top-10), and the single tail becomes the tail of the
+  // whole record.
+  //
+  // Verdict register is 'descriptive', not the card's surprise banks: about 18
+  // days a year are top-5% days, so "WTF." would fire every summer here.
+  const yearVerdict = (() => {
+    const value = getCurrentTemp();
+    if (value === null) return null;
+    const band = getCurrentBand();
+    const observed = observedPool(yearTimeline, currentMetric).filter((d) => {
+      const v = d[currentMetric];
+      return typeof v === 'number' && Number.isFinite(v);
+    });
+    if (observed.length === 0) return null;
+    // The pool's own first year — never a hardcoded 1950, since a cell's record
+    // can start later and the sentence says the number out loud.
+    let firstYear = observed[0].year;
+    for (const d of observed) if (d.year < firstYear) firstYear = d.year;
+    const allTimeNative = observed.map((d) => d[currentMetric] as number);
+    const prose = resolveVerdictProse({
+      // On a forecast row the row's value is already snapped to the band median
+      // at load (AppContext), so the two agree; read the band to be explicit.
+      displayValue: band ? band.mid : value,
+      band,
+      windowNative: allTimeNative,
+      allTimeNative,
+      metric: currentMetric,
+      system,
+      // "…of all days since 1950…" — "all" is deliberate: without it, "2.4% of
+      // days since 1950" reads as "of THESE days".
+      pool: { quantifier: 'all ', scope: ` since ${firstYear}` },
+      style: 'descriptive',
+    });
+    if (!prose) return null;
+    const city = location.name ? location.name.split(',')[0].trim() : '';
+    const where = city ? ` in ${city}` : '';
+    const year = new Date(currentDate + 'T12:00:00').getFullYear();
+    const lead =
+      `For any day of the year, ${formatTargetDate(currentDate)}, ${year} ` +
+      `${metricQuestionLabel[currentMetric]}${where} is`;
+    return { lead, verdict: prose.verdict, rarityLine: prose.rarityLine };
+  })();
 
   return (
     <div className="app">
@@ -386,13 +447,26 @@ const AppContent: React.FC = () => {
               />
             </section>
 
-            {/* Section 3.5 — the year at a glance (radial) */}
+            {/* Section 3.5 — the year at a glance (radial). Same shape as the
+                card at the top of the page, asking the whole-record question
+                instead of the seasonal one. With no row for the target date
+                there's no value to judge — section 1 already says so — so the
+                heading falls back to naming the chart. No confetti from here:
+                the page fires it once, from the card. */}
             <section className="page-section">
-              <div className="chart-title">
-                {capitalize(metricQuestionLabel[currentMetric])}
-                {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
-                {` (1950–${new Date().getFullYear()})`}
-              </div>
+              {yearVerdict ? (
+                <>
+                  <p className="conclusion-lead">{yearVerdict.lead}</p>
+                  <div className="conclusion-verdict">{yearVerdict.verdict}</div>
+                  <div className="chart-subtitle">{yearVerdict.rarityLine}</div>
+                </>
+              ) : (
+                <div className="chart-title">
+                  {capitalize(metricQuestionLabel[currentMetric])}
+                  {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
+                  {` (1950–${new Date().getFullYear()})`}
+                </div>
+              )}
               <RadialLegend metric={currentMetric} currentDate={currentDate} />
               <div className="radial-chart-row">
                 <YearRadialChart
