@@ -22,11 +22,6 @@ debiasing model that maps the raw forecast onto the distribution the ERA5-Land
 record would have shown. The chart marks which points are reanalysis and which
 are forecast.
 
-> **This is not a weather forecast service.** The forecast tier exists so the
-> historical comparison can run right up to today; if you want to know whether
-> to take an umbrella, use a forecast provider. The debias layer is beta and its
-> residual archive-vs-forecast biases are still under review.
-
 ## How it runs
 
 Four pieces, all on Cloudflare, deployed manually (`git push` does not ship
