@@ -40,7 +40,7 @@ export const getRadialLegendData = (
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
     { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
   ];
-  // A forecast target draws its uncertainty as a shaded ring band around the
+  // A forecast target draws its uncertainty as a hatched ring band around the
   // dashed ring on its median — the same two percentiles the envelope above
   // uses, so the label says which they are rather than just "Forecast". The
   // swatch shows both marks, the way the dial draws them.
@@ -166,7 +166,15 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
       )}
       {item.type === 'band' && (
         <>
-          <rect width={12} height={12} y={-6} fill={item.color} opacity={0.18} />
+          {/* 45° stripes at the chart's own pitch + ink, plus the dashed median
+              ring through them — the two marks a forecast target draws. */}
+          <path
+            d="M0,2 L8,-6 M0,6 L12,-6 M4,6 L12,-2 M8,6 L12,2"
+            fill="none"
+            stroke={item.color}
+            strokeOpacity={0.5}
+            strokeWidth={1.4}
+          />
           <line x1={0} x2={12} y1={0} y2={0} stroke={item.color} strokeWidth={1} strokeDasharray="3,2" />
         </>
       )}

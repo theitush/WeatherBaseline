@@ -395,13 +395,14 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       // for a value on this dial: every day outside it was more extreme than
       // that value, which is exactly what the section's heading counts.
       //
-      // On a forecast day the uncertainty is a SHADED ANNULUS between q10 and
-      // q90 — the ribbon idiom the main chart uses for a range, bent round the
-      // dial — with the thin dashed ring on the median still marking the value
-      // the dot sits at. Two more dashed rings read as two more gridlines; a
-      // filled band reads as one interval. It is tinted in the foreground, not
-      // the metric's band colour, so it can't be mistaken for the climatology
-      // envelope it sits on top of. A settled day has one value and one ring.
+      // On a forecast day the uncertainty is a HATCHED ANNULUS between q10 and
+      // q90 — the same 45° diagonal stripes the histogram shades its forecast
+      // confidence region with (same 6px pitch, same foreground ink at 0.5), so
+      // "this texture means forecast" is one visual rule across the page — with
+      // the thin dashed ring on the median still marking the value the dot sits
+      // at. Two more dashed rings read as two more gridlines; a textured band
+      // reads as one interval, and the stripes keep it from being mistaken for
+      // the flat climatology envelope underneath. A settled day gets one ring.
       const targetRing = (
         r: number,
         strokeWidth: number,
@@ -430,11 +431,29 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           .outerRadius(rHi)
           .startAngle(0)
           .endAngle(2 * Math.PI);
+        // Pattern ids are document-global, so the id carries a per-render uid —
+        // two dials on one page would otherwise share (and fight over) one defs.
+        const hatchId = `radial-conf-hatch-${Math.random().toString(36).slice(2, 8)}`;
+        svg
+          .append('defs')
+          .append('pattern')
+          .attr('id', hatchId)
+          .attr('patternUnits', 'userSpaceOnUse')
+          .attr('width', 6)
+          .attr('height', 6)
+          .attr('patternTransform', 'rotate(45)')
+          .append('line')
+          .attr('x1', 0)
+          .attr('y1', 0)
+          .attr('x2', 0)
+          .attr('y2', 6)
+          .attr('stroke', 'var(--text-h)')
+          .attr('stroke-width', 1.4)
+          .attr('stroke-opacity', 0.5);
         g.append('path')
           .attr('class', 'radial-target-band')
           .attr('d', bandRing(null) as string)
-          .attr('fill', 'var(--text-h)')
-          .attr('opacity', 0.13)
+          .attr('fill', `url(#${hatchId})`)
           // A filled shape this large would otherwise swallow the month wedges'
           // hover (they are drawn beneath it); the rings never did, being stroke-only.
           .attr('pointer-events', 'none');
