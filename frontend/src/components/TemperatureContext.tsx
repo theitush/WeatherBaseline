@@ -3,14 +3,8 @@ import type { TemperatureContext as TempContext, WeatherDataPoint, MetricKey, Me
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, unitLabelBare, valueDecimals } from '../utils/units';
 import { comparablePool, findRecords, observedPool } from '../utils/dataProcessor';
-import { resolveForecastMarker } from '../utils/forecastReference';
 import { recordScaleFraction } from '../utils/recordScale';
-import {
-  bandQuantilePoints,
-  probabilityOneSided,
-  probabilityBetween,
-  valueAtTailFraction,
-} from '../utils/confidence';
+import { ordinalSuffix, resolveVerdictProse } from '../utils/verdictProse';
 import CONFIG from '../utils/config';
 import './TemperatureContext.css';
 
@@ -58,74 +52,6 @@ const formatDate = (d: Date): string => {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 };
-
-// "st"/"nd"/"rd"/"th" for an ordinal — the historical top-5 rank line and the
-// date labels all share it.
-const ordinalSuffix = (n: number): string =>
-  n % 10 === 1 && n !== 11 ? 'st' :
-  n % 10 === 2 && n !== 12 ? 'nd' :
-  n % 10 === 3 && n !== 13 ? 'rd' : 'th';
-
-// Direction words for the single-tailed "this hot/hotter" line, per metric.
-// [adjective, comparative, superlative] for the high side and the low side.
-const METRIC_DIRECTION: Record<
-  MetricKey,
-  { high: [string, string, string]; low: [string, string, string] }
-> = {
-  max_temperature: { high: ['hot', 'hotter', 'hottest'], low: ['cold', 'colder', 'coldest'] },
-  min_temperature: { high: ['hot', 'hotter', 'hottest'], low: ['cold', 'colder', 'coldest'] },
-  precipitation_sum: { high: ['wet', 'wetter', 'wettest'], low: ['dry', 'drier', 'driest'] },
-  wind_speed_10m_max: { high: ['windy', 'windier', 'windiest'], low: ['calm', 'calmer', 'calmest'] },
-};
-
-// Comparative used in the mild "a bit ___ than most" line, per metric & side.
-const METRIC_COMPARATIVE: Record<MetricKey, { high: string; low: string }> = {
-  max_temperature: { high: 'warmer', low: 'colder' },
-  min_temperature: { high: 'warmer', low: 'colder' },
-  precipitation_sum: { high: 'wetter', low: 'drier' },
-  wind_speed_10m_max: { high: 'windier', low: 'calmer' },
-};
-
-// Softeners for the mild "a ___ ___ than most" line.
-const MILD_HEDGE = ['bit', 'tad', 'touch', 'smidge', 'hair'];
-
-// Dead-center (40–60%) bottom line — no direction is meaningful, so just
-// lampoon the averageness. The top verdict still draws from VERDICT_MILD.
-const DEAD_CENTER_LINE = [
-  'Uniquely unique',
-  'Averagely average',
-  'Remarkably unremarkable',
-  'Distinctly indistinct',
-  'Textbook nothing',
-];
-
-// Verdict banks answering "How extreme is this weather?" — random per render.
-// #1-on-record gets the exclusive "Record-breaker!" (handled separately).
-const VERDICT_TOP5 = ['Crazy!!!', 'Off the charts!', 'One for the history books!', 'Legend.'];
-// Reserved for a top-1/2/3 value across the WHOLE record (not just its ±N-day
-// window) — the rarest thing the page can show, so the lines go big.
-const VERDICT_ALLTIME = ['Practically unheard of!', 'A page in the record books.', 'Legendary!']; //top/bottom 5 historical measurements
-const VERDICT_VERY_EXTREME = ['WTF.', 'Unreal.', 'Insane.', 'Holy smokes.']; // top/bottom 5% + 80% confidence or top/bottom 3% for historical
-const VERDICT_PROB_VERY_EXTREME = ['Uncommon.', 'Rare.', 'Remarkable.']; // top/bottom 5%
-const VERDICT_EXTREME = ['Quite unusual.', 'Remarkable.', 'Pretty wild.', 'Pretty rare.']; //top/bottom 10%
-const VERDICT_NOTABLE = ['Notable.', 'Almost exciting.', 'A bit unusual.', 'Mildly interesting.']; // top/bottom 20%
-const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.']; // mid 60%
-
-// Deterministic pick — same (bank, seed) always yields the same phrase, so a
-// verdict stays put across the several re-renders a metric/date switch triggers
-// instead of re-rolling 2-3 times before settling. The seed is derived from the
-// inputs that define the day (metric + value + rank), so it still varies between
-// days and metrics.
-const hashSeed = (s: string): number => {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-};
-const pick = (bank: string[], seed: string) => bank[hashSeed(seed) % bank.length];
-
 
 // Lightweight confetti burst — no dependency. Fires once when called.
 // `multiplier` scales the piece count: 1 for an in-window top-3, 5 for an
@@ -248,226 +174,47 @@ const TemperatureContextDisplay: React.FC<TemperatureContextProps> = ({
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const tDay = td.getDate();
   const since = ` within ±${win} days of ${shortMonths[td.getMonth()]} ${tDay}${ordinalSuffix(tDay)}`;
-  // Min temp is always the overnight low, so describe the pool as nights.
+  // Min temp is always the overnight low, so describe the pool as nights (the
+  // ladder applies the same rule to its own sentences).
   const noun = currentMetric === 'min_temperature' ? 'night' : 'day';
-  const nounP = noun + 's';
 
-  // Verdict (bold line) + rarity line, both keyed off how far into the day's own
-  // tail it sits. HISTORICAL rows tier by rank/rarity on the value's side:
-  //   - all-time top-10: "One of the hottest days EVER recorded!!!" (scope, no %)
-  //   - top-5 in-window: the exact ordinal → "The 3rd hottest day within ±3 …"
-  //       (rank is real on settled data; #1 drops the ordinal + gets Record-breaker!)
-  //   - extreme  (≤5%):  single-tailed %, named direction  → "Only 2.4% … this hot!"
-  //   - notable  (≤20%): single-tailed %, cumulative       → "About 10% … this hot or hotter."
-  //   - mild     (>20%): two-sided flavour line            → "A tad warmer than most …"
+  // Verdict (bold line) + rarity line, from THE shared prose ladder
+  // (utils/verdictProse) — the same function the year dial's heading runs on a
+  // whole-record pool, so the two sections can never word the same tier
+  // differently. The ladder itself documents the tiers; what's decided HERE is
+  // only which pool the claim is about and how to name it.
   //
-  // FORECAST/recent-model rows (`band` present) NEVER show a rank/ordinal — a point
-  // estimate can't stand behind one. They resolve on the quantile tiers only
-  // (all-time, extreme=5%, a bucketed-only mid=10%, notable=20%, mild), and the whole
-  // rarity line becomes one plain-English confidence statement — "There's a ~C%
-  // chance this day will be <predicate>" — where C is a real CQR exceedance
-  // probability from the row's own 9-quantile band against the historical threshold
-  // VALUE the tier claims (see utils/confidence). No verdict prefix, no (Pr>…) suffix.
-  let extremeLine: string | null = null;
-  let verdict = context.description;
-  let rank = 0; // 1-based rank on the day's side; 0 when undeterminable.
-  let allTimeRank = 0; // rank across the ENTIRE record (every day, all years); 0 = N/A.
-  // Forecast top-5% day we're ≥80% sure clears the 5% cutoff — drives the strong
-  // verdict bank AND the confetti burst below. Stays false on historical rows.
-  let isVeryExtremeForecast = false;
-  {
-    // Tier + rarity run off the SAME observed-only climatology pool the histogram
-    // brackets and the record star use — MODEL ROWS EXCLUDED, i.e. the target's own
-    // forecast row and any recent-tier precip/wind. Including them (as this card
-    // used to) ranks the value against near-copies of itself and lands it a tier
-    // MILDER than the histogram, which excludes them — the "card says top 20% / chart
-    // says top 10%" bug; and it let a model row be ranked #1 while the star sat on a
-    // real one. resolveForecastMarker is THE shared tier resolver
-    // (utils/forecastReference) the histogram calls too, so the card headline and the
-    // bracket can no longer disagree about which tier fired. Ranking is unit-agnostic,
-    // so the marker runs on NATIVE pools; display-unit copies below feed only the
-    // confidence cutoff VALUES.
-    const windowNative = observedPool(valid, currentMetric)
-      .map((d) => d[currentMetric] as number);
-    const allTimeNative = observedPool(yearTimeline, currentMetric)
-      .map((d) => d[currentMetric])
-      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-    const bucketed = !!band;
-    const marker = resolveForecastMarker(displayTemp, windowNative, allTimeNative, bucketed);
-    if (marker) {
-      const { tier, isHighSide, singleTail } = marker;
-      rank = marker.rank;
-      allTimeRank = marker.allTimeRank;
-      const n = windowNative.length;
-      // Display-unit copies of those SAME pools — only the confidence cutoff VALUES
-      // (valueAtTailFraction) below need display units; the tier decision above is
-      // rank-based and unit-agnostic. tierPool tracks the tier's own pool.
-      const values = windowNative.map((v) => convert(v, currentMetric, system));
-      const allVals = allTimeNative.map((v) => convert(v, currentMetric, system));
-      const tierPool = marker.tierUsesAllTime ? allVals : values;
-      const tierCutoff = marker.tierCutoff;
-      const tierTwoSided = marker.tierTwoSided;
-      const dir = METRIC_DIRECTION[currentMetric];
-      const [adj, comp, sup] = isHighSide ? dir.high : dir.low;
-      // Stable per-day seed so the verdict phrase doesn't re-roll on re-render.
-      const seed = `${currentMetric}:${displayTemp}:${rank}`;
-
-      // The predicate after "…this day will be ___" in the forecast bottom line
-      // (e.g. "in the top 10% hottest days within ±3 days of Jul 12th"). Every
-      // forecast tier sets it (all-time included); it stays null only on the
-      // historical-only top-5 tier, whose ordinal line has no forecast form. The
-      // TIER is resolveForecastMarker's call now (shared with the histogram); this
-      // switch only picks the wording + verdict bank for whichever tier fired.
-      let forecastPredicate: string | null = null;
-
-      if (tier === 'alltime') {
-        // Among the rarest the page shows: a top-10 value across the WHOLE record.
-        // We deliberately DON'T name the exact slot — ERA5-Land on a 0.1° grid
-        // can't credibly resolve #1 vs #2 vs … #10; those gaps sit inside the noise.
-        // Historical rows keep this punchy scope line. Forecast rows swap it for the
-        // shared "~C% chance … one of the hottest ever" line below — that number is a
-        // forecast CONFIDENCE (chance the settled value clears the all-time top-10
-        // cutoff), NOT a climatology share, so the old "different denominator / it's
-        // just summer" objection to a % here doesn't apply.
-        extremeLine = `One of the ${sup} ${nounP} EVER recorded!!!`;
-        verdict = pick(VERDICT_ALLTIME, seed);
-        forecastPredicate = `one of the ${sup} ${nounP} ever recorded`;
-      } else if (tier === 'top5') {
-        // Top-5 within its ±window — HISTORICAL rows only (resolveForecastMarker
-        // gates this tier on !bucketed). We name the exact ordinal because on settled
-        // data the rank is real; a forecast is a point estimate that would overclaim
-        // an ordinal, so forecast rows never reach here — they fall to the quantile
-        // tiers (extreme = median past the 5% cutoff). #1 drops the clumsy "1st".
-        const ord = rank === 1 ? '' : `${rank}${ordinalSuffix(rank)} `;
-        extremeLine = `The ${ord}${sup} ${noun}${since}.`;
-        // #1 gets the exclusive phrase; #2–#5 the party bank.
-        verdict = rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP5, seed);
-      } else if (tier === 'extreme') {
-        if (bucketed) {
-          extremeLine = `Under 5% of ${nounP}${since} were this ${adj}!`;
-        } else {
-          // one decimal, floored so a record never prints "0.0%".
-          const pct = singleTail * 100;
-          const shown = pct < 0.1 ? '<0.1' : pct.toFixed(1);
-          extremeLine = `Only ${shown}% of ${nounP}${since} were this ${adj}!`;
-        }
-        // Top-5% tier — the strongest tail short of a record. The verdict word is
-        // graded by how SURE we are it's really that extreme. HISTORICAL rows (no
-        // band, no confidence) grade on tail depth: top/bottom 3% earns the strong
-        // bank, 3–5% the hedged one. FORECAST rows get re-graded in the confidence
-        // block below once the CQR probability p is known (≥80% → strong, else
-        // hedged). Note: 'extreme' no longer uses VERDICT_EXTREME — that bank moved
-        // down to the 5–10% 'mid' tier.
-        verdict = singleTail <= 0.03
-          ? pick(VERDICT_VERY_EXTREME, seed)
-          : pick(VERDICT_PROB_VERY_EXTREME, seed);
-        forecastPredicate = `in the top 5% ${sup} ${nounP}${since}`;
-      } else if (tier === 'mid') {
-        // Mid-tier, forecast/recent-model rows only — splits the old 5%→20% gap so
-        // "under 10%" reads distinctly from "under 20%".
-        extremeLine = `Under 10% of ${nounP}${since} were this ${adj}!`;
-        verdict = pick(VERDICT_EXTREME, seed);
-        forecastPredicate = `in the top 10% ${sup} ${nounP}${since}`;
-      } else if (tier === 'notable') {
-        // Notable — cumulative ("or hotter"). Drop the comparative when nothing
-        // can be more extreme (a 0mm day can't be "drier").
-        const atFloor = displayTemp === 0 && !isHighSide;
-        if (bucketed) {
-          extremeLine = atFloor
-            ? `About under 20% of ${nounP}${since} were this ${adj}.`
-            : `About under 20% of ${nounP}${since} were this ${adj} or ${comp}.`;
-        } else {
-          const pct = singleTail * 100;
-          extremeLine = atFloor
-            ? `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj}.`
-            : `About ${pct.toFixed(0)}% of ${nounP}${since} were this ${adj} or ${comp}.`;
-        }
-        verdict = pick(VERDICT_NOTABLE, seed);
-        forecastPredicate = `in the top 20% ${sup} ${nounP}${since}`;
-      } else {
-        // Mild — the middle 60% (p20–p80). resolveForecastMarker split it into
-        // 'mildDead' (dead-centre p40–60) vs 'mildOff' (off-centre); both are graded
-        // against the same two-sided [p20,p80] band (marker.tierTwoSided), differing
-        // only in flavour wording.
-        if (tier === 'mildDead') {
-          const deadPhrase = pick(DEAD_CENTER_LINE, seed);
-          extremeLine = `${deadPhrase} for ${nounP}${since}.`;
-        } else {
-          const cmp = METRIC_COMPARATIVE[currentMetric];
-          const word = isHighSide ? cmp.high : cmp.low;
-          const hedge = pick(MILD_HEDGE, seed);
-          extremeLine = `A ${hedge} ${word} than most ${nounP}${since}.`;
-        }
-        // Forecast form states the tier plainly against the same [p20, p80] band
-        // the confidence is graded on and the histogram brackets: "…this day will
-        // be within the middle 60% of days…". (The playful lines above are the
-        // historical, non-forecast wording; the flavour split doesn't carry over.)
-        forecastPredicate = `within the middle 60% of ${nounP}${since}`;
-        verdict = pick(VERDICT_MILD, seed);
-      }
-
-      // Confidence qualifier — forecast/recent-model rows only (same `band`
-      // gating the old ± readout used). A real CQR exceedance probability:
-      // given the historical threshold VALUE this tier is claiming (e.g. the
-      // value beyond which a day counts as "under 10%"), how likely is the
-      // row's OWN predictive distribution to still land on the correct side
-      // of it. Rendered as both a verdict-word prefix and a "(Pr>…%)" suffix on
-      // the rarity line. Skipped on a too-small pool — not enough signal.
-      if (band && n >= 5) {
-        const points = bandQuantilePoints(band, currentMetric, system);
-        // Two-sided (dead-center mild) integrates the forecast mass inside the
-        // claimed band [p40,p60]; every other tier — the tails AND off-center
-        // mild — integrates the mass on one side of a single cutoff. Same
-        // primitive (probInInterval) so a degenerate/tight climatology can't
-        // zero it out.
-        const loT = valueAtTailFraction(tierPool, tierCutoff, false);
-        const hiT = valueAtTailFraction(tierPool, tierCutoff, true);
-        const oneT = valueAtTailFraction(tierPool, tierCutoff, isHighSide);
-        const p = tierTwoSided
-          ? probabilityBetween(points, loT, hiT)
-          : probabilityOneSided(points, oneT, isHighSide);
-        // Top-5% forecast: confidence-grade the verdict word. ≥80% sure the settled
-        // value clears the 5% cutoff earns the strong "very-extreme" bank (and the
-        // confetti burst below); 50–80% (and the rare <50% floor) the hedged
-        // "probably-very-extreme" bank.
-        if (tier === 'extreme') {
-          isVeryExtremeForecast = p >= 0.8;
-          verdict = isVeryExtremeForecast
-            ? pick(VERDICT_VERY_EXTREME, seed)
-            : pick(VERDICT_PROB_VERY_EXTREME, seed);
-        }
-        // Degenerate middle band — p20 == p80 (a bone-dry precip window where nearly
-        // every comparable day is 0mm). "…within the middle 60%…" is meaningless when
-        // the band is a single point, so restate it against the majority the day
-        // actually resembles: "…like 99% of days…". The share is COMPUTED (never
-        // hardcoded) on the SAME pool the histogram's dry bracket counts — the
-        // observed climatology days, model rows excluded — so the card number and
-        // the bracket always agree.
-        if (tierTwoSided && Math.abs(hiT - loT) < 1e-6) {
-          const climatology = observedPool(valid, currentMetric);
-          const atValue = climatology.filter(
-            (d) => convert(d[currentMetric] as number, currentMetric, system) <= loT + 1e-9
-          ).length;
-          const share = Math.round((atValue / Math.max(1, climatology.length)) * 100);
-          forecastPredicate = `like ${share}% of ${nounP}${since}`;
-        }
-        // p drives the bottom line: on any ±window tier (forecastPredicate set)
-        // that whole line becomes the plain-English statement of p — "~C% chance
-        // this day will be <predicate>" — since p IS exactly the chance the
-        // forecast falls in the region the predicate claims. Only all-time keeps
-        // its own line + the coarse (Pr>…%) bucket. (The verdict itself carries no
-        // confidence qualifier anymore — the bottom line says it plainly.)
-        // forecastPredicate is set on every forecast tier now (all-time included),
-        // so the rarity line becomes the plain-English statement of p. Round to the
-        // nearest 5% (cap at 95, never "~100%") — the "~" already says approximate,
-        // and a wide forecast band can't support a to-the-point figure.
-        if (forecastPredicate !== null) {
-          const chance = Math.min(95, Math.round(p * 20) * 5);
-          extremeLine = `There's a ~${chance}% chance that this ${noun} will be ${forecastPredicate}.`;
-        }
-      }
-    }
-  }
+  // Tier + rarity run off the SAME observed-only climatology pool the histogram
+  // brackets and the record star use — MODEL ROWS EXCLUDED, i.e. the target's own
+  // forecast row and any recent-tier precip/wind. Including them (as this card
+  // used to) ranks the value against near-copies of itself and lands it a tier
+  // MILDER than the histogram, which excludes them — the "card says top 20% / chart
+  // says top 10%" bug; and it let a model row be ranked #1 while the star sat on a
+  // real one. Ranking is unit-agnostic, so the pools go in NATIVE units.
+  const windowNative = observedPool(valid, currentMetric)
+    .map((d) => d[currentMetric] as number);
+  const allTimeNative = observedPool(yearTimeline, currentMetric)
+    .map((d) => d[currentMetric])
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const prose = resolveVerdictProse({
+    displayValue: displayTemp,
+    band: band ?? null,
+    windowNative,
+    allTimeNative,
+    metric: currentMetric,
+    system,
+    // "…of days within ±3 days of Aug 30th…" — no quantifier: the scope clause
+    // already says which days, and the dial's "all" would read as a contrast.
+    pool: { quantifier: '', scope: since },
+    style: 'surprise',
+  });
+  const verdict = prose ? prose.verdict : context.description;
+  const extremeLine = prose?.rarityLine ?? null;
+  const rank = prose?.rank ?? 0; // 1-based rank on the day's side; 0 when undeterminable.
+  const allTimeRank = prose?.allTimeRank ?? 0; // rank across the ENTIRE record; 0 = N/A.
+  // Forecast top-5% day we're >=80% sure clears the 5% cutoff — drives the
+  // confetti burst below. Stays false on historical rows.
+  const isVeryExtremeForecast = prose?.isVeryExtremeForecast ?? false;
 
   // Confetti for a standout day. HISTORICAL rows fire on an in-window top-3 — a
   // real, settled rank. FORECAST rows are point estimates, so a rank-1 median isn't

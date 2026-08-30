@@ -23,8 +23,8 @@
 import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from './config';
-import { comparablePool, getCurrentDateData, rankValue } from './dataProcessor';
-import { valueAtTailFraction } from './confidence';
+import { comparablePool, getCurrentDateData, rankValue } from './dataProcessor.ts';
+import { valueAtTailFraction } from './confidence.ts';
 
 export type ForecastTier =
   | 'alltime' // top-10 across the WHOLE record

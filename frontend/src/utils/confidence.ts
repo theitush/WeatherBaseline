@@ -7,8 +7,8 @@
 // correct side of it, using the row's own predictive distribution rather than
 // just its point estimate.
 import type { MetricBand, MetricKey } from '../types';
-import type { UnitSystem } from './units';
-import { convert } from './units';
+import type { UnitSystem } from './units.ts';
+import { convert } from './units.ts';
 
 /** A point on a predictive CDF: cumulative probability -> value. */
 interface QuantilePoint {
