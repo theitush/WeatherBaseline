@@ -45,12 +45,12 @@ Reading order for the current (q9, 9-level) system, then the studies that led to
 
 | notebook | question it answers |
 |---|---|
+| `debias_eval.ipynb` | Probably the most interesting and definitely the most up-to-date notebook in the repo. Raw forecast vs the previously shipped 7-level model (scored *as served*, all 8,620 live cells) vs the q9 retrain, on identical rows: signed error per tier (boxplots + full histograms), band coverage per tier per metric, and a worst-cells drill-down (QQ + rung reliability). |
 | `ml_debias.ipynb` | The modelling notebook. Wires `train_quantile_debias`'s functions to the cached full-grid fits (no retraining — `CELL_LIMIT` must stay `None`) and evaluates them: point error vs raw at the tails, band coverage/width, feature importance, cycle offset, where M2 (no cell identity) and M3 disagree, and the gating diagnostic (cells where M3 hurts). |
 | `cqr_per_level_validity.ipynb` | **Level 0.** Computes the eight per-level one-sided CQR shifts `make_debias_tables.py` bakes in, and measures how honest each calibrated tail is on days the calibration never saw — marginal, monthly, and conditional on an extreme forecast. Also the empirical bands for gated cells and the forecast-conditional precip band. |
 | `cdf_rung_coverage.ipynb` | **Level 1.** Builds the 9-point band exactly as the frontend does and checks the interpolated predictive CDF at every 5 % rung (15, 20, 30 … are interpolations *between* trained heads). |
 | `card_claim_reliability.ipynb` | **Level 2.** Is the card's "~C % chance this day will be ‹predicate›" calibrated — overall and **per verdict tier** that fired? The tier-conditional view is where selection effects show up (extreme tiers over-promise; a retrain can't fix that). |
 | `part3_validation_summary.ipynb` | One-page graphical verdict of the 2026-08-27 q9 validation run, recomputed from cached artifacts in ~1 min. The three notebooks above stay the source of truth. |
-| `debias_eval.ipynb` | Raw forecast vs the previously shipped 7-level model (scored *as served*, all 8,620 live cells) vs the q9 retrain, on identical rows: signed error per tier (boxplots + full histograms), band coverage per tier per metric, and a worst-cells drill-down (QQ + rung reliability). Renamed 2026-08-30 from `raw_vs_prod_vs_q9.ipynb` — that's the name `git log` shows. |
 
 ### Earlier studies (conclusions already folded into the scripts)
 
