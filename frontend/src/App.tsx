@@ -486,7 +486,7 @@ const AppContent: React.FC = () => {
               </header>
               <div className="faq-list">
                 <details className="faq-item">
-                  <summary>What's this data?</summary>
+                  <summary>Where does the data come from?</summary>
                   <div className="faq-body">
                     <p>
                       The historical record comes from{' '}
@@ -500,53 +500,85 @@ const AppContent: React.FC = () => {
                         </a>
                       </strong>
                       , the European Centre for Medium-Range Weather Forecasts'
-                      reanalysis. A reanalysis isn't a forecast and it isn't a single
-                      weather station — it's the output of running a modern physics
-                      model backwards over every observation we have (stations,
-                      balloons, ships, satellites) to reconstruct a single, gap-free,
-                      globally consistent estimate of what the weather actually did.
-                      ERA5-Land gives one value per day per cell on a fixed 0.1° grid
-                      (roughly 11 km), so the seam between cities is never an artifact
-                      of where a thermometer happened to sit.{' '}
+                      reanalysis, distributed through the Copernicus Climate Change
+                      Service. A reanalysis isn't a forecast and it isn't a single
+                      weather station. It's one modern physics model run forward over
+                      the whole historical record, swallowing every observation we have
+                      along the way (stations, balloons, ships, satellites) to
+                      reconstruct a single gap-free, globally consistent estimate of
+                      what the weather actually did.
+                    </p>
+                    <p>
+                      ERA5-Land sits on a fixed 0.1° grid, roughly 11 km, so the seam
+                      between cities is never an artifact of where a thermometer
+                      happened to sit. It's published hour by hour; the daily numbers
+                      here are ours, summarised from those hours over the{' '}
+                      <em>local</em> solar day rather than the UTC one, so a
+                      night-time low is the low of your night and not of Greenwich's.
                     </p>
                     <p>
                       When you search a city we snap it to the nearest grid cell
-                      centre rather than interpolating — the number you see is a real
-                      ERA5-Land cell, not a blend. We show daily maximum and minimum
+                      centre rather than interpolating, so the number you see is a real
+                      ERA5-Land cell and not a blend. We show daily maximum and minimum
                       temperature, precipitation, and peak wind.
                     </p>
                     <p>
-                      A reanalysis can't cover the present: ERA5-Land lags real time
-                      by several days, so the last week — and the few days
-                      ahead — have to come from elsewhere. The forecast days use{' '}
+                      <em>
+                        Generated using Copernicus Climate Change Service information.
+                        Neither the European Commission nor ECMWF is responsible for any
+                        use of this data.
+                      </em>
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>Why are recent and future days different?</summary>
+                  <div className="faq-body">
+                    <p>
+                      A reanalysis can't cover the present, so the tail of the chart has
+                      to come from somewhere else. It comes from{' '}
                       <a
                         href="https://www.ecmwf.int/en/forecasts/documentation-and-support/medium-range-forecasts"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
                         <strong>ECMWF's IFS HRES</strong>
-                      </a>, the 9 km high-resolution
-                      deterministic model. We use that one specifically because it's
-                      from the same institution that builds ERA5, so the physics and
-                      the variables line up as closely as a forecast reasonably can
-                      with the archive it's extending.{' '} Even so, the forecast and the
-                      reanalysis don't sit on exactly the same grid, so we run the forecast
-                      through a custom debiasing model. For forecast days you're therefore
-                      seeing not the raw forecast but the model's estimate of the
-                      distribution (and median) of how that forecast typically lands in the ERA5-Land
-                      record. This is still a beta version of the model, and we plan to open
-                      source the full thing soon.
+                      </a>
+                      , the 9 km high-resolution deterministic model. We use that one
+                      specifically because it's from the same institution that builds
+                      ERA5, so the physics and the variables line up as closely as a
+                      forecast reasonably can with the archive it's extending.
                     </p>
                     <p>
-                      <strong>Caveat 1:</strong> The forecast is a forecast. Thus, it may change as the
-                      forecast date approaches.
+                      Even so, the forecast and the reanalysis don't sit on exactly the
+                      same grid, so we run the forecast through a debiasing model of our
+                      own. For those days you're therefore seeing not the raw forecast
+                      but the model's estimate of the distribution (and median) of how
+                      that forecast typically lands in the ERA5-Land record. It's still
+                      a beta version of the model, and it's open source along with the
+                      rest of the site:{' '}
+                      <a
+                        href="https://github.com/theitush/HowHotWasIt"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        github.com/theitush/HowHotWasIt
+                      </a>
+                      .
                     </p>
                     <p>
-                      <strong>Caveat 2:</strong> It may take the historical temperature data up to 7 days
-                      to be uploaded and then fetched, and the precipitation data can take upwards
-                      of a month. Thus, the last several days of temperature data are a forecast
-                      and the last month of wind and precipitation are a forecast. You can always see in the chart
-                      and by hovering over a data point whether a datapoint is a forecast or a reanalysis.
+                      <strong>Caveat 1:</strong> A forecast is a forecast. It may change
+                      as the day approaches.
+                    </p>
+                    <p>
+                      <strong>Caveat 2:</strong> The unsettled tail isn't the same
+                      length for every metric. Temperature settles quickly: the
+                      reanalysis reaches to about a week ago, so only the last few days
+                      and the days ahead are model output. Precipitation and wind settle
+                      much more slowly, and for them the archive can run a month or so
+                      behind, which means a rainy day a fortnight back may still be a
+                      forecast rather than a settled reading. You can always tell which
+                      is which from the chart, or by hovering a data point.
                     </p>
                     <p>
                       <strong>Caveat 3:</strong> This site is still in beta, and part of what that
@@ -564,32 +596,38 @@ const AppContent: React.FC = () => {
                   <summary>What are these metrics?</summary>
                   <div className="faq-body">
                     <p>
-                      Every number here is a <strong>daily</strong> value — one figure
+                      Every number here is a <strong>daily</strong> value, one figure
                       summarising a single 24-hour day, not an hourly reading or a
                       monthly average. There are four:
                     </p>
                     <p>
                       <strong>Max temperature</strong> is the hottest the air got that
-                      day — the peak of the afternoon. <strong>Min temperature</strong>{' '}
-                      is the coldest it got — the bottom of the night, usually just
+                      day, the peak of the afternoon. <strong>Min temperature</strong>{' '}
+                      is the coldest it got, the bottom of the night, usually just
                       before dawn. Between them they bracket the day's full swing.
                     </p>
                     <p>
-                      <strong>Wind speed</strong> is the day's strongest sustained
-                      wind, measured 10 m above the ground. It{' '}
-                      <em>excludes gusts</em> — the brief, sharp spikes that can be far
-                      higher — so it reflects how hard the wind was steadily blowing
-                      rather than its momentary peaks.
+                      <strong>Wind speed</strong> is the day's strongest hourly wind,
+                      measured 10 m above the ground: the highest of the day's hourly
+                      average wind speeds. It <em>excludes gusts</em>, the brief sharp
+                      spikes that can be far higher, so it reflects how hard the wind
+                      was steadily blowing rather than its momentary peaks.
                     </p>
                     <p>
                       <strong>Precipitation</strong> is the total water that fell over
                       the day, and "water" is the key word: it counts{' '}
                       <em>everything</em>, not just rain. Snow, sleet and hail are all
-                      melted down to their liquid equivalent before being added up. As
-                      a rough rule of thumb, about <strong>10 cm of fresh snow melts
-                      down to ~1 mm</strong> of precipitation — so a number that looks
-                      small on a winter day can still mean a lot of snow on the ground.
+                      melted down to their liquid equivalent before being added up.
+                      Fresh snow melts down at roughly <strong>ten to one</strong>, so
+                      1 cm of snow is about 1 mm of precipitation, and a winter day
+                      reading 15 mm had something like 15 cm of snow falling on it.
                     </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>What about humidity?</summary>
+                  <div className="faq-body">
+                    <p>Coming soon!</p>
                   </div>
                 </details>
                 <details className="faq-item">
@@ -597,13 +635,13 @@ const AppContent: React.FC = () => {
                   <div className="faq-body">
                     <p>
                       It often won't, and that's expected. Your phone usually
-                      reports the nearest weather station — one thermometer at one
-                      spot, often the airport. Everything here instead comes off a
+                      reports the nearest weather station, one thermometer at one
+                      spot, often the airport. Everything here instead comes off a{' '}
                       <strong>grid</strong>, and the number is a whole cell's
                       value, not a single point. Both tiers work this way: the
                       ERA5-Land archive (0.1°, ~11 km) <em>and</em> the ECMWF
                       forecast days (9 km) are gridded model output, not a
-                      station's reading — so neither one will track your app's
+                      station's reading, so neither one will track your app's
                       local thermometer.
                     </p>
                     <p>
@@ -612,14 +650,14 @@ const AppContent: React.FC = () => {
                       is normal even on a calm day. Where the ground is
                       complicated the gap grows: coastal cities run roughly a
                       degree off, and in <strong>mountains it can reach several
-                      degrees</strong> — the cell's average elevation simply isn't
-                      the elevation of the village in the valley or the peak above
-                      it.
+                      degrees</strong>, because the cell's average elevation simply
+                      isn't the elevation of the village in the valley or the peak
+                      above it.
                     </p>
                     <p>
                       That's a deliberate trade. A single grid that behaves the
                       same way in <strong>1950 and today</strong>, everywhere on
-                      Earth, is what makes the comparison fair — you're ranking a
+                      Earth, is what makes the comparison fair: you're ranking a
                       day against its own history measured the exact same way, not
                       against a station that moved, closed, or never existed back
                       then. Matching your app to the decimal would mean giving that
@@ -628,11 +666,63 @@ const AppContent: React.FC = () => {
                   </div>
                 </details>
                 <details className="faq-item">
+                  <summary>Is this a good source for weather forecasts?</summary>
+                  <div className="faq-body">
+                    <p>
+                      Probably not! Use your weather app. This site shows you the days
+                      ahead because it would be strange to hand you a blank card for
+                      tomorrow, but forecasting is not what it's built to do.
+                    </p>
+                    <p>
+                      Two reasons. The first is that the number you see isn't really the
+                      forecast: we push the raw ECMWF output through a debiasing model
+                      whose entire job is to answer "how will this day eventually land
+                      in the ERA5-Land record?" That's the right question for ranking a
+                      day against 76 years of history and the wrong one for deciding
+                      whether to take a coat.
+                    </p>
+                    <p>
+                      The second is resolution. One value per day, per ~11 km cell. No
+                      hours, no gusts, no cloud, no humidity, no warnings, and nothing
+                      about the particular four hours you'll actually be outside. A real
+                      forecast gives you all of that, usually from this same ECMWF
+                      model, without our archive-shaped detour.
+                    </p>
+                    <p>
+                      What this <em>is</em> good for is the opposite question: given
+                      that tomorrow is supposed to be hot, how strange is that for here,
+                      at this time of year, against the whole record? That's what
+                      everything on this page is arranged around.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
+                  <summary>Why is my city showing up under another name?</summary>
+                  <div className="faq-body">
+                    <p>
+                      Because you aren't getting your city, you're getting a grid cell.
+                      We serve a curated set of about 8,600 land cells, and searching
+                      snaps you to the nearest one, with the distance shown in the
+                      result so you can see how far you travelled to get there.
+                    </p>
+                    <p>
+                      Names come from the populated place closest to the cell centre,
+                      resolved down to sub-district level so that neighbouring cells
+                      never collide on a single name. Inside a big city that means a
+                      cell can end up labelled with a district rather than the city
+                      itself. On a coast or a small island it can be stranger still: the
+                      grid only has land where ERA5-Land has land, so a narrow spit or a
+                      small island may have no cell of its own at all and snap to the
+                      mainland behind it.
+                    </p>
+                  </div>
+                </details>
+                <details className="faq-item">
                   <summary>Why ±{CONFIG.chart.seasonalWindowDays} days?</summary>
                   <div className="faq-body">
                     <p>
                       To say whether a given day was extreme, you need something to
-                      compare it against — and the only fair comparison is{' '}
+                      compare it against, and the only fair comparison is{' '}
                       <em>the same time of year</em>. A 25° day is unremarkable in
                       July and astonishing in January, so we never pool the whole
                       year together. Instead we line up every year's version of the
@@ -644,7 +734,7 @@ const AppContent: React.FC = () => {
                       points, and any one of them can be a fluke. So we widen the
                       slot to a{' '}
                       <strong>±{CONFIG.chart.seasonalWindowDays}-day window</strong>{' '}
-                      around your date — June 5th pulls in{' '}
+                      around your date. June 5th pulls in{' '}
                       {CONFIG.chart.seasonalWindowDays} days before through{' '}
                       {CONFIG.chart.seasonalWindowDays} days after, every year.
                       That gives a richer sample to characterise "what this part of
@@ -656,7 +746,7 @@ const AppContent: React.FC = () => {
                       enough that the weather hasn't meaningfully drifted into a
                       different season. The climate barely moves across{' '}
                       {CONFIG.chart.seasonalWindowDays * 2 + 1} days, so you're
-                      still comparing apples to apples — which is exactly what lets
+                      still comparing apples to apples, which is exactly what lets
                       the answer to "how extreme was <em>this</em>{' '}
                       weather?" actually mean something.
                     </p>
@@ -667,8 +757,8 @@ const AppContent: React.FC = () => {
                   <div className="faq-body">
                     <p>
                       A reanalysis is only as good as what it can swallow. Before
-                      the satellite era most of the planet — oceans, deserts, the
-                      poles, anywhere without a dense station network — was simply
+                      the satellite era most of the planet (oceans, deserts, the
+                      poles, anywhere without a dense station network) was simply
                       unobserved, so the model has to lean harder on its own physics
                       to fill the gaps. The big regime change is{' '}
                       <strong>1979</strong>, when continuous global satellite
@@ -707,7 +797,7 @@ const AppContent: React.FC = () => {
                     <p>
                       <strong>Start after the satellites.</strong> The windows are
                       anchored so the comparison stays inside the well-observed,
-                      post-1979 era wherever possible — see above. We're not going to
+                      post-1979 era wherever possible, see above. We're not going to
                       hang a "it's getting hotter" claim on the noisiest part of the
                       record.
                     </p>
@@ -725,7 +815,7 @@ const AppContent: React.FC = () => {
                       reshuffle the labels <strong>10,000 times</strong> at random, and see how often 
                       pure chance produces a gap as big as the one we observed. 
                       Two reasons it beats a classic t-test here. First, it's{' '}
-                      <strong>non-parametric</strong> — it makes no assumption that
+                      <strong>non-parametric</strong>: it makes no assumption that
                       the data are normally distributed, which daily temperatures and
                       especially rainfall flatly are not. Second, and more important,
                       weather is heavily <strong>autocorrelated</strong>: today looks
@@ -733,7 +823,7 @@ const AppContent: React.FC = () => {
                       standard t-test treats every day as an independent data point,
                       which massively overstates how much information you really have
                       and produces falsely tiny p-values. So we shuffle whole years as
-                      indivisible blocks rather than individual days — that keeps each
+                      indivisible blocks rather than individual days, which keeps each
                       year's internal correlation intact and gives an honest p-value
                       instead of an inflated one.
                     </p>
@@ -745,8 +835,8 @@ const AppContent: React.FC = () => {
                     <p>
                       <strong>Yep.</strong> This isn't a close call. Many
                       independent analyses, built from completely different
-                      raw data — surface stations, ocean buoys, weather
-                      balloons, satellites, and reanalyses all point the same way: 
+                      raw data (surface stations, ocean buoys, weather
+                      balloons, satellites, and reanalyses) all point the same way: 
                       the planet is warming. When methods that share almost nothing
                       converge on the same answer, that's about as strong as
                       empirical evidence gets.
