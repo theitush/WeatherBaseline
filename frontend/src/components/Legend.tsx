@@ -22,10 +22,10 @@ const ordinal = (n: number): string => {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
-// Legend for the radial dial: only the marks it actually draws. The band labels
-// are the main chart's, word for word — they are the same two percentiles in the
-// same two colours, so a reader shouldn't have to re-learn them one section down.
-// The wedge label names the actual window, e.g. "Jun 6th ±3 days".
+// Legend for the radial dial: only the marks it actually draws. The dial shows
+// the day cloud itself rather than a percentile envelope over it, so — unlike
+// the main chart — there are no band swatches to label here. The wedge label
+// names the actual window, e.g. "Jun 6th ±3 days".
 export const getRadialLegendData = (
   metric: MetricKey,
   currentDate: string,
@@ -35,15 +35,13 @@ export const getRadialLegendData = (
   const windowLabel = `${MONTHS[dt.getMonth()]} ${ordinal(dt.getDate())} ±${CONFIG.chart.seasonalWindowDays} days`;
   const items: LegendItem[] = [
     { type: 'circle', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Historical daily data' },
-    { type: 'wave', color: CONFIG.getColorForElement(metric, 'percentileBand90'), label: '10th–90th pct', op: 1 },
-    { type: 'wave', color: CONFIG.getColorForElement(metric, 'percentileBand75'), label: '25th–75th pct', op: 1 },
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
     { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
   ];
-  // A forecast target draws its uncertainty as a hatched ring band around the
-  // dashed ring on its median — the same two percentiles the envelope above
-  // uses, so the label says which they are rather than just "Forecast". The
-  // swatch shows both marks, the way the dial draws them.
+  // A forecast target draws its uncertainty as a shaded ring band around the
+  // dashed ring on its median — the only shading on the dial, so the label says
+  // which two percentiles it spans rather than just "Forecast". The swatch shows
+  // both marks, the way the dial draws them.
   if (isForecast) {
     items.push({ type: 'band', color: 'var(--text-h)', label: 'Forecast 10th–90th pct' });
   }
@@ -166,15 +164,9 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
       )}
       {item.type === 'band' && (
         <>
-          {/* 45° stripes at the chart's own pitch + ink, plus the dashed median
-              ring through them — the two marks a forecast target draws. */}
-          <path
-            d="M0,2 L8,-6 M0,6 L12,-6 M4,6 L12,-2 M8,6 L12,2"
-            fill="none"
-            stroke={item.color}
-            strokeOpacity={0.5}
-            strokeWidth={1.4}
-          />
+          {/* The wash plus the dashed median ring through it — the two marks a
+              forecast target draws. */}
+          <rect width={12} height={12} y={-6} fill={item.color} opacity={0.18} />
           <line x1={0} x2={12} y1={0} y2={0} stroke={item.color} strokeWidth={1} strokeDasharray="3,2" />
         </>
       )}

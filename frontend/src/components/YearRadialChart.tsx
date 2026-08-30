@@ -133,12 +133,14 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       .attr('fill', 'var(--text-h)')
       .attr('opacity', 0.07);
 
-    // --- percentile envelope (per day-of-year, ±WINDOW_DAYS) ----------------
+    // --- seasonal median (per day-of-year, ±WINDOW_DAYS) --------------------
     // Each ring point pools the days within ±WINDOW_DAYS of that day of the
     // year, across every year — which is EXACTLY the pool the top card's "is
-    // this unusual for the date?" question runs on. So the band at the target
-    // marker's angle is the card's comparison set, drawn; the dashed ring at the
-    // marker's radius is the whole-year question this section's heading asks.
+    // this unusual for the date?" question runs on. Only the MEDIAN of that pool
+    // is drawn: the cloud of dots IS the observed spread here, so shading a
+    // percentile envelope over it re-states in ink what the reader can already
+    // see, and washes out the dots it covers. Shading on this dial is reserved
+    // for the one thing there are no dots for — the forecast band below.
     // Bucketing by day-of-year first keeps this to one pass over the cloud plus
     // 365 merges of 2·WINDOW_DAYS+1 small buckets.
     const valuesByDoy = new Map<number, number[]>();
@@ -149,9 +151,6 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       if (bucket) bucket.push(v);
       else valuesByDoy.set(doy, [v]);
     }
-    type RadialBand = { frac: number; lo: number; hi: number };
-    const band1090: RadialBand[] = [];
-    const band2575: RadialBand[] = [];
     const medianPath: Array<{ frac: number; val: number }> = [];
     for (let doy = 0; doy < 365; doy++) {
       const pool: number[] = [];
@@ -162,48 +161,9 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       }
       if (pool.length === 0) continue;
       pool.sort(d3.ascending);
-      const frac = doy / 365;
-      band1090.push({
-        frac,
-        lo: d3.quantileSorted(pool, 0.1) as number,
-        hi: d3.quantileSorted(pool, 0.9) as number,
-      });
-      band2575.push({
-        frac,
-        lo: d3.quantileSorted(pool, 0.25) as number,
-        hi: d3.quantileSorted(pool, 0.75) as number,
-      });
-      // The median comes off the SAME windowed pool as the band around it — a
-      // bare per-day median (one value per year) is noisy enough to wander
-      // outside its own 25th–75th ribbon, which reads as a drawing bug.
-      medianPath.push({ frac, val: d3.quantileSorted(pool, 0.5) as number });
-    }
-
-    if (band1090.length > 8) {
-      const bandArea = d3
-        .areaRadial<RadialBand>()
-        // areaRadial measures angle from 12 o'clock clockwise — Jan 1 anchored
-        // at top, matching the rest of the dial.
-        .angle((d) => d.frac * 2 * Math.PI)
-        .innerRadius((d) => rScale(d.lo))
-        .outerRadius((d) => rScale(d.hi))
-        .curve(d3.curveCardinalClosed);
-      // Palest 10–90 underneath, 25–75 over it — the main chart's nesting and,
-      // via getColorForElement, its exact two band colours.
-      for (const [datum, element, cls] of [
-        [band1090, 'percentileBand90', 'radial-band-1090'],
-        [band2575, 'percentileBand75', 'radial-band-2575'],
-      ] as const) {
-        g.append('path')
-          .datum(datum)
-          .attr('class', `radial-band ${cls}`)
-          .attr('fill', CONFIG.getColorForElement(currentMetric, element))
-          .attr('d', bandArea as never)
-          .style('opacity', 0)
-          .transition()
-          .duration(500)
-          .style('opacity', 1);
-      }
+      // A WINDOWED median, not a bare per-day one (one value per year): the bare
+      // version is noisy enough to visibly wander, which reads as a drawing bug.
+      medianPath.push({ frac: doy / 365, val: d3.quantileSorted(pool, 0.5) as number });
     }
 
     // --- the day cloud on CANVAS -------------------------------------------
@@ -304,8 +264,8 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
     }
 
     // --- median ring --------------------------------------------------------
-    // The centre line of the envelope built above, drawn over both bands.
-    // Smooths the seasonal cycle the day-cloud only hints at.
+    // The centre line of the pool built above, drawn over the cloud. Smooths the
+    // seasonal cycle the day-cloud only hints at.
     if (medianPath.length > 8) {
       const radialLine = d3
         .lineRadial<{ frac: number; val: number }>()
@@ -395,14 +355,13 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       // for a value on this dial: every day outside it was more extreme than
       // that value, which is exactly what the section's heading counts.
       //
-      // On a forecast day the uncertainty is a HATCHED ANNULUS between q10 and
-      // q90 — the same 45° diagonal stripes the histogram shades its forecast
-      // confidence region with (same 6px pitch, same foreground ink at 0.5), so
-      // "this texture means forecast" is one visual rule across the page — with
-      // the thin dashed ring on the median still marking the value the dot sits
-      // at. Two more dashed rings read as two more gridlines; a textured band
-      // reads as one interval, and the stripes keep it from being mistaken for
-      // the flat climatology envelope underneath. A settled day gets one ring.
+      // On a forecast day the uncertainty is a SHADED ANNULUS between q10 and
+      // q90, with the thin dashed ring on the median still marking the value the
+      // dot sits at: two more dashed rings read as two more gridlines, a filled
+      // band reads as one interval. A flat wash, not the histogram's diagonal
+      // hatch — stripes at a fixed 45° cut across a dial's radial geometry at a
+      // different angle everywhere round the circle, so the texture reads as a
+      // moiré rather than as one band. A settled day gets one ring.
       const targetRing = (
         r: number,
         strokeWidth: number,
@@ -431,29 +390,11 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           .outerRadius(rHi)
           .startAngle(0)
           .endAngle(2 * Math.PI);
-        // Pattern ids are document-global, so the id carries a per-render uid —
-        // two dials on one page would otherwise share (and fight over) one defs.
-        const hatchId = `radial-conf-hatch-${Math.random().toString(36).slice(2, 8)}`;
-        svg
-          .append('defs')
-          .append('pattern')
-          .attr('id', hatchId)
-          .attr('patternUnits', 'userSpaceOnUse')
-          .attr('width', 6)
-          .attr('height', 6)
-          .attr('patternTransform', 'rotate(45)')
-          .append('line')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', 0)
-          .attr('y2', 6)
-          .attr('stroke', 'var(--text-h)')
-          .attr('stroke-width', 1.4)
-          .attr('stroke-opacity', 0.5);
         g.append('path')
           .attr('class', 'radial-target-band')
           .attr('d', bandRing(null) as string)
-          .attr('fill', `url(#${hatchId})`)
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.13)
           // A filled shape this large would otherwise swallow the month wedges'
           // hover (they are drawn beneath it); the rings never did, being stroke-only.
           .attr('pointer-events', 'none');
