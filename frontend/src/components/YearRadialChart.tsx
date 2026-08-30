@@ -395,10 +395,13 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       // for a value on this dial: every day outside it was more extreme than
       // that value, which is exactly what the section's heading counts.
       //
-      // On a forecast day the uncertainty is drawn the same way rather than as a
-      // stub on one spoke: two rings at q10 and q90 bracket where the settled
-      // value is likely to land, and a thinner ring marks the median between
-      // them. A settled day has one value and gets one ring.
+      // On a forecast day the uncertainty is a SHADED ANNULUS between q10 and
+      // q90 — the ribbon idiom the main chart uses for a range, bent round the
+      // dial — with the thin dashed ring on the median still marking the value
+      // the dot sits at. Two more dashed rings read as two more gridlines; a
+      // filled band reads as one interval. It is tinted in the foreground, not
+      // the metric's band colour, so it can't be mistaken for the climatology
+      // envelope it sits on top of. A settled day has one value and one ring.
       const targetRing = (
         r: number,
         strokeWidth: number,
@@ -416,8 +419,25 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           .attr('opacity', opacity);
 
       if (targetBand) {
-        targetRing(rScale(cv(targetBand.q10)), 1.5, '5,5', 0.7, 'radial-target-ring radial-target-ring-band');
-        targetRing(rScale(cv(targetBand.q90)), 1.5, '5,5', 0.7, 'radial-target-ring radial-target-ring-band');
+        // min/max, not q10/q90 as given: the radial scale is always increasing,
+        // but a metric drawn on a reversed/clamped domain must never hand
+        // arc() an inner radius outside its outer one.
+        const rLo = Math.min(rScale(cv(targetBand.q10)), rScale(cv(targetBand.q90)));
+        const rHi = Math.max(rScale(cv(targetBand.q10)), rScale(cv(targetBand.q90)));
+        const bandRing = d3
+          .arc<unknown>()
+          .innerRadius(rLo)
+          .outerRadius(rHi)
+          .startAngle(0)
+          .endAngle(2 * Math.PI);
+        g.append('path')
+          .attr('class', 'radial-target-band')
+          .attr('d', bandRing(null) as string)
+          .attr('fill', 'var(--text-h)')
+          .attr('opacity', 0.13)
+          // A filled shape this large would otherwise swallow the month wedges'
+          // hover (they are drawn beneath it); the rings never did, being stroke-only.
+          .attr('pointer-events', 'none');
         targetRing(tR, 1, '3,3', 0.9, 'radial-target-ring radial-target-ring-mid');
       } else {
         targetRing(tR, 1.75, '5,5', 0.9, 'radial-target-ring');

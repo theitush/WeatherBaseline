@@ -249,7 +249,7 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
     rarityLine = `The ${ord}${sup} ${oneDay}.`;
     // #1 gets the exclusive phrase; #2–#5 the party bank.
     verdict = descriptive
-      ? `Among the ${sup} ${nounP} of the year.`
+      ? `Among the ${sup} ${nounP}`
       : rank === 1 ? 'Record-breaker!' : pick(VERDICT_TOP5, seed);
   } else if (tier === 'extreme') {
     if (bucketed) {
@@ -268,7 +268,7 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
     // hedged). Note: 'extreme' no longer uses VERDICT_EXTREME — that bank moved
     // down to the 5–10% 'mid' tier.
     verdict = descriptive
-      ? `Among the ${sup} ${nounP} of the year.`
+      ? `Among the ${sup} ${nounP}`
       : singleTail <= 0.03
         ? pick(VERDICT_VERY_EXTREME, seed)
         : pick(VERDICT_PROB_VERY_EXTREME, seed);
@@ -277,7 +277,7 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
     // Mid-tier, forecast/recent-model rows only — splits the old 5%→20% gap so
     // "under 10%" reads distinctly from "under 20%".
     rarityLine = `Under 10% of ${manyDays} were this ${adj}!`;
-    verdict = descriptive ? `A ${adj} ${noun} by any standard.` : pick(VERDICT_EXTREME, seed);
+    verdict = descriptive ? `A ${adj} ${noun} by any standard` : pick(VERDICT_EXTREME, seed);
     forecastPredicate = `in the top 10% ${sup} ${tierDays}`;
   } else if (tier === 'notable') {
     // Notable — cumulative ("or hotter"). Drop the comparative when nothing
@@ -293,7 +293,7 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
         ? `About ${pct.toFixed(0)}% of ${manyDays} were this ${adj}.`
         : `About ${pct.toFixed(0)}% of ${manyDays} were this ${adj} or ${comp}.`;
     }
-    verdict = descriptive ? `${capitalize(comp)} than most.` : pick(VERDICT_NOTABLE, seed);
+    verdict = descriptive ? `${capitalize(comp)} than most` : pick(VERDICT_NOTABLE, seed);
     forecastPredicate = `in the top 20% ${sup} ${tierDays}`;
   } else {
     // Mild — the middle 60% (p20–p80). resolveForecastMarker split it into
@@ -316,8 +316,8 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
       const share = Math.round((beyond / Math.max(1, n)) * 100);
       rarityLine = `${capitalize(mildWord)} than about ${share}% of ${manyDays}.`;
       verdict = tier === 'mildDead'
-        ? `A typical ${noun} here.`
-        : `A shade ${mildWord} than the typical ${noun} here.`;
+        ? `A typical ${noun} here`
+        : `A shade ${mildWord} than the typical ${noun} here`;
     } else if (tier === 'mildDead') {
       const deadPhrase = pick(DEAD_CENTER_LINE, seed);
       rarityLine = `${deadPhrase} for ${manyDays}.`;
@@ -363,8 +363,8 @@ export function resolveVerdictProse(input: VerdictProseInput): VerdictProse | nu
       isVeryExtremeForecast = p >= 0.8;
       if (descriptive) {
         verdict = isVeryExtremeForecast
-          ? `Among the ${sup} ${nounP} of the year.`
-          : `Probably among the ${sup} ${nounP} of the year.`;
+          ? `Among the ${sup} ${nounP}`
+          : `Probably among the ${sup} ${nounP}`;
       } else {
         verdict = isVeryExtremeForecast
           ? pick(VERDICT_VERY_EXTREME, seed)

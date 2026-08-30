@@ -11,7 +11,8 @@ export type LegendItem =
   | { type: 'circle'; color: string; label: string }
   | { type: 'forecast'; color: string; label: string }
   | { type: 'target'; color: string; label: string }
-  | { type: 'wedge'; color: string; label: string };
+  | { type: 'wedge'; color: string; label: string }
+  | { type: 'band'; color: string; label: string };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -39,11 +40,12 @@ export const getRadialLegendData = (
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
     { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
   ];
-  // A forecast target draws its uncertainty as two more dashed rings around the
-  // one on its median — the same two percentiles the envelope above uses, so the
-  // label says which they are rather than just "Forecast".
+  // A forecast target draws its uncertainty as a shaded ring band around the
+  // dashed ring on its median — the same two percentiles the envelope above
+  // uses, so the label says which they are rather than just "Forecast". The
+  // swatch shows both marks, the way the dial draws them.
   if (isForecast) {
-    items.push({ type: 'dashed', color: 'var(--text-h)', label: 'Forecast 10th–90th pct' });
+    items.push({ type: 'band', color: 'var(--text-h)', label: 'Forecast 10th–90th pct' });
   }
   return items;
 };
@@ -161,6 +163,12 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
       )}
       {item.type === 'wedge' && (
         <rect width={12} height={12} y={-6} fill={item.color} opacity={0.18} />
+      )}
+      {item.type === 'band' && (
+        <>
+          <rect width={12} height={12} y={-6} fill={item.color} opacity={0.18} />
+          <line x1={0} x2={12} y1={0} y2={0} stroke={item.color} strokeWidth={1} strokeDasharray="3,2" />
+        </>
       )}
     </g>
   </svg>

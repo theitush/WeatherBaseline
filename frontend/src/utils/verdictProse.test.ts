@@ -74,7 +74,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     'About 15% of all days since 1950 were this hot or hotter.',
     'dial rarity says "all days since 1950"'
   );
-  assertEq(dial.verdict, 'Hotter than most.', 'dial verdict is the fixed notable phrase');
+  assertEq(dial.verdict, 'Hotter than most', 'dial verdict is the fixed notable phrase');
 }
 
 // --- Case 2: the mild tiers — percentile, not a punchline --------------------
@@ -86,7 +86,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assertEq(dead.tier, 'mildDead', 'dead-centre value lands on mildDead');
-  assertEq(dead.verdict, 'A typical day here.', 'mildDead verdict');
+  assertEq(dead.verdict, 'A typical day here', 'mildDead verdict');
   assertEq(dead.rarityLine, 'Warmer than about 50% of all days since 1950.', 'mildDead percentile line');
 
   // 30 in 0..99 is on the cold side: 70 days are warmer.
@@ -95,7 +95,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assertEq(off.tier, 'mildOff', 'off-centre value lands on mildOff');
-  assertEq(off.verdict, 'A shade colder than the typical day here.', 'mildOff verdict takes the low-side word');
+  assertEq(off.verdict, 'A shade colder than the typical day here', 'mildOff verdict takes the low-side word');
   assertEq(off.rarityLine, 'Colder than about 69% of all days since 1950.', 'mildOff percentile counts the strictly warmer days');
 
   // The card keeps its playful wording on the very same day.
@@ -114,7 +114,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     displayValue: 50, band: null, windowNative: WINDOW_100, allTimeNative: RECORD_1000,
     metric: 'min_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
-  assertEq(night.verdict, 'A typical night here.', 'min temperature says "night"');
+  assertEq(night.verdict, 'A typical night here', 'min temperature says "night"');
   assertEq(night.rarityLine, 'Warmer than about 50% of all nights since 1950.', 'min temperature says "nights"');
 }
 
@@ -128,7 +128,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assertEq(extreme.tier, 'extreme', 'rank 15 of 400 is the extreme tier, not all-time');
-  assertEq(extreme.verdict, 'Among the hottest days of the year.', 'extreme verdict');
+  assertEq(extreme.verdict, 'Among the hottest days', 'extreme verdict');
   assertEq(extreme.rarityLine, 'Only 3.8% of all days since 1950 were this hot!', 'extreme rarity line');
 
   // Top-10 of the record: the one tier that keeps the card's bank on both styles.
@@ -145,7 +145,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     displayValue: 14, band: null, windowNative: RECORD_400, allTimeNative: RECORD_400,
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
-  assertEq(cold.verdict, 'Among the coldest days of the year.', 'low side reads coldest');
+  assertEq(cold.verdict, 'Among the coldest days', 'low side reads coldest');
   assertEq(cold.rarityLine, 'Only 3.8% of all days since 1950 were this cold!', 'low side rarity line');
 }
 
@@ -158,7 +158,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   })!;
   assertEq(tight.tier, 'extreme', 'a forecast median in the top 5% is the extreme tier');
   assert(tight.isVeryExtremeForecast, 'a tight band clears the 80% confidence bar');
-  assertEq(tight.verdict, 'Among the hottest days of the year.', 'confident forecast keeps the plain phrase');
+  assertEq(tight.verdict, 'Among the hottest days', 'confident forecast keeps the plain phrase');
   assertEq(
     tight.rarityLine,
     "There's a ~95% chance that this day will be in the top 5% hottest days since 1950.",
@@ -171,7 +171,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assert(!loose.isVeryExtremeForecast, 'a wide band misses the 80% bar');
-  assertEq(loose.verdict, 'Probably among the hottest days of the year.', 'hedged forecast verdict');
+  assertEq(loose.verdict, 'Probably among the hottest days', 'hedged forecast verdict');
 
   // Same forecast, the card's pool: identical shape, its own scope clause.
   const card = resolveVerdictProse({
@@ -204,7 +204,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     "There's a ~95% chance that this day will be like 90% of all days since 1950.",
     'the degenerate band restates the majority, with a computed share'
   );
-  assertEq(dial.verdict, 'A shade drier than the typical day here.', 'dry-side mild verdict');
+  assertEq(dial.verdict, 'A shade drier than the typical day here', 'dry-side mild verdict');
 
   const card = resolveVerdictProse({
     displayValue: 0, band: dryBand, windowNative: dryPool, allTimeNative: dryPool,
