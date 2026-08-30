@@ -422,6 +422,48 @@ body {
   margin: 8px 0 4px 0;
 }
 
+/* Section 3's heading, in the same two-line shape as the card at the top of the
+   page: quiet lead (matches .context-lead / .context-explain), then the verdict
+   big — a step under the card's headline (.context-verdict-lead), since this
+   line carries a full clause rather than a two-word punch. */
+.conclusion-lead {
+  text-align: center;
+  margin: 0 0 13px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.conclusion-verdict {
+  text-align: center;
+  margin: 0 0 6px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-strong);
+  /* Holds the line while a test is in flight (the verdict is empty then), so a
+     metric switch doesn't shunt the chart up and back down. */
+  min-height: 1.2em;
+}
+
+/* Shrink on mobile in the same proportion the card's verdict does. */
+@media (max-width: 767px) {
+  .conclusion-verdict {
+    font-size: 24px;
+  }
+}
+
+/* The window a chart (or the conclusion above it) is drawn from — kept quieter
+   than the claim itself. */
+.chart-subtitle {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin: 4px 0 4px 0;
+}
+
 .radial-chart-row {
   display: flex;
   justify-content: center;

@@ -107,13 +107,52 @@ export const PeriodLegend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
 const MARGIN = { top: 44, right: 20, bottom: 36, left: 55 };
 const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
 
-// Conventional significance stars from a p-value (matches the SignificancePanel
-// thresholds at the top end; "ns" = not significant).
+// Significance tier of a p-value: 0 = not significant, 1 = p<0.05, 2 = p<0.01,
+// 3 = p<0.001. The single source for both the in-chart stars and the section's
+// prose conclusion, so the asterisks and the words can never disagree.
+function significanceTier(p: number): 0 | 1 | 2 | 3 {
+  if (p < 0.001) return 3;
+  if (p < 0.01) return 2;
+  if (p < 0.05) return 1;
+  return 0;
+}
+
+// Conventional significance stars, by tier ("ns" = not significant).
+const TIER_STARS = ['ns', '*', '**', '***'];
 function starsFor(p: number): string {
-  if (p < 0.001) return '***';
-  if (p < 0.01) return '**';
-  if (p < 0.05) return '*';
-  return 'ns';
+  return TIER_STARS[significanceTier(p)];
+}
+
+// How confidently the conclusion headline may claim a change, by tier. Tier 0
+// never gets a direction — a test that didn't reject says nothing about which
+// way the metric moved — so it has its own phrasing in changeVerdict.
+const TIER_CONFIDENCE = ['', 'Probably', 'Very likely', 'Definitely'];
+
+// Which way a positive / negative change reads, per metric. Shared by the
+// conclusion headline and the verdict panel so both name the direction alike.
+export const METRIC_DIRECTION_UP: Record<MetricKey, string> = {
+  max_temperature: 'warmer',
+  min_temperature: 'warmer',
+  precipitation_sum: 'wetter',
+  wind_speed_10m_max: 'windier',
+};
+export const METRIC_DIRECTION_DOWN: Record<MetricKey, string> = {
+  max_temperature: 'cooler',
+  min_temperature: 'cooler',
+  precipitation_sum: 'drier',
+  wind_speed_10m_max: 'calmer',
+};
+
+// The big line of the section's conclusion headline, completing the quiet lead
+// "<metric> on <date> in <city> has …". Confidence comes from the p-value's
+// tier (same one the stars encode), direction from the sign of the median
+// difference the permutation test measured.
+export function changeVerdict(pValue: number, observedDiff: number, metric: MetricKey): string {
+  const tier = significanceTier(pValue);
+  if (tier === 0) return 'Possibly not changed over the decades';
+  const direction =
+    observedDiff >= 0 ? METRIC_DIRECTION_UP[metric] : METRIC_DIRECTION_DOWN[metric];
+  return `${TIER_CONFIDENCE[tier]} gotten ${direction} over the decades`;
 }
 
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({

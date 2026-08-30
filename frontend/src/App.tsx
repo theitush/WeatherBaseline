@@ -8,7 +8,10 @@ import TemperatureContextDisplay from './components/TemperatureContext';
 import LoadingOverlay from './components/LoadingOverlay';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
-import PeriodHistogramChart, { PeriodLegend } from './components/PeriodHistogramChart';
+import PeriodHistogramChart, {
+  PeriodLegend,
+  changeVerdict,
+} from './components/PeriodHistogramChart';
 import YearRadialChart from './components/YearRadialChart';
 import SignificancePanel from './components/SignificancePanel';
 import { Legend, RadialLegend } from './components/Legend';
@@ -27,6 +30,10 @@ const metricQuestionLabel: Record<MetricKey, string> = {
   precipitation_sum: 'precipitation',
   wind_speed_10m_max: 'wind speed',
 };
+
+// Those phrases are written lowercase so they can sit mid-sentence; titles that
+// lead with one capitalize it here.
+const capitalize = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
 
 const AppContent: React.FC = () => {
   const {
@@ -102,6 +109,37 @@ const AppContent: React.FC = () => {
     const city = location.name ? location.name.split(',')[0].trim() : '';
     const where = city ? ` in ${city}` : '';
     return `± ${CONFIG.chart.seasonalWindowDays} days around ${date}${where}`;
+  };
+
+  // The worker normally answers a metric switch in well under a second. Naming
+  // that wait ("still testing") only turns one visible change into three, so the
+  // verdict line just holds its height while a test is in flight and words the
+  // wait solely when it runs genuinely long. The panel below carries the spinner.
+  const [testRunningLong, setTestRunningLong] = useState(false);
+  useEffect(() => {
+    if (!significance.pending) {
+      setTestRunningLong(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setTestRunningLong(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, [significance.pending, currentMetric]);
+
+  // Section 3's heading answers the question the chart asks, in the same
+  // two-line shape as the card at the top of the page: a quiet lead line, then
+  // the verdict big. The verdict itself comes from the permutation test — see
+  // changeVerdict — and is only ever shown for the metric it was computed on.
+  const conclusionLines = (dateStr: string) => {
+    const city = location.name ? location.name.split(',')[0].trim() : '';
+    const where = city ? ` in ${city}` : '';
+    const lead = `${capitalize(metricQuestionLabel[currentMetric])} on ${formatTargetDate(dateStr)}${where} has`;
+    const result =
+      significance.resultMetric === currentMetric ? significance.result : null;
+    if (result) {
+      return { lead, verdict: changeVerdict(result.pValue, result.observedDiff, currentMetric) };
+    }
+    if (significance.pending) return { lead, verdict: testRunningLong ? 'Yet to be tested…' : '' };
+    return { lead, verdict: 'Too little data to say' };
   };
 
   // Get current date data for temperature context.
@@ -305,7 +343,18 @@ const AppContent: React.FC = () => {
 
             {/* Section 3 — recent-memory trend */}
             <section className="page-section">
-              <div className="chart-title">{formatChartTitle(currentDate)}</div>
+              {(() => {
+                const { lead, verdict } = conclusionLines(currentDate);
+                return (
+                  <>
+                    <p className="conclusion-lead">{lead}</p>
+                    <div className="conclusion-verdict">{verdict}</div>
+                  </>
+                );
+              })()}
+              <div className="chart-subtitle">
+                {`± ${CONFIG.chart.seasonalWindowDays} days around ${formatTargetDate(currentDate)}`}
+              </div>
               <PeriodLegend metric={currentMetric} />
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
                 <PeriodHistogramChart
@@ -328,8 +377,11 @@ const AppContent: React.FC = () => {
                 />
               </div>
               <SignificancePanel
-                result={significance.result}
-                loading={significance.loading}
+                /* Same guard as the headline: a result belongs to the metric it
+                   was computed on, and a switch reads as pending from the very
+                   first render — never the previous metric's sentence. */
+                result={significance.resultMetric === currentMetric ? significance.result : null}
+                loading={significance.pending}
                 currentMetric={currentMetric}
               />
             </section>
@@ -337,7 +389,7 @@ const AppContent: React.FC = () => {
             {/* Section 3.5 — the year at a glance (radial) */}
             <section className="page-section">
               <div className="chart-title">
-                {metricQuestionLabel[currentMetric].replace(/^\w/, c => c.toUpperCase())}
+                {capitalize(metricQuestionLabel[currentMetric])}
                 {location.name ? ` in ${location.name.split(',')[0].trim()}` : ''}
                 {` (1950–${new Date().getFullYear()})`}
               </div>

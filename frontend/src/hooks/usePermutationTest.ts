@@ -7,11 +7,15 @@ import type { PermWorkerRequest, PermWorkerResponse } from '../utils/permutation
 
 export interface PermutationTestState {
   result: PermutationResult | null;
-  loading: boolean;
   // The metric `result` was computed for. Lets consumers tell a fresh result
   // from a stale one when the metric was just switched (the worker is async, so
   // for a tick `result` still holds the previous metric's numbers).
   resultMetric: MetricKey | null;
+  // True from the moment the metric changes until that metric's result lands.
+  // The raw worker-busy flag only flips in the dispatch effect, i.e. one render
+  // *after* the switch, so it isn't exposed: keying off it alone flashes an
+  // "empty" state in that gap.
+  pending: boolean;
 }
 
 /**
@@ -103,5 +107,10 @@ export function usePermutationTest(
     worker.postMessage(req);
   }, [records, currentMetric]);
 
-  return { result, loading, resultMetric };
+  // Records are non-empty exactly when a test can run, so a metric with data but
+  // no result for it yet is always a test in flight — even before the dispatch
+  // effect has had its turn.
+  const pending = loading || (records.length > 0 && resultMetric !== currentMetric);
+
+  return { result, resultMetric, pending };
 }
