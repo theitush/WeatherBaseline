@@ -688,7 +688,13 @@ body {
   justify-content: center;
 }
 
-.github-banner {
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.footer-icon-link {
   display: inline-flex;
   align-items: center;
   color: var(--text-secondary);
@@ -696,6 +702,6 @@ body {
   transition: color 0.15s ease;
 }
 
-.github-banner:hover {
+.footer-icon-link:hover {
   color: var(--text-strong);
 }
