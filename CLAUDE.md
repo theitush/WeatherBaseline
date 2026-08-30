@@ -17,7 +17,7 @@ Working one:
    gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id 36ef7d70
    ```
    Status option ids: backlog `72269122` · Queued `93fc0ce3` · In Progress `36ef7d70` · Blocked `d50a3e21` · Done `bef6703c` · Cancelled `bf4d973d`.
-3. Do the work; commit the way this repo's rules say.
+3. Do the work; commit and push per **Committing and pushing** below.
 4. Finish: write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
    ```bash
    { gh issue view $n --json body -q .body; printf '\n---\n**Result**\n\n%s\n' "<what was done and how it was verified>"; } > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
@@ -27,6 +27,15 @@ Working one:
    Blocked instead: Status `d50a3e21`, the blocker written into the body, issue left open.
 
 New tasks that come out of the work become issues here and go on the project: `gh issue create ...`, then `gh project item-add 2 --owner theitush --url <issue url>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `item-edit` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
+
+### Committing and pushing
+
+Never end a session with unpushed work. If a file was written or changed, it is committed and pushed before the session ends — work that lives only in a working tree is invisible to Ita and the COO, and dies with the machine. Where it goes depends on the state of the work:
+
+- **Complete and verified** → trunk, however this repo normally lands changes.
+- **Incomplete, unverified, or risky** → a feature branch named for the task (`task-<n>-<short-slug>`), pushed.
+
+A pushed feature branch is written into its task the moment it exists: one line in the issue body — `In flight on branch task-<n>-<slug>`. That line is what makes the branch findable from the board or a phone; a branch nobody wrote down is a branch nobody knows to look at. Merge it per this repo's rules when the work lands, delete it when the task closes.
 
 ### Staying focused
 
