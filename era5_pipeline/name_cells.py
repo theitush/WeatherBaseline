@@ -67,7 +67,7 @@ def download_gazetteer() -> None:
         return
     GAZ_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {GEONAMES_URL} ...", file=sys.stderr)
-    req = urllib.request.Request(GEONAMES_URL, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+    req = urllib.request.Request(GEONAMES_URL, headers={"User-Agent": "weatherbaseline-namecells/1.0"})
     with urllib.request.urlopen(req) as resp:
         raw = resp.read()
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
@@ -86,7 +86,7 @@ def load_country_names() -> dict[str, str]:
     url = "https://download.geonames.org/export/dump/countryInfo.txt"
     out: dict[str, str] = {}
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "weatherbaseline-namecells/1.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             text = resp.read().decode("utf-8")
     except Exception as e:  # noqa: BLE001
@@ -111,7 +111,7 @@ def load_admin1_names() -> dict[str, str]:
     url = "https://download.geonames.org/export/dump/admin1CodesASCII.txt"
     out: dict[str, str] = {}
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "weatherbaseline-namecells/1.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             text = resp.read().decode("utf-8")
     except Exception as e:  # noqa: BLE001
@@ -274,7 +274,7 @@ def save_revgeo_cache(cache: dict) -> None:
 def photon_reverse(lat: float, lon: float) -> tuple[str, str] | None:
     """Reverse-geocode a point via Photon. Returns (name, country) or None."""
     url = f"https://photon.komoot.io/reverse?lat={lat}&lon={lon}"
-    req = urllib.request.Request(url, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "weatherbaseline-namecells/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())

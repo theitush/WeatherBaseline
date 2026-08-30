@@ -17,11 +17,19 @@ uploads, CORS, DNS).
 | **Worker** | `https://www.weatherbaseline.com/api/*` (also reachable direct at `https://howhotwasit.yajna-auth.workers.dev`) | Control-plane API: `/api/geo`, `/api/ensure-fresh`, `/api/health`, plus the private `/dashboard`. Tops up the volatile R2 tiers from Open-Meteo. |
 | **Data** | R2 bucket `weather-baseline`, public at `https://data.weatherbaseline.com` (custom domain; the rate-limited dev fallback `https://pub-403d94ceb15c48af9cb6005b1d541e82.r2.dev` still works) | The `archive/recent/forecast` `.csv.gz` tier files and the static `debias-vN/` tables. The frontend reads these **directly** from R2 — reads never touch the Worker. |
 
-> **Naming note (cosmetic):** the Worker is named `howhotwasit` and the account
-> subdomain is `yajna-auth` — leftovers from the old product name / account.
-> **Users never see either**: the site and its `/api/*` both serve from
+> **Naming note (cosmetic):** the project was originally called *HowHotWasIt*,
+> and three infrastructure names still carry it: the Worker `howhotwasit`, the D1
+> database `howhotwasit-analytics`, and the account subdomain `yajna-auth`.
+> **Users never see any of them**: the site and its `/api/*` both serve from
 > `www.weatherbaseline.com`, and the `workers.dev` URL survives only as a direct
 > handle for smoke tests.
+>
+> They are deliberately *not* renamed. `name` in
+> [`worker/wrangler.toml`](worker/wrangler.toml) is the Worker's identity, so
+> changing it deploys a **new** Worker while the dashboard-managed `/api/*` route
+> below stays bound to the old one — `/api/*` would start returning the SPA's HTML
+> until the route was moved by hand. Renaming the D1 database likewise orphans the
+> `hits` history. Neither buys anything a visitor can see.
 
 ### The `/api/*` route is dashboard-managed
 

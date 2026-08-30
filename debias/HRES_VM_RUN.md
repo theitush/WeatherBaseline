@@ -81,6 +81,8 @@ set -e
 export OPENMETEO_API_KEY="your_key_here"   # delete this line for the free tier
 apt-get update && apt-get install -y python3-venv git
 cd /root
+# NOTE: HowHotWasIt is the repo's original name and the directory that already
+# exists on the running VM — keep it, so the paths below stay valid.
 git clone REPO_URL HowHotWasIt
 cd HowHotWasIt/era5_pipeline
 python3 -m venv .venv && . .venv/bin/activate

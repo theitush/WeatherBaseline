@@ -558,11 +558,11 @@ const AppContent: React.FC = () => {
                       a beta version of the model, and it's open source along with the
                       rest of the site:{' '}
                       <a
-                        href="https://github.com/theitush/HowHotWasIt"
+                        href="https://github.com/theitush/WeatherBaseline"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        github.com/theitush/HowHotWasIt
+                        github.com/theitush/WeatherBaseline
                       </a>
                       .
                     </p>

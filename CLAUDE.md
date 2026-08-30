@@ -1,4 +1,4 @@
-# HowHotWasIt
+# WeatherBaseline
 
 This file is thin on purpose: it grows a line at a time, when something proves worth writing down. Otherwise orient by reading the repo. One standing rule: **nothing deploys to prod without Ita's explicit green light** — never run `scripts/deploy_prod.sh` on your own judgement.
 
@@ -13,7 +13,7 @@ Working one:
 1. Read it: `gh issue view <n>`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
 2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project field, not an issue label, so it is set by item id:
    ```bash
-   n=<n>; item=$(gh project item-list 2 --owner theitush -L 500 --format json -q ".items[] | select(.content.repository==\"theitush/HowHotWasIt\" and .content.number==$n) | .id")
+   n=<n>; item=$(gh project item-list 2 --owner theitush -L 500 --format json -q ".items[] | select(.content.repository==\"theitush/WeatherBaseline\" and .content.number==$n) | .id")
    gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id 36ef7d70
    ```
    Status option ids: backlog `72269122` · Queued `93fc0ce3` · In Progress `36ef7d70` · Blocked `d50a3e21` · Done `bef6703c` · Cancelled `bf4d973d`.

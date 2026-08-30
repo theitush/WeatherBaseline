@@ -70,7 +70,7 @@ async function callOpenMeteo(base, params, retries = 3) {
     let res;
     try {
       res = await fetch(url, {
-        headers: { Accept: 'application/json', 'User-Agent': 'HowHotWasIt/2.0' },
+        headers: { Accept: 'application/json', 'User-Agent': 'WeatherBaseline/2.0' },
       });
     } catch (networkErr) {
       lastErr = networkErr;

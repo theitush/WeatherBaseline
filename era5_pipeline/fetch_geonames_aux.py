@@ -17,7 +17,7 @@ for name, url in FILES.items():
     if dest.exists():
         print(f"  {name}: cached ({dest.stat().st_size/1e3:.0f} KB)")
         continue
-    req = urllib.request.Request(url, headers={"User-Agent": "howhotwasit-namecells/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "weatherbaseline-namecells/1.0"})
     with urllib.request.urlopen(req, timeout=30) as r:
         dest.write_bytes(r.read())
     print(f"  {name}: fetched {dest.stat().st_size/1e3:.0f} KB")

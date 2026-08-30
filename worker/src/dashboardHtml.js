@@ -12,7 +12,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>HowHotWasIt — analytics</title>
+<title>WeatherBaseline — analytics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Spectral:wght@500;600&display=swap" rel="stylesheet">
@@ -99,7 +99,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>HowHotWasIt <span class="sub">first-party analytics · D1 <code>hits</code></span></h1>
+    <h1>WeatherBaseline <span class="sub">first-party analytics · D1 <code>hits</code></span></h1>
     <div class="controls">
       <label class="count" for="range">Range</label>
       <select id="range" title="Time window ending now">

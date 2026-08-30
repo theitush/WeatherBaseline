@@ -1,4 +1,4 @@
-// HowHotWasIt v2 — Cloudflare Worker entrypoint (control plane).
+// WeatherBaseline v2 — Cloudflare Worker entrypoint (control plane).
 //
 // Three routes:
 //   GET /api/ensure-fresh?lat=&lon=  → top up recent/forecast in R2 from Open-Meteo

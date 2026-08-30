@@ -1,4 +1,4 @@
-# HowHotWasIt — v2 architecture (data & serving)
+# WeatherBaseline — v2 architecture (data & serving)
 
 Status: **shipped** (on `main`, deployed). Grid decision **RESOLVED
 2026-06-03** — see "✅ GRID DECISION" below. Replaced the original v1 Node

@@ -1,4 +1,4 @@
-# Cloudflare Worker — HowHotWasIt v2 control plane (ensure-fresh + geo).
+# Cloudflare Worker — WeatherBaseline v2 control plane (ensure-fresh + geo).
 #
 # The Worker is the thin tail-only backend from ARCHITECTURE.md: it tops up the
 # volatile recent/forecast tiers from Open-Meteo and writes them to R2. Reads of
@@ -11,6 +11,9 @@
 # prod (dev = local code, remote data). The Vite proxy forwards the frontend's
 # /api/* to this port. `npm run dev:local` falls back to a Miniflare-emulated R2
 # in .wrangler/state (no account needed; seed it with scripts/seed-local-r2.sh).
+# Legacy name from the project's original title (HowHotWasIt) — deliberately kept.
+# This is the Worker's IDENTITY: renaming it deploys a new Worker and leaves the
+# dashboard-managed www.weatherbaseline.com/api/* route on the old one. See DEPLOY.md.
 name = "howhotwasit"
 main = "src/index.js"
 compatibility_date = "2024-09-23"

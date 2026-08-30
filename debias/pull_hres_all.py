@@ -155,7 +155,7 @@ def session() -> requests.Session:
     s = getattr(_tls, "s", None)
     if s is None:
         s = requests.Session()
-        s.headers["User-Agent"] = "HowHotWasIt-biasstudy/1.0"
+        s.headers["User-Agent"] = "WeatherBaseline-biasstudy/1.0"
         adapter = requests.adapters.HTTPAdapter(pool_connections=2,
                                                 pool_maxsize=2)
         s.mount("https://", adapter)

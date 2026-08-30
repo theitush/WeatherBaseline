@@ -1,4 +1,4 @@
--- Unique-visitor logging for HowHotWasIt. One row per server-side hit, written by
+-- Unique-visitor logging for WeatherBaseline. One row per server-side hit, written by
 -- the Worker (src/index.js → logHit). Adblock-proof: logged at the edge, not via
 -- a client beacon. The visitor id is a STABLE pseudonymous hash of IP+UA+salt (no
 -- raw IP is ever stored, no cookie), so COUNT(DISTINCT visitor) counts unique

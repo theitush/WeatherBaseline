@@ -1,8 +1,8 @@
 {
-  "name": "howhotwasit-worker",
+  "name": "weatherbaseline-worker",
   "version": "1.0.0",
   "private": true,
-  "description": "HowHotWasIt v2 control-plane Worker: ensure-fresh + geo, R2-backed.",
+  "description": "WeatherBaseline v2 control-plane Worker: ensure-fresh + geo, R2-backed.",
   "type": "module",
   "scripts": {
     "gen:cells": "node scripts/gen-cell-keys.mjs",

@@ -41,7 +41,7 @@ CELLS = DATA / "cells.csv"
 REVGEO_CACHE = DATA / "era5-land" / "revgeo_cache.json"
 
 COORD_NAME = re.compile(r"^\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+\s*$")
-UA = "howhotwasit-namecells/1.0 (nafaltov@gmail.com)"
+UA = "weatherbaseline-namecells/1.0 (nafaltov@gmail.com)"
 
 # Most-specific -> least-specific OSM address fields we'll accept as the place
 # label. We take the first present so a real town beats the enclosing district.

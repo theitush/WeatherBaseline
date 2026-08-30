@@ -45,7 +45,7 @@ function privatePage() {
     {
       status: 401,
       headers: {
-        'WWW-Authenticate': 'Basic realm="HowHotWasIt analytics", charset="UTF-8"',
+        'WWW-Authenticate': 'Basic realm="WeatherBaseline analytics", charset="UTF-8"',
         'Content-Type': 'text/html; charset=utf-8',
       },
     }

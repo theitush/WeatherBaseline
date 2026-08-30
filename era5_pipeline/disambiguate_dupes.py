@@ -50,7 +50,7 @@ DATA = HERE.parents[1] / "data"
 CELLS = DATA / "cells.csv"
 SUBDIST_CACHE = DATA / "era5-land" / "subdistrict_cache.json"
 
-UA = "howhotwasit-namecells/1.0 (nafaltov@gmail.com)"
+UA = "weatherbaseline-namecells/1.0 (nafaltov@gmail.com)"
 
 # Finest -> coarsest OSM address fields we'll accept as the sub-district piece to
 # prepend. We take the first present that isn't already a segment of the label, so

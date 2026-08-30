@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy HowHotWasIt to production — Worker + frontend (Cloudflare Pages) — in one
+# Deploy WeatherBaseline to production — Worker + frontend (Cloudflare Pages) — in one
 # go. Encodes the exact steps from DEPLOY.md so you don't have to remember them.
 #
 #   bash scripts/deploy_prod.sh

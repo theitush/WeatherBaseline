@@ -54,6 +54,8 @@ The pipeline reads `data/era5/cells.csv` and writes `data/era5-land/archive/`,
 both relative to the repo root (`REPO/data/...`). Preserve that layout — clone
 the repo, or rsync just the pieces:
 ```bash
+# NOTE: ~/HowHotWasIt is the repo's original name and the directory that already
+# exists on the running VM — keep it, so the rsync/ssh paths below stay valid.
 git clone <your-repo-url> ~/HowHotWasIt
 # OR, minimal:
 # rsync -av era5_pipeline/ data/era5/cells.csv user@vm:~/HowHotWasIt/...

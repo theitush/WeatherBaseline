@@ -1,5 +1,5 @@
 {
-  "name": "howhot-weather-app",
+  "name": "weatherbaseline",
   "version": "1.0.0",
   "description": "Weather visualization app with temperature history",
   "main": "worker/src/index.js",
