@@ -39,10 +39,11 @@ export const getRadialLegendData = (
     { type: 'line', color: CONFIG.getColorForElement(metric, 'trendLine'), label: 'Median' },
     { type: 'wedge', color: 'var(--text-h)', label: windowLabel },
   ];
-  // A forecast target draws its own hollow marker + uncertainty segment on the
-  // dial; same swatch and label as the main chart's.
+  // A forecast target draws its uncertainty as two more dashed rings around the
+  // one on its median — the same two percentiles the envelope above uses, so the
+  // label says which they are rather than just "Forecast".
   if (isForecast) {
-    items.push({ type: 'forecast', color: CONFIG.getColorForElement(metric, 'dataPoints'), label: 'Forecast' });
+    items.push({ type: 'dashed', color: 'var(--text-h)', label: 'Forecast 10th–90th pct' });
   }
   return items;
 };

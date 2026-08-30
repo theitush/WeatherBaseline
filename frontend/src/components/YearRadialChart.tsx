@@ -383,52 +383,56 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       const [tx, ty] = polar(tFrac, tR);
       // A model row carries its bias-corrected 9-quantile band, and the row's
       // value is already snapped to that band's median (AppContext), so the dot
-      // is in the right place — what's missing is how wide the guess is. Drawn as
-      // a q10→q90 segment along the day's own spoke, i.e. in the one direction
-      // that means "value" on this chart. The dashed ring stays on the dot.
+      // is in the right place — what's missing is how wide the guess is.
       const targetBand = target.band?.[currentMetric] ?? null;
       const vdp = valueDecimals(currentMetric, system);
       const ciLine = targetBand
         ? `<br/><span class="tt-ci">90% CI ${cv(targetBand.lo).toFixed(vdp)}–${cv(targetBand.hi).toFixed(vdp)}${unit}</span>`
         : '';
-      if (targetBand) {
-        const [q10x, q10y] = polar(tFrac, rScale(cv(targetBand.q10)));
-        const [q90x, q90y] = polar(tFrac, rScale(cv(targetBand.q90)));
-        g.append('line')
-          .attr('class', 'radial-target-ci')
-          .attr('x1', q10x)
-          .attr('y1', q10y)
-          .attr('x2', q90x)
-          .attr('y2', q90y)
+
+      // Constant-value rings, in the theme foreground (white on dark, black on
+      // light) so they always read against the cloud. A ring is the natural mark
+      // for a value on this dial: every day outside it was more extreme than
+      // that value, which is exactly what the section's heading counts.
+      //
+      // On a forecast day the uncertainty is drawn the same way rather than as a
+      // stub on one spoke: two rings at q10 and q90 bracket where the settled
+      // value is likely to land, and a thinner ring marks the median between
+      // them. A settled day has one value and gets one ring.
+      const targetRing = (
+        r: number,
+        strokeWidth: number,
+        dash: string,
+        opacity: number,
+        cls: string
+      ) =>
+        g.append('circle')
+          .attr('class', cls)
+          .attr('r', r)
+          .attr('fill', 'none')
           .attr('stroke', 'var(--text-h)')
-          .attr('stroke-width', 2)
-          .attr('stroke-linecap', 'round')
-          .attr('opacity', 0.75);
+          .attr('stroke-width', strokeWidth)
+          .attr('stroke-dasharray', dash)
+          .attr('opacity', opacity);
+
+      if (targetBand) {
+        targetRing(rScale(cv(targetBand.q10)), 1.5, '5,5', 0.7, 'radial-target-ring radial-target-ring-band');
+        targetRing(rScale(cv(targetBand.q90)), 1.5, '5,5', 0.7, 'radial-target-ring radial-target-ring-band');
+        targetRing(tR, 1, '3,3', 0.9, 'radial-target-ring radial-target-ring-mid');
+      } else {
+        targetRing(tR, 1.75, '5,5', 0.9, 'radial-target-ring');
       }
 
-      // dashed circumference at the target's radius, in the theme foreground
-      // (white on dark, black on light) so it always reads against the cloud —
-      // matches the target dot and spoke.
+      // the selected point itself — a plain dark dot (like the main chart's
+      // target dot) so it reads against the same-colour cloud. A forecast day
+      // says so through its rings and its tooltip, not through a different dot.
       g.append('circle')
-        .attr('class', 'radial-target-ring')
-        .attr('r', tR)
-        .attr('fill', 'none')
-        .attr('stroke', 'var(--text-h)')
-        .attr('stroke-width', 1.75)
-        .attr('stroke-dasharray', '5,5')
-        .attr('opacity', 0.9);
-
-      // the selected point itself — dark fill (like the main chart's target dot)
-      // so it reads against the same-colour cloud. A model row inverts to a
-      // hollow dot, the same "this is a guess, not a measurement" mark the main
-      // chart's forecast points wear.
-      g.append('circle')
-        .attr('class', `radial-target-point${targetBand ? ' radial-target-forecast' : ''}`)
+        .attr('class', 'radial-target-point')
         .attr('cx', tx)
         .attr('cy', ty)
         .attr('r', 5.5)
-        .attr('fill', targetBand ? 'var(--surface)' : 'var(--text-h)')
-        .attr('stroke', targetBand ? 'var(--text-h)' : 'var(--surface)')
+        .attr('fill', 'var(--text-h)')
+        .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 2)
         .on('mouseover', (event) => {
           tooltip
@@ -440,20 +444,70 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
         })
         .on('mouseout', () => tooltip.style('opacity', 0));
 
-      // Target date label sitting just above the dot, e.g. "Jun 7th, 2026".
-      const dateLabel = `${MONTHS[targetDt.getMonth()]} ${ordinal(targetDt.getDate())}, ${targetDt.getFullYear()}`;
-      g.append('text')
+      // The date label belongs to the ±N-day WEDGE, not to the dot: it sits at
+      // the wedge's outer end, out by the month ring, so the dot is left
+      // carrying only its own value and the label stops moving up and down the
+      // dial as the value changes. Naming the window here is what makes the
+      // wedge self-explanatory — e.g. "Aug 30th, 2026 ±3 days".
+      const dateLabel =
+        `${MONTHS[targetDt.getMonth()]} ${ordinal(targetDt.getDate())}, ` +
+        `${targetDt.getFullYear()} ±${WINDOW_DAYS} days`;
+      const [dlx, dly] = polar(tFrac, rOuter + 12);
+      const dateText = g
+        .append('text')
         .attr('class', 'radial-window-date')
-        .attr('x', tx)
-        .attr('y', ty - 11)
+        .attr('x', dlx)
+        .attr('y', dly)
+        .attr('dy', '0.32em')
         .style('text-anchor', 'middle')
         .style('font-size', '11px')
         .style('font-weight', '600')
         .style('fill', 'var(--text-h)')
+        // It can be pulled in over the day cloud (below), so give it a
+        // surface-coloured halo rather than trusting it to land on empty space.
+        .style('stroke', 'var(--surface)')
+        .style('stroke-width', 3)
+        .style('paint-order', 'stroke')
         .text(dateLabel);
+      // Out east or west the dial keeps only ~20px of margin, far less than this
+      // label is wide, so slide it back inside the box. It stays on the wedge's
+      // arc, which is all the association it needs.
+      const labelNode = dateText.node() as SVGTextElement;
+      const firstBox = labelNode.getBBox();
+      const overLeft = -cx + 4 - firstBox.x;
+      const overRight = firstBox.x + firstBox.width - (cx - 4);
+      if (overLeft > 0) dateText.attr('x', dlx + overLeft);
+      else if (overRight > 0) dateText.attr('x', dlx - overRight);
 
-      // Target VALUE label just below the marker (date label sits above it), so
-      // both labels travel with the dot as it moves around the dial.
+      // A due-east or due-west date puts the dot, its value label and this one
+      // all on the same horizontal line, so that clamp slides the label straight
+      // onto the dot. The value label hangs below the dot, so lift this one
+      // clear above it — the only side that is always free.
+      const clamped = labelNode.getBBox();
+      const dotZone = { x: tx - 9, y: ty - 9, w: 18, h: 35 };
+      const hitsDot =
+        clamped.x < dotZone.x + dotZone.w &&
+        clamped.x + clamped.width > dotZone.x &&
+        clamped.y < dotZone.y + dotZone.h &&
+        clamped.y + clamped.height > dotZone.y;
+      if (hitsDot) dateText.attr('y', ty - 20);
+
+      // It now sits on the month ring, so drop any month name it lands on: this
+      // label names that stretch of the year more precisely, and two labels in
+      // one spot read as neither.
+      const dateBox = labelNode.getBBox();
+      g.selectAll<SVGTextElement, unknown>('.radial-month-label').each(function () {
+        const b = this.getBBox();
+        const hits =
+          b.x < dateBox.x + dateBox.width + 3 &&
+          b.x + b.width + 3 > dateBox.x &&
+          b.y < dateBox.y + dateBox.height + 2 &&
+          b.y + b.height + 2 > dateBox.y;
+        if (hits) this.remove();
+      });
+
+      // Target VALUE label just below the marker — the one label that does
+      // travel with the dot, because it is the dot's own reading.
       g.append('text')
         .attr('class', 'radial-target-value')
         .attr('x', tx)
