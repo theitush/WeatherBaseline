@@ -6,7 +6,7 @@ import CONFIG from '../utils/config';
 import { observedPool } from '../utils/dataProcessor';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
-import { convert, unitLabel, tickCount } from '../utils/units';
+import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
 import './YearRadialChart.css';
 
 interface YearRadialChartProps {
@@ -381,6 +381,30 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       const tFrac = dayFraction(target.date);
       const tR = rScale(tVal);
       const [tx, ty] = polar(tFrac, tR);
+      // A model row carries its bias-corrected 9-quantile band, and the row's
+      // value is already snapped to that band's median (AppContext), so the dot
+      // is in the right place — what's missing is how wide the guess is. Drawn as
+      // a q10→q90 segment along the day's own spoke, i.e. in the one direction
+      // that means "value" on this chart. The dashed ring stays on the dot.
+      const targetBand = target.band?.[currentMetric] ?? null;
+      const vdp = valueDecimals(currentMetric, system);
+      const ciLine = targetBand
+        ? `<br/><span class="tt-ci">90% CI ${cv(targetBand.lo).toFixed(vdp)}–${cv(targetBand.hi).toFixed(vdp)}${unit}</span>`
+        : '';
+      if (targetBand) {
+        const [q10x, q10y] = polar(tFrac, rScale(cv(targetBand.q10)));
+        const [q90x, q90y] = polar(tFrac, rScale(cv(targetBand.q90)));
+        g.append('line')
+          .attr('class', 'radial-target-ci')
+          .attr('x1', q10x)
+          .attr('y1', q10y)
+          .attr('x2', q90x)
+          .attr('y2', q90y)
+          .attr('stroke', 'var(--text-h)')
+          .attr('stroke-width', 2)
+          .attr('stroke-linecap', 'round')
+          .attr('opacity', 0.75);
+      }
 
       // dashed circumference at the target's radius, in the theme foreground
       // (white on dark, black on light) so it always reads against the cloud —
@@ -395,20 +419,22 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
         .attr('opacity', 0.9);
 
       // the selected point itself — dark fill (like the main chart's target dot)
-      // so it reads against the same-colour cloud.
+      // so it reads against the same-colour cloud. A model row inverts to a
+      // hollow dot, the same "this is a guess, not a measurement" mark the main
+      // chart's forecast points wear.
       g.append('circle')
-        .attr('class', 'radial-target-point')
+        .attr('class', `radial-target-point${targetBand ? ' radial-target-forecast' : ''}`)
         .attr('cx', tx)
         .attr('cy', ty)
         .attr('r', 5.5)
-        .attr('fill', 'var(--text-h)')
-        .attr('stroke', 'var(--surface)')
+        .attr('fill', targetBand ? 'var(--surface)' : 'var(--text-h)')
+        .attr('stroke', targetBand ? 'var(--text-h)' : 'var(--surface)')
         .attr('stroke-width', 2)
         .on('mouseover', (event) => {
           tooltip
             .style('opacity', 1)
             .html(
-              `<strong>${target.date.toDateString()}</strong><br/>${tVal.toFixed(1)}${unit}<br/><em>Target date</em>`
+              `<strong>${target.date.toDateString()}</strong><br/>${tVal.toFixed(1)}${unit}<br/><em>Target date${targetBand ? ' · forecast' : ''}</em>${ciLine}`
             );
           place(event);
         })
