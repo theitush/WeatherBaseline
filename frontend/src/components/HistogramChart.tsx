@@ -364,22 +364,21 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // lands 1–3% off the cutoff the top card actually compares to. The brackets
     // themselves are drawn by drawSpanPartition below.
     const fmtPct = (p: number) => (Number.isInteger(p) ? p.toFixed(0) : p.toFixed(1)) + '%';
+    // Percentages, NOT formatted strings: drawSpanPartition may have to merge two
+    // slices into one bracket, and that label is their sum. Both branches return a
+    // complementary pair, so a merged pair reads exactly 100%.
     const pivotLabels = (
       pivot: number,
       exact?: { pct: number; isHighSide: boolean }
-    ): { lower: string; higher: string } => {
+    ): { lower: number; higher: number } => {
       if (exact) {
-        return {
-          lower: fmtPct(exact.isHighSide ? 100 - exact.pct : exact.pct),
-          higher: fmtPct(exact.isHighSide ? exact.pct : 100 - exact.pct),
-        };
+        const higher = exact.isHighSide ? exact.pct : 100 - exact.pct;
+        return { lower: 100 - higher, higher };
       }
       const total = histValues.length;
-      if (total === 0) return { lower: fmtPct(0), higher: fmtPct(0) };
-      return {
-        lower: fmtPct((histValues.filter((v) => v < pivot).length / total) * 100),
-        higher: fmtPct((histValues.filter((v) => v >= pivot).length / total) * 100),
-      };
+      if (total === 0) return { lower: 0, higher: 0 };
+      const lower = (histValues.filter((v) => v < pivot).length / total) * 100;
+      return { lower, higher: 100 - lower };
     };
 
     // One curly-brace bracket spanning temps [lo, hi], drawn to the side of the
@@ -476,13 +475,47 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     };
 
     // Partition the temp axis at the interior `pivots` (ascending) and draw one
-    // span bracket per resulting slice, low→high, labelled by `segLabels`
-    // (pivots.length + 1 of them). Slices too short to render are dropped by
-    // drawSpanBracket, so a pivot on the axis floor yields fewer brackets.
-    const drawSpanPartition = (pivots: number[], segLabels: string[]) => {
+    // span bracket per resulting slice, low→high, labelled by `segPcts`
+    // (pivots.length + 1 percentages, summing to 100). A slice too short to render
+    // is MERGED into its neighbour — its share rolls into that bracket's label —
+    // the same rule drawSharePartition below applies, so the visible brackets
+    // always sum to 100%. Dropping it instead is what left a bone-dry forecast
+    // window showing a lone "5%" bracket drawn across a bar holding every day in
+    // the pool: the pivot (p95 = 0mm) sits on the axis floor, so the low slice has
+    // zero span and vanished, and the tail label was left labelling everything.
+    const drawSpanPartition = (pivots: number[], segPcts: number[]) => {
       const [dLo, dHi] = tempScale.domain() as [number, number];
+      const axisMax = isVertical ? width : height;
+      const axisPx = (v: number) => clampSpan(tempScale(v), axisMax);
       const bounds = [dLo, ...pivots, dHi];
-      segLabels.forEach((label, i) => drawSpanBracket(bounds[i], bounds[i + 1], label));
+      // Keep a boundary only if it's ≥ MIN_SPAN pixels past the last kept cut,
+      // accumulating the shares of the slices it swallows.
+      const cuts = [bounds[0]];
+      const pcts: number[] = [];
+      let acc = 0;
+      for (let i = 1; i < bounds.length - 1; i++) {
+        acc += segPcts[i - 1];
+        if (Math.abs(axisPx(bounds[i]) - axisPx(cuts[cuts.length - 1])) >= MIN_SPAN) {
+          cuts.push(bounds[i]);
+          pcts.push(acc);
+          acc = 0;
+        }
+      }
+      cuts.push(bounds[bounds.length - 1]);
+      pcts.push(acc + segPcts[segPcts.length - 1]);
+      // A thin FINAL slice folds backwards instead (nothing follows it to merge
+      // into): drop the penultimate cut and add its share to the slice before.
+      if (
+        cuts.length >= 3 &&
+        Math.abs(axisPx(cuts[cuts.length - 1]) - axisPx(cuts[cuts.length - 2])) < MIN_SPAN
+      ) {
+        cuts.splice(cuts.length - 2, 1);
+        pcts[pcts.length - 2] += pcts[pcts.length - 1];
+        pcts.pop();
+      }
+      for (let i = 0; i < cuts.length - 1; i++) {
+        drawSpanBracket(cuts[i], cuts[i + 1], fmtPct(pcts[i]));
+      }
     };
 
     // Like drawSpanPartition, but LABELS each slice by the pool's ACTUAL day-share
@@ -844,12 +877,17 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             drawSharePartition([nonEmptyBins[0].x1!]);
           }
         } else if (marker) {
-          perpLine(refValue)
-            .attr('class', 'forecast-ref-line')
-            .attr('stroke', 'var(--text-tertiary)')
-            .attr('stroke-width', 1)
-            .attr('stroke-dasharray', '4,3')
-            .style('opacity', 0.4);
+          // Skip a reference line pinned to the axis floor/ceiling (a dry window's
+          // p95 sits at 0mm) — it would just trace the baseline. Same guard the
+          // two-sided branch above puts on its band edges.
+          if (refValue > domLo2 && refValue < domHi2) {
+            perpLine(refValue)
+              .attr('class', 'forecast-ref-line')
+              .attr('stroke', 'var(--text-tertiary)')
+              .attr('stroke-width', 1)
+              .attr('stroke-dasharray', '4,3')
+              .style('opacity', 0.4);
+          }
           // Partition at the reference line. Label the verdict side with the
           // tier's canonical % (5/10/20) — the exact figure the top card compares
           // to, not the ref line's snapped day-fraction. All-time has no canonical
