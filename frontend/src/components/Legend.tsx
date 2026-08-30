@@ -41,9 +41,11 @@ export const getRadialLegendData = (
   // A forecast target draws its uncertainty as a shaded ring band around the
   // dashed ring on its median — the only shading on the dial, so the label says
   // which two percentiles it spans rather than just "Forecast". The swatch shows
-  // both marks, the way the dial draws them.
+  // both marks, the way the dial draws them. 5th–95th is the same pair the
+  // section's heading reads its range off (utils/verdictProse), and the ring is
+  // drawn on it (YearRadialChart) — the three move together or not at all.
   if (isForecast) {
-    items.push({ type: 'band', color: 'var(--text-h)', label: 'Forecast 10th–90th pct' });
+    items.push({ type: 'band', color: 'var(--text-h)', label: 'Forecast 5th–95th pct' });
   }
   return items;
 };

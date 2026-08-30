@@ -355,8 +355,11 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       // for a value on this dial: every day outside it was more extreme than
       // that value, which is exactly what the section's heading counts.
       //
-      // On a forecast day the uncertainty is a SHADED ANNULUS between q10 and
-      // q90, with the thin dashed ring on the median still marking the value the
+      // On a forecast day the uncertainty is a SHADED ANNULUS between q05 and
+      // q95 — the SAME two ends the section's heading quotes ("in the top 3-4%
+      // hottest days since 1950", utils/verdictProse.bandSpreadPredicate), so
+      // the sentence and the ring can't describe different forecasts — with the
+      // thin dashed ring on the median still marking the value the
       // dot sits at: two more dashed rings read as two more gridlines, a filled
       // band reads as one interval. A flat wash, not the histogram's diagonal
       // hatch — stripes at a fixed 45° cut across a dial's radial geometry at a
@@ -379,11 +382,11 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
           .attr('opacity', opacity);
 
       if (targetBand) {
-        // min/max, not q10/q90 as given: the radial scale is always increasing,
+        // min/max, not lo/hi as given: the radial scale is always increasing,
         // but a metric drawn on a reversed/clamped domain must never hand
         // arc() an inner radius outside its outer one.
-        const rLo = Math.min(rScale(cv(targetBand.q10)), rScale(cv(targetBand.q90)));
-        const rHi = Math.max(rScale(cv(targetBand.q10)), rScale(cv(targetBand.q90)));
+        const rLo = Math.min(rScale(cv(targetBand.lo)), rScale(cv(targetBand.hi)));
+        const rHi = Math.max(rScale(cv(targetBand.lo)), rScale(cv(targetBand.hi)));
         const bandRing = d3
           .arc<unknown>()
           .innerRadius(rLo)
