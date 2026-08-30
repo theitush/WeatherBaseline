@@ -17,7 +17,7 @@ if [ ! -f "$HOME/.cdsapirc" ]; then
     echo "Linking $HERE/.cdsapirc -> ~/.cdsapirc"
     ln -s "$HERE/.cdsapirc" "$HOME/.cdsapirc"
   else
-    echo "WARNING: ~/.cdsapirc not found and scripts/era5_pipeline/.cdsapirc not found."
+    echo "WARNING: ~/.cdsapirc not found and era5_pipeline/.cdsapirc not found."
     echo "Create one with:"
     echo "  url: https://cds.climate.copernicus.eu/api"
     echo "  key: <your-CDS-key>"

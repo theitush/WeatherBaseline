@@ -131,7 +131,7 @@ log the lens state with no worker changes.
    air temperature. The prototype translates them by the felt−air delta (delta
    treated as known) — acceptable for judging UX, not for shipping: the real
    version needs its own quantile-debias training on `apparent_max` /
-   `apparent_min` (same pipeline as [scripts/bias_study], new target variables),
+   `apparent_min` (same pipeline as [debias], new target variables),
    plus hourly forecast inputs in the Worker's ensure-fresh path so the index is
    formed before the daily aggregation on the live tiers too. Acknowledged
    2026-08-24; not yet scoped or costed.

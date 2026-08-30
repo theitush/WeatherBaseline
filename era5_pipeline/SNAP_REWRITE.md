@@ -79,7 +79,7 @@ Saint-Pierre 27 km (Burin Peninsula).
 `--copy` → `--write-csv` → San Andrés re-pull
 (`download_cells.py --tile 15_27 --cells "San Andrés, Colombia" --overwrite
 --upload-r2`; the `--cells` flag was added for this) → elevation regen
-(`bias_study/make_cell_elevation.py`) → frontend deploy → `--delete-old --yes`
+(`debias/make_cell_elevation.py`) → frontend deploy → `--delete-old --yes`
 → `--status`.
 
 Frontend safety net shipped with this change: a URL-seeded load now snaps its

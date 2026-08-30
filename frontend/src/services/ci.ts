@@ -1,6 +1,6 @@
 // ci — client-side bias correction from static per-cell R2 tables.
 //
-// Replaces the old dev-only POST to `scripts/bias_study/ci_server.py`. The site
+// Replaces the old dev-only POST to `debias/ci_server.py`. The site
 // serves raw HRES-derived values for forecast/recent days while the archive (and
 // all percentile math) is on the ERA5-Land scale; the M3_base fits correct that
 // mismatch. Those fits are ~1 GB — never Worker-runnable — so we bake them into

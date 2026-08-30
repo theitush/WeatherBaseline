@@ -11,7 +11,7 @@ CORS just tells the browser it's allowed to read the bytes from script.
 
 Auth: same R2 S3 API token env vars as r2_upload.py (source r2.env first).
 
-Usage (from scripts/era5_pipeline/):
+Usage (from era5_pipeline/):
   set -a; source r2.env; set +a
   python r2_set_cors.py                       # apply
   python r2_set_cors.py --show                # print current policy

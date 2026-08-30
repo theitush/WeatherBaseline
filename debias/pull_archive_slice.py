@@ -23,7 +23,7 @@ pull without touching R2.
 
 OUTPUT — a local dir paralleling the HRES one (NOT re-uploaded to R2; this is a
 research extract):
-  scripts/bias_study/data/archive-overlap/archive_{lat}_{lon}.csv.gz
+  debias/data/archive-overlap/archive_{lat}_{lon}.csv.gz
   columns: date,tmax_C,tmin_C,precip_mm,wind_max_ms  (unchanged archive schema)
 
 CELL SET — by default the cells that HAVE an HRES object in R2 (so baseline and
@@ -42,7 +42,7 @@ Class B allowance; egress is free on R2. So the whole grid costs effectively $0.
 Auth — R2 S3 token in env (reuses era5_pipeline/r2.env), same as pull_hres_all.py:
   R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY  [R2_BUCKET=weather-baseline]
 
-Usage (from scripts/bias_study/, with the era5_pipeline venv):
+Usage (from debias/, with the era5_pipeline venv):
   source ../era5_pipeline/.venv/bin/activate
   source ../era5_pipeline/r2.env
   python pull_archive_slice.py --only Chicago     # one-cell smoke test (by name)

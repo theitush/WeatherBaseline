@@ -52,11 +52,11 @@ is the previous build. debias-v9 = this 9-level qn8620_s0_q9 bake (2026-08-26).
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
-Runs in scripts/era5_pipeline/.venv (needs the full archive-overlap + hres-forecast-ifs-hres
+Runs in era5_pipeline/.venv (needs the full archive-overlap + hres-forecast-ifs-hres
 data the fits were trained on). Reuses train_quantile_debias.py for the data
 pipeline (preflight/load_and_verify/add_features/split/shrink) and feature layout.
 
-  cd scripts/bias_study && ../era5_pipeline/.venv/bin/python make_debias_tables.py \
+  cd debias && ../era5_pipeline/.venv/bin/python make_debias_tables.py \
       --out-dir data/debias-v10
 Debug: --limit N (random cells) --allow-partial (warn+drop stale) --self-check-cells N
 """

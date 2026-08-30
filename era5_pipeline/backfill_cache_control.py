@@ -18,10 +18,10 @@ calls, so the pool shares one R2Uploader.
 Idempotent: skips objects that already have the target header. Safe to re-run.
 
     # dry run — HEAD every object, report which would change, touch nothing
-    scripts/era5_pipeline/.venv/bin/python scripts/era5_pipeline/backfill_cache_control.py --dry-run
+    era5_pipeline/.venv/bin/python era5_pipeline/backfill_cache_control.py --dry-run
 
     # apply (32 workers)
-    scripts/era5_pipeline/.venv/bin/python scripts/era5_pipeline/backfill_cache_control.py --workers 32
+    era5_pipeline/.venv/bin/python era5_pipeline/backfill_cache_control.py --workers 32
 
 Needs the same R2 creds as r2_upload.py (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID /
 R2_SECRET_ACCESS_KEY, from an R2 Object Read & Write S3 API token).

@@ -128,7 +128,7 @@ Currently `area = None` in `fetch_year` (already global). If B wins, leave it. I
 
 ### 4. Run the full pull
 ```bash
-python scripts/era5_pipeline/fetch_era5.py --start-year 1950 --end-year 2025 --max-concurrent 2
+python era5_pipeline/fetch_era5.py --start-year 1950 --end-year 2025 --max-concurrent 2
 ```
 Resumable via `state.json`. Expect days-to-weeks given CDS queue behaviour. Consider running it on a small year range first (e.g. 2018–2020) end-to-end to confirm the full path works (download → interp → CSV append) before committing to the full 76-year run.
 

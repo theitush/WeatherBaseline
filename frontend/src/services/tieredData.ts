@@ -215,7 +215,7 @@ export interface CellTimeline {
  * Load the full merged daily timeline for a snapped cell.
  *
  * Merge precedence per date (last-wins): forecast < recent < archive. archive is
- * the canonical era5_land pull (scripts/era5_pipeline/) and always wins when
+ * the canonical era5_land pull (era5_pipeline/) and always wins when
  * present — recent's precip/wind come from Open-Meteo's live IFS model (era5_land
  * returns null for those there), a lower-fidelity stand-in for the seam before
  * archive catches up, so it must never outrank archive on a shared date. recent

@@ -8,7 +8,7 @@ You run this ONCE. It does the whole Cloudflare side for you:
   4. creates the `hits` table
   5. deploys the Worker (uploads the new logging version so Cloudflare runs it)
 
-    python3 scripts/analytics/setup_analytics.py
+    python3 analytics/setup_analytics.py
 
 Safe to re-run — every step skips itself if it's already done. The only thing it
 can't do for you is the browser login: if you're not logged in it stops and tells

@@ -18,7 +18,7 @@ Python formatter now routes through `coord_str`, which drops the sign. Keep it
 that way — never build a key or filename with a bare `:.1f`.
 
 Dependency-free on purpose: download_cells.py (which defers its boto3 import),
-the snap-rewrite planning scripts and scripts/bias_study/ all import this.
+the snap-rewrite planning scripts and debias/ all import this.
 """
 from __future__ import annotations
 

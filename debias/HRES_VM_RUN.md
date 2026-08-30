@@ -52,7 +52,7 @@ This job is light (network + small CSV writes, no heavy RAM like the era5 pull).
 your laptop can stay on, you don't need a VM:
 
 ```bash
-cd scripts/bias_study
+cd debias
 source ../era5_pipeline/.venv/bin/activate
 export $(grep -v '^#' ../era5_pipeline/r2.env | xargs)   # R2 upload creds
 export OPENMETEO_API_KEY=your_key      # OMIT this line for the free tier
@@ -82,14 +82,14 @@ export OPENMETEO_API_KEY="your_key_here"   # delete this line for the free tier
 apt-get update && apt-get install -y python3-venv git
 cd /root
 git clone REPO_URL HowHotWasIt
-cd HowHotWasIt/scripts/era5_pipeline
+cd HowHotWasIt/era5_pipeline
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 # R2 creds: paste the three R2_* values (from era5_pipeline/r2.env) here:
 export R2_ACCOUNT_ID=...
 export R2_ACCESS_KEY_ID=...
 export R2_SECRET_ACCESS_KEY=...
-cd ../bias_study
+cd ../debias
 # loop so a transient daily-stop on the FREE tier retries; on Standard it finishes
 # in one pass. Exit 2 = "more to do", anything else = done/failed -> stop looping.
 while :; do

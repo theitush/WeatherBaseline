@@ -1,7 +1,7 @@
 // cellStore — v2 tiered storage, backed by an R2 binding (env.BUCKET).
 //
 // Object keys are `{tier}/{tier}_{lat}_{lon}.csv.gz`, matching what the frontend
-// fetches and what the producer / upload scripts (scripts/era5_pipeline/) write.
+// fetches and what the producer / upload scripts (era5_pipeline/) write.
 // Storage notes:
 //
 //   - reads/writes go through the R2 binding (env.BUCKET);
@@ -138,7 +138,7 @@ async function gunzipToText(body) {
 
 // --- CSV helpers (no quoting needed: all fields are dates/numbers) ----------
 // Format must stay identical to the producer / upload scripts in
-// scripts/era5_pipeline/ so archive + live tiers parse the same.
+// era5_pipeline/ so archive + live tiers parse the same.
 
 function parseCsv(text) {
   const lines = text.trim().split('\n');

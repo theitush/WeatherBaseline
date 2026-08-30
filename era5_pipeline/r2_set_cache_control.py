@@ -14,7 +14,7 @@ would otherwise drop them). Safe to re-run.
 
 Auth: same R2 S3 API token env vars as r2_upload.py (source r2.env first).
 
-Usage (from scripts/era5_pipeline/):
+Usage (from era5_pipeline/):
   set -a; source r2.env; set +a
   .venv/bin/python r2_set_cache_control.py --tiers recent forecast   # volatile first
   .venv/bin/python r2_set_cache_control.py --tiers archive --workers 32

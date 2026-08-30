@@ -98,8 +98,8 @@ curl -s "$BASE/api/ensure-fresh?lat=51.5&lon=-0.1"
 
 ## R2 data + CORS
 
-- **Uploading tier files:** `scripts/era5_pipeline/r2_upload.py` (boto3, needs
-  `source scripts/era5_pipeline/r2.env` first), or the VM data job with
+- **Uploading tier files:** `era5_pipeline/r2_upload.py` (boto3, needs
+  `source era5_pipeline/r2.env` first), or the VM data job with
   `--upload-r2`. Object keys are `{tier}/{tier}_{lat}_{lon}.csv.gz` — **no**
   `data/` or `era5-land/` prefix.
 - **CORS is required** and easy to get wrong. The frontend fetches the `.csv.gz`
@@ -114,9 +114,9 @@ curl -s "$BASE/api/ensure-fresh?lat=51.5&lon=-0.1"
   Current policy / apply:
   ```bash
   npx wrangler r2 bucket cors list weather-baseline          # show
-  npx wrangler r2 bucket cors set weather-baseline --file scripts/era5_pipeline/r2-cors.json
+  npx wrangler r2 bucket cors set weather-baseline --file era5_pipeline/r2-cors.json
   ```
-  (`scripts/era5_pipeline/r2_set_cors.py` holds the canonical origin list; the
+  (`era5_pipeline/r2_set_cors.py` holds the canonical origin list; the
   wrangler JSON uses the `{"rules":[{"allowed":{...}}]}` shape, which differs
   from boto3's.)
 

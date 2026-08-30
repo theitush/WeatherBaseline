@@ -44,7 +44,7 @@ OUTPUT (models/):
   per_cell_{TAG}.csv             per cell x var x variant: MAE/p95 raw vs q50
 
 Run on the box (tmux!):
-  cd scripts/bias_study && source ../era5_pipeline/.venv/bin/activate
+  cd debias && source ../era5_pipeline/.venv/bin/activate
   python train_quantile_debias.py                # full run, resumes if rerun
 Debug flags: --limit N (random cell sample) --iters N --retrain --skip-pull
   --allow-partial (missing/stale cells -> warn+drop instead of raise; NOT for

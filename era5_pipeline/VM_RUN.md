@@ -56,12 +56,12 @@ the repo, or rsync just the pieces:
 ```bash
 git clone <your-repo-url> ~/HowHotWasIt
 # OR, minimal:
-# rsync -av scripts/era5_pipeline/ data/era5/cells.csv user@vm:~/HowHotWasIt/...
+# rsync -av era5_pipeline/ data/era5/cells.csv user@vm:~/HowHotWasIt/...
 ```
 
 ### 3. Set up the venv
 ```bash
-cd ~/HowHotWasIt/scripts/era5_pipeline
+cd ~/HowHotWasIt/era5_pipeline
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -70,12 +70,12 @@ pip install -r requirements.txt
 This is the #1 thing people forget. From your **laptop**:
 ```bash
 scp ~/.netrc user@vm:~/                                                  # DestinE / EarthDataHub — the download credential
-scp scripts/era5_pipeline/r2.env user@vm:~/HowHotWasIt/scripts/era5_pipeline/   # R2 S3 keys — the UPLOAD credential
+scp era5_pipeline/r2.env user@vm:~/HowHotWasIt/era5_pipeline/   # R2 S3 keys — the UPLOAD credential
 # .cdsapirc is the superseded CDS path; not needed for the zarr download.
 ```
 Then on the VM:
 ```bash
-chmod 600 ~/.netrc ~/HowHotWasIt/scripts/era5_pipeline/r2.env
+chmod 600 ~/.netrc ~/HowHotWasIt/era5_pipeline/r2.env
 ```
 - `~/.netrc` (download): `download_cells.py` opens the zarr store with
   `trust_env: True`, so auth is read from `~/.netrc` of the user running python.

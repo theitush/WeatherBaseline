@@ -27,7 +27,7 @@ to cells.csv.
 Deps — cfgrib + eccodes (self-contained wheels) in the pipeline venv:
   ../era5_pipeline/.venv/bin/pip install cfgrib eccodes
 
-Usage (from scripts/bias_study/):
+Usage (from debias/):
   ../era5_pipeline/.venv/bin/python make_cell_elevation.py
 """
 from __future__ import annotations

@@ -215,7 +215,7 @@ of on every view. No data, format, or storage change. Free-tier ceilings
 ## Producer gap (separate from serving)
 
 The pipeline that builds the `archive` files isn't finished — see
-`scripts/era5_pipeline/STATUS.md`. `download_cells.py` currently writes plain
+`era5_pipeline/STATUS.md`. `download_cells.py` currently writes plain
 `.csv` keyed by `cell_id` for only 9 test cells × 1 year. To feed this
 architecture it needs to:
 

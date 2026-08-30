@@ -30,9 +30,9 @@ __pycache__/
 /data/era5-land/
 
 # Debias tables — ~400MB local mirrors of the versioned R2 debias-vN/ tiers
-# (regenerable via scripts/bias_study/make_debias_tables.py; the canonical copy
+# (regenerable via debias/make_debias_tables.py; the canonical copy
 # lives on R2). Covers debias/, debias-v9/, debias-v10/, … and retired copies.
-/scripts/bias_study/data/debias*/
+/debias/data/debias*/
 # Kept pre-flip frontend build = one-command rollback (wrangler pages deploy dist-v7)
 /dist-v*/
 
@@ -41,9 +41,9 @@ __pycache__/
 /cache_deprecated/
 
 # R2 S3 API credentials (S3 access key/secret). NEVER commit.
-/scripts/era5_pipeline/r2.env
+/era5_pipeline/r2.env
 
 # Cloudflare Analytics API token + zone id. NEVER commit.
-/scripts/analytics/cloudflare.env
+/analytics/cloudflare.env
 
 .wrangler/

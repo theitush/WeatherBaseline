@@ -7,7 +7,7 @@ plus local md5sums is a full-fidelity check: every local file present under
 the prefix with the identical digest, and nothing extra on R2.
 
     set -a; source r2.env; set +a
-    python r2_verify_prefix.py --dir ../bias_study/data --tiers debias-v9
+    python r2_verify_prefix.py --dir ../debias/data --tiers debias-v9
 
 Exit 0 only when the sets match exactly and every digest agrees.
 """

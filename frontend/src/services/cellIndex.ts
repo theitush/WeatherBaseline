@@ -7,7 +7,7 @@
 // search yields ≤6 results × ~10K cells.
 //
 // Each cell also carries a human `name` (backfilled offline — see
-// scripts/era5_pipeline/name_cells.py). That name is the ONLY label the app
+// era5_pipeline/name_cells.py). That name is the ONLY label the app
 // shows: it labels the suggestion the user picks, and it's what we resolve a
 // coords-only shareable URL back into on load. No geocoding needed for either.
 

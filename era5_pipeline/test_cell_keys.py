@@ -8,7 +8,7 @@ archive_51.5_0.0.csv.gz — a 404 for every visitor of those cells. Every
 formatter now routes through cell_keys, and this file pins the convention:
 no key or filename ever carries a "-0.0" axis.
 
-Run (from scripts/era5_pipeline/):
+Run (from era5_pipeline/):
   source .venv/bin/activate
   pytest test_cell_keys.py -v
 """

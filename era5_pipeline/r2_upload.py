@@ -18,7 +18,7 @@ static route sets the same headers. Keys mirror the tier layout: {tier}/{name},
 with {name} = {tier}_{lat}_{lon}.csv.gz built ONLY via cell_keys.py (it drops
 the sign of a -0.0 axis so Python keys match the JS readers' `toFixed(1)`).
 
-CLI usage (local test, from scripts/era5_pipeline/):
+CLI usage (local test, from era5_pipeline/):
   source .venv/bin/activate
   python r2_upload.py --tiers recent forecast        # fast volatile-only seed
   python r2_upload.py --tiers archive recent forecast
@@ -44,8 +44,8 @@ DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
 # Tiers this CLI can upload but that aren't part of the default era5-land set:
 # the static M3_base bias-correction tables (one .csv.gz per cell), which live
-# under scripts/bias_study/data/, not data/era5-land/, so you upload them
-# explicitly with `--dir .../bias_study/data --tiers debias-v9`.
+# under debias/data/, not data/era5-land/, so you upload them
+# explicitly with `--dir .../debias/data --tiers debias-v9`.
 #
 # The debias prefix is VERSIONED. A regen (IFS cycle cutover, cells.csv change,
 # retrain) is baked into a NEW `debias-vN/` dir, uploaded under that same

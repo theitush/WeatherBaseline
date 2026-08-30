@@ -28,7 +28,7 @@ design. The grid is 0.1° (~11 km). Both cities sit **on the coastline**
 (Edinburgh on the Firth of Forth, Wellington on its harbour), so the snapped
 0.1° gridpoint lands **just offshore — on an ocean cell with no data.**
 
-The download pipeline (`scripts/era5_pipeline/download_cells.py`) selects the
+The download pipeline (`era5_pipeline/download_cells.py`) selects the
 gridpoint with `method="nearest"`, which returns the *geometrically* nearest
 cell even when that cell is an ocean `NaN`. It does not fall back to the nearest
 cell that actually has land data. So it extracted the empty ocean cell and wrote

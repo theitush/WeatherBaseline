@@ -75,7 +75,7 @@ at 20s) and retries in place — the retry usually hits the now-warmed chunk cac
 and returns in seconds. Counters, the ledger, and progress lines are applied
 single-writer on the main thread.
 
-Usage (from scripts/bias_study/, with the era5_pipeline venv):
+Usage (from debias/, with the era5_pipeline venv):
   source ../era5_pipeline/.venv/bin/activate
   source ../era5_pipeline/r2.env
   python pull_hres_all.py --only Chicago        # one-cell smoke test (by name)
