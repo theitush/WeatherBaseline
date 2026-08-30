@@ -15,3 +15,19 @@ catboost_info/
 # Full-grid archive-overlap slices — local mirror, rebuildable with
 # pull_archive_slice.py (R2) or rsync from the training box.
 data/archive-overlap/
+
+# Open-Meteo IFS-HRES forecast pull, version-pinned rebuild of data/hres-forecast/
+# (8.8k files) — local cache of the R2 copy, same rule as above.
+data/hres-forecast-ifs-hres/
+
+# Notebook-exploration data mirrors: full archive sample (318 MB) and the
+# confidence-validation frames (505 MB). Rebuildable from the pipeline / R2.
+data/archive-full-sample/
+data/nb_confidence/
+data/pipeline_frame_full.feather
+
+# cfgrib index sidecars
+*.grib.*.idx
+
+# Editing snapshots (notebooks + feathers) kept beside their originals
+*.bak*

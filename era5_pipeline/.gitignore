@@ -22,3 +22,13 @@ __pycache__/
 # Snap-distance audit: cached per-tile land masks + report (regenerable)
 snap_audit_masks/
 snap_audit.csv
+
+# Run artefacts from top-up / repair passes: tile & cell worklists, resume
+# logs, pid files. Regenerated per run, meaningless to anyone else.
+gap_cells_*.txt
+gap_tiles_*.txt
+repull_tiles.txt
+orphan_archives.txt
+topup_*_remaining_tiles.txt
+topup_*.log
+topup_*.pid

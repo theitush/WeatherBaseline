@@ -47,3 +47,17 @@ __pycache__/
 /analytics/cloudflare.env
 
 .wrangler/
+
+# WSL "downloaded from the internet" sidecars
+*:Zone.Identifier
+
+# Local Claude Code config + worktree checkouts (machine-specific)
+/.claude/
+
+# Ad-hoc analytics scratch: a root-level notebook and the raw hit exports
+# that analytics/report.py pulls from Cloudflare.
+/anaytics.ipynb
+/hhwi-hits*.csv
+
+# Local config backups (Claude Code state, not project files)
+/backups/
