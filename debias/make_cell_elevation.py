@@ -41,7 +41,12 @@ import pandas as pd
 import xarray as xr
 
 HERE = Path(__file__).resolve().parent
-CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
+# Repo root — walked up to the dir holding data/cells.csv rather than
+# counting levels off HERE: debias/ sits at the repo root since the
+# 2026-08-30 promotion, but the VM's rsync'd mirror is still the old
+# scripts/<dir>/ layout, and both have to keep working.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 GEO_GRIB = HERE / "data" / "geo.grib"
 OUT_CSV = HERE / "data" / "cell_elevation.csv"
 GRAVITY = 9.80665  # m/s^2, WMO standard

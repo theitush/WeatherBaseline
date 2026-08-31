@@ -66,7 +66,11 @@ import pandas as pd
 from catboost import CatBoostRegressor, Pool
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# Repo root — walked up to the dir holding data/cells.csv rather than
+# counting levels off HERE: debias/ sits at the repo root since the
+# 2026-08-30 promotion, but the VM's rsync'd mirror is still the old
+# scripts/<dir>/ layout, and both have to keep working.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
 CELLS_CSV = REPO / "data" / "cells.csv"
 ARC_DIR = HERE / "data" / "archive-overlap"
 HRES_DIR = HERE / "data" / "hres-forecast-ifs-hres"

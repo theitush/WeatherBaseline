@@ -57,7 +57,8 @@ TIERS = ("archive", "recent", "forecast")
 # moved to deprecated/.
 #   debias     7-level qn8727_s0 bake (2026-07-05), retired 2026-08-28
 #   debias-v9  9-level qn8620_s0_q9 bake (2026-08-26)
-DEBIAS_TIERS = ("debias", "debias-v9")
+#   debias-v10 adds the fifth variable, dew point (2026-08-31)
+DEBIAS_TIERS = ("debias", "debias-v9", "debias-v10")
 EXTRA_TIERS = DEBIAS_TIERS
 UPLOADABLE_TIERS = TIERS + EXTRA_TIERS
 

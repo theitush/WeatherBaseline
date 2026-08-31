@@ -70,10 +70,15 @@ sys.path.insert(0, str(HERE.parent / "era5_pipeline"))
 from cell_keys import cell_base  # noqa: E402
 from r2_upload import R2Uploader  # noqa: E402
 
-CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
+# Repo root — walked up to the dir holding data/cells.csv rather than
+# counting levels off HERE: debias/ sits at the repo root since the
+# 2026-08-30 promotion, but the VM's rsync'd mirror is still the old
+# scripts/<dir>/ layout, and both have to keep working.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 # Where download_cells.py writes each cell's full-history archive on local disk —
 # the source for --local (mirrors the R2 archive/ prefix read in the default mode).
-LOCAL_ARCHIVE_DIR = HERE.parent.parent / "data" / "era5-land" / "archive"
+LOCAL_ARCHIVE_DIR = REPO / "data" / "era5-land" / "archive"
 OUT_DIR = HERE / "data" / "archive-overlap"
 ARCHIVE_PREFIX = "archive"
 HRES_PREFIX = "hres-forecast-ifs-hres"
