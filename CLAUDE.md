@@ -8,6 +8,8 @@ This repo's tasks are its **GitHub issues**. When Ita says **"task 5"** he means
 
 A task is the issue title; the issue body is its notes; and once finished, the result goes in the same body under a `---` rule and a `**Result**` heading. The project's columns are `Status` (backlog / Queued / In Progress / Blocked / Done / Cancelled), `Priority` (ASAP / high / medium / low), `Worker` (ita / fable / opus / sonnet / haiku) and `Due`.
 
+**Every piece of work starts from a task.** If Ita names an issue, that is your task. If he asks for something with no issue behind it, write the issue here first — a title and a few lines of what he asked for — `gh project item-add` it, set it In Progress, and *then* start. Filing it afterwards defeats the point: In Progress before the work is what a crashed session leaves behind. A task is for work that ends in a commit; a question, a read or a five-minute look is not work and must not be filed, or the board becomes a log and buries the queue.
+
 Working one:
 
 1. Read it: `gh issue view <n>`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
