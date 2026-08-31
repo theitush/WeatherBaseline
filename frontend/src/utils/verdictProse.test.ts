@@ -86,7 +86,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assertEq(dead.tier, 'mildDead', 'dead-centre value lands on mildDead');
-  assertEq(dead.verdict, 'A typical day here', 'mildDead verdict');
+  assertEq(dead.verdict, 'A typical day', 'mildDead verdict');
   assertEq(dead.rarityLine, 'Warmer than about 50% of all days since 1950.', 'mildDead percentile line');
 
   // 30 in 0..99 is on the cold side: 70 days are warmer.
@@ -95,7 +95,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
   assertEq(off.tier, 'mildOff', 'off-centre value lands on mildOff');
-  assertEq(off.verdict, 'A shade colder than the typical day here', 'mildOff verdict takes the low-side word');
+  assertEq(off.verdict, 'A shade colder than the typical day', 'mildOff verdict takes the low-side word');
   assertEq(off.rarityLine, 'Colder than about 69% of all days since 1950.', 'mildOff percentile counts the strictly warmer days');
 
   // The card keeps its playful wording on the very same day.
@@ -114,7 +114,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
     displayValue: 50, band: null, windowNative: WINDOW_100, allTimeNative: RECORD_1000,
     metric: 'min_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
   })!;
-  assertEq(night.verdict, 'A typical night here', 'min temperature says "night"');
+  assertEq(night.verdict, 'A typical night', 'min temperature says "night"');
   assertEq(night.rarityLine, 'Warmer than about 50% of all nights since 1950.', 'min temperature says "nights"');
 }
 
@@ -161,7 +161,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(tight.verdict, 'Among the hottest days', 'confident forecast keeps the plain phrase');
   assertEq(
     tight.rarityLine,
-    'This day will be in the top 3–4% hottest days since 1950.',
+    'In the top 3–4% hottest days since 1950.',
     "the dial states where the band's q05/q95 ends land, not a probability"
   );
 
@@ -176,7 +176,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   // every day on record is floored at the rarest slot the pool resolves (1/400).
   assertEq(
     loose.rarityLine,
-    'This day will be in the top 0.3–13% hottest days since 1950.',
+    'In the top 0.3–13% hottest days since 1950.',
     'a wide band widens the stated range'
   );
 
@@ -196,7 +196,10 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
 {
   console.log('Case 4b: mild + straddling forecasts fall back to the pack form');
   // A mild forecast: "the top 47% hottest days" would only mean "above average",
-  // so the dial says where in the pack it sits, exactly as a settled mild day does.
+  // so the dial says where in the pack the MEDIAN sits — the same number and the
+  // same words a settled mild day gets, one "Probably" in front. Quoting the two
+  // band ends here instead would fight the verdict above it, which is read off
+  // the median: "a shade warmer than typical" under a range starting at 53%.
   const mild = resolveVerdictProse({
     displayValue: 250, band: bandAround(250, 20), windowNative: RECORD_400, allTimeNative: RECORD_400,
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
@@ -204,13 +207,13 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(mild.tier, 'mildOff', 'a forecast median at the 63rd percentile is off-centre mild');
   assertEq(
     mild.rarityLine,
-    'This day will be warmer than about 53–72% of all days since 1950.',
-    'the mild tier states the pack share, both ends'
+    'Probably warmer than about 63% of days since 1950.',
+    "the mild tier states the median's own place in the pack"
   );
 
   // A tail tier whose band is wide enough to reach past the middle: "top X%" has
-  // nothing left to carry, so the same pack form takes over. The high end is past
-  // every day on record and prints 99%, never "about 100%".
+  // nothing left to carry, so the same pack form takes over — the ring still
+  // shows how wide the band is.
   const straddle = resolveVerdictProse({
     displayValue: 385, band: bandAround(385, 120), windowNative: RECORD_400, allTimeNative: RECORD_400,
     metric: 'max_temperature', system: 'metric', pool: YEAR_POOL, style: 'descriptive',
@@ -218,7 +221,7 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(straddle.tier, 'extreme', 'the median is still in the top 5%');
   assertEq(
     straddle.rarityLine,
-    'This day will be warmer than about 42–99% of all days since 1950.',
+    'Probably warmer than about 96% of days since 1950.',
     'a band reaching past the middle drops the top-N% frame'
   );
 }
@@ -239,10 +242,12 @@ const VERDICT_MILD = ['Very average.', 'Totally normal.', 'Boring.', 'Meh.'];
   assertEq(dial.tier, 'mildOff', 'a dry day sits in the middle 60% of a dry record');
   assertEq(
     dial.rarityLine,
-    'This day will be like 90% of all days since 1950.',
+    'Like 90% of days since 1950.',
     'the degenerate band restates the majority, with a computed share'
   );
-  assertEq(dial.verdict, 'A shade drier than the typical day here', 'dry-side mild verdict');
+  // No direction: 90 of the 100 days are tied at 0mm, so "a shade drier than
+  // the typical day" would claim a gap that isn't there.
+  assertEq(dial.verdict, 'A typical dry day', 'the tied dry day is the typical day');
 
   const card = resolveVerdictProse({
     displayValue: 0, band: dryBand, windowNative: dryPool, allTimeNative: dryPool,

@@ -356,9 +356,13 @@ const YearRadialChart: React.FC<YearRadialChartProps> = ({
       // that value, which is exactly what the section's heading counts.
       //
       // On a forecast day the uncertainty is a SHADED ANNULUS between q05 and
-      // q95 — the SAME two ends the section's heading quotes ("in the top 3-4%
-      // hottest days since 1950", utils/verdictProse.bandSpreadPredicate), so
-      // the sentence and the ring can't describe different forecasts — with the
+      // q95 — the SAME two ends the section's heading quotes while they stay in
+      // a tail ("In the top 3-4% hottest days since 1950",
+      // utils/verdictProse.bandTailPredicate), so the sentence and the ring
+      // can't describe different forecasts. Once they reach past the median the
+      // heading states the median's place in the pack instead and this ring is
+      // the only thing showing the spread — all the more reason to draw it —
+      // with the
       // thin dashed ring on the median still marking the value the
       // dot sits at: two more dashed rings read as two more gridlines, a filled
       // band reads as one interval. A flat wash, not the histogram's diagonal
