@@ -29,6 +29,7 @@ const METRIC_LEAD_LABEL: Record<MetricKey, string> = {
   min_temperature: 'min temperature',
   precipitation_sum: 'precipitation',
   wind_speed_10m_max: 'wind speed',
+  dew_point_2m_mean: 'dew point',
 };
 
 // Gradient stops: record-low blue -> white -> record-high red (matches the bar exactly)

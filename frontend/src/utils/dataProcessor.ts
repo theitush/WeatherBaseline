@@ -270,6 +270,7 @@ export function calculateTemperaturePercentile(
  *   - temperature: cold ↔ hot
  *   - precipitation: dry ↔ wet
  *   - wind: calm ↔ gusty
+ *   - dew point: dry ↔ muggy
  * The percentile branching that picks a bank is identical across metrics.
  */
 interface MetricPhrases {
@@ -377,11 +378,43 @@ const WIND_PHRASES: MetricPhrases = {
   ],
 };
 
+const DEWPOINT_PHRASES: MetricPhrases = {
+  normal: [
+    'Pretty typical', 'Normal range', 'Average humidity', 'Nothing unusual',
+    'Right on track', 'Nothing special', 'Just average', 'Not exciting',
+  ],
+  mildLow: [
+    'A bit dry', 'Slightly crisp', 'Drier side', 'Touch below normal',
+    'Mildly dry', 'A bit parched', 'Somewhat dry', 'Sorta crisp',
+  ],
+  mildHigh: [
+    'A bit muggy', 'Slightly sticky', 'Humid side', 'Touch above normal',
+    'Mildly humid', 'A bit clammy', 'Somewhat muggy', 'Sorta sticky',
+  ],
+  strongLow: [
+    'Unusually dry air', 'Quite crisp', 'Pretty parched', 'Really dry',
+    'Very dry air', 'Desert dry', 'Dry af', 'Chapped-lips dry',
+  ],
+  strongHigh: [
+    'Unusually muggy', 'Quite sticky', 'Pretty steamy', 'Really humid',
+    'Very muggy', 'Muggy af', 'Soupy', 'Sweaty',
+  ],
+  extremeLow: [
+    'Exceptionally dry air!', 'Bone-dry air!', 'Desert-dry record!',
+    'Brutally parched!', 'Static-shock dry!',
+  ],
+  extremeHigh: [
+    'Tropical soup!', 'Oppressively muggy!', 'Steam-room humid!',
+    'Swamp air!', 'Record mugginess!',
+  ],
+};
+
 const METRIC_PHRASES: Record<MetricKey, MetricPhrases> = {
   max_temperature: TEMP_PHRASES,
   min_temperature: TEMP_PHRASES,
   precipitation_sum: PRECIP_PHRASES,
   wind_speed_10m_max: WIND_PHRASES,
+  dew_point_2m_mean: DEWPOINT_PHRASES,
 };
 
 /**

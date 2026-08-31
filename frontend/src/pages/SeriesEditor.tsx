@@ -9,6 +9,7 @@ const METRIC_LABELS: Record<MetricKey, string> = {
   min_temperature: 'Min Temp',
   precipitation_sum: 'Precip',
   wind_speed_10m_max: 'Wind',
+  dew_point_2m_mean: 'Dew Pt',
 };
 const METRICS = Object.keys(METRIC_LABELS) as MetricKey[];
 

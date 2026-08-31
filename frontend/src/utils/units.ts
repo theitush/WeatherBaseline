@@ -14,8 +14,10 @@ import type { MetricKey } from './config';
 
 export type UnitSystem = 'metric' | 'imperial';
 
+// Dew point is a temperature too: same °C/°F conversion, degree labels, bin
+// ladder and ±2° axis pad as tmax/tmin.
 const isTemp = (m: MetricKey) =>
-  m === 'max_temperature' || m === 'min_temperature';
+  m === 'max_temperature' || m === 'min_temperature' || m === 'dew_point_2m_mean';
 
 // ---- value conversion (absolute readings) ---------------------------------
 
@@ -68,6 +70,7 @@ export function axisLabel(metric: MetricKey, system: UnitSystem): string {
     case 'min_temperature': return `Daily Min Temp (${u})`;
     case 'precipitation_sum': return `Daily Precipitation (${u})`;
     case 'wind_speed_10m_max': return `Daily Max Wind Speed (${u})`;
+    case 'dew_point_2m_mean': return `Daily Mean Dew Point (${u})`;
   }
 }
 

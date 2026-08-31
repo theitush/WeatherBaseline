@@ -21,14 +21,18 @@ const MetricSelector: React.FC<MetricSelectorProps> = ({ currentMetric, onChange
     min_temperature: 'Min Temperature',
     precipitation_sum: 'Precipitation',
     wind_speed_10m_max: 'Wind Speed',
+    dew_point_2m_mean: 'Dew Point',
   };
 
   // Compact labels shown on narrow screens (CSS swaps which span is visible).
+  // Five buttons share one row on a phone (~50–60px of text each), so these are
+  // the weather-app shorthands: High/Low for the daily temperature extremes.
   const metricLabelsShort: Record<MetricKey, string> = {
-    max_temperature: 'Max Temp',
-    min_temperature: 'Min Temp',
-    precipitation_sum: 'Precipitation',
+    max_temperature: 'High',
+    min_temperature: 'Low',
+    precipitation_sum: 'Precip',
     wind_speed_10m_max: 'Wind',
+    dew_point_2m_mean: 'Dew Pt',
   };
 
   return (

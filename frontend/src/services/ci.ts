@@ -38,6 +38,7 @@ export interface BandRequestRow {
   min_temperature?: number;
   precipitation_sum?: number;
   wind_speed_10m_max?: number;
+  dew_point_2m_mean?: number;
 }
 
 export type BandsByDate = Record<string, Partial<Record<MetricKey, MetricBand>>>;
@@ -49,6 +50,9 @@ const METRICS: { key: MetricKey; var: string; nonneg: boolean }[] = [
   { key: 'min_temperature', var: 'tmin', nonneg: false },
   { key: 'precipitation_sum', var: 'precip', nonneg: true },
   { key: 'wind_speed_10m_max', var: 'wind', nonneg: true },
+  // Present only in tables baked from a 5-var run (debias-v10+); an older table
+  // simply has no `dewpt` rows -> no band, raw value flows through (see above).
+  { key: 'dew_point_2m_mean', var: 'dewpt', nonneg: false },
 ];
 
 // Below this, a day's precipitation counts as 0 — the same trace clamp applied at

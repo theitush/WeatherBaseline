@@ -1,6 +1,11 @@
 // Configuration and constants
 
-export type MetricKey = 'max_temperature' | 'min_temperature' | 'precipitation_sum' | 'wind_speed_10m_max';
+export type MetricKey =
+  | 'max_temperature'
+  | 'min_temperature'
+  | 'precipitation_sum'
+  | 'wind_speed_10m_max'
+  | 'dew_point_2m_mean';
 
 export type ElementType = 'trendLine' | 'percentileBand90' | 'percentileBand75' | 'dataPoints' | 'histogramBars';
 
@@ -14,6 +19,7 @@ export interface ActiveMetrics {
   min_temperature: boolean;
   precipitation_sum: boolean;
   wind_speed_10m_max: boolean;
+  dew_point_2m_mean: boolean;
 }
 
 export interface Margin {
@@ -87,7 +93,8 @@ const CONFIG: Config = {
     max_temperature: true,      // ✅ Maximum temperature
     min_temperature: true,      // ✅ Minimum temperature
     precipitation_sum: true,    // ✅ Precipitation
-    wind_speed_10m_max: true    // ✅ Wind speed
+    wind_speed_10m_max: true,   // ✅ Wind speed
+    dew_point_2m_mean: true      // ✅ Dew point (daily mean)
   },
 
   // Chart dimensions
@@ -116,6 +123,10 @@ const CONFIG: Config = {
     wind_speed_10m_max: {
       base: '#8A8F98',
       name: 'Gray'
+    },
+    dew_point_2m_mean: {
+      base: '#2A9D8F',
+      name: 'Teal'
     }
   },
 
@@ -190,7 +201,8 @@ const CONFIG: Config = {
       max_temperature: 'apparent_temperature_max',
       min_temperature: 'apparent_temperature_min',
       precipitation_sum: 'precipitation_sum',
-      wind_speed_10m_max: 'wind_speed_10m_max'
+      wind_speed_10m_max: 'wind_speed_10m_max',
+      dew_point_2m_mean: 'dew_point_2m_mean'
     };
 
     return this.getActiveMetrics()

@@ -135,12 +135,14 @@ export const METRIC_DIRECTION_UP: Record<MetricKey, string> = {
   min_temperature: 'warmer',
   precipitation_sum: 'wetter',
   wind_speed_10m_max: 'windier',
+  dew_point_2m_mean: 'more humid',
 };
 export const METRIC_DIRECTION_DOWN: Record<MetricKey, string> = {
   max_temperature: 'cooler',
   min_temperature: 'cooler',
   precipitation_sum: 'drier',
   wind_speed_10m_max: 'calmer',
+  dew_point_2m_mean: 'drier',
 };
 
 // The big line of the section's conclusion headline, completing the quiet lead

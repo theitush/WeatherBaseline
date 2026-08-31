@@ -18,12 +18,14 @@ export interface UrlState {
 }
 
 // Short URL token <-> internal MetricKey. tmax/tmin (not min/max) per the data's
-// daily-extreme naming; precip/wind are the obvious abbreviations.
+// daily-extreme naming; precip/wind are the obvious abbreviations; dew = the
+// daily max dew point.
 const METRIC_TO_TOKEN: Record<MetricKey, string> = {
   max_temperature: 'tmax',
   min_temperature: 'tmin',
   precipitation_sum: 'precip',
   wind_speed_10m_max: 'wind',
+  dew_point_2m_mean: 'dew',
 };
 const TOKEN_TO_METRIC: Record<string, MetricKey> = Object.fromEntries(
   Object.entries(METRIC_TO_TOKEN).map(([k, v]) => [v, k as MetricKey])

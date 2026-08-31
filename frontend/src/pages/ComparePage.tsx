@@ -21,14 +21,16 @@ const METRIC_NAME: Record<MetricKey, string> = {
   min_temperature: 'min temp',
   precipitation_sum: 'precip',
   wind_speed_10m_max: 'wind',
+  dew_point_2m_mean: 'dew point',
 };
 
-// Metrics that share a UNIT belong on the same dial. Min and max temperature are
-// both °C/°F, so they pool together; precip (mm/in) and wind (km/h/mph) stand
-// alone. Grouping/domain key on this family rather than the exact metric.
+// Metrics that share a UNIT belong on the same dial. Min/max temperature and
+// dew point are all °C/°F, so they pool together; precip (mm/in) and wind
+// (km/h/mph) stand alone. Grouping/domain key on this family rather than the
+// exact metric.
 type UnitFamily = 'temp' | 'precip' | 'wind';
 const unitFamily = (m: MetricKey): UnitFamily =>
-  m === 'max_temperature' || m === 'min_temperature'
+  m === 'max_temperature' || m === 'min_temperature' || m === 'dew_point_2m_mean'
     ? 'temp'
     : m === 'precipitation_sum'
       ? 'precip'

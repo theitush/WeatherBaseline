@@ -31,6 +31,7 @@ const metricQuestionLabel: Record<MetricKey, string> = {
   min_temperature: 'min temperature',
   precipitation_sum: 'precipitation',
   wind_speed_10m_max: 'wind speed',
+  dew_point_2m_mean: 'dew point',
 };
 
 // Those phrases are written lowercase so they can sit mid-sentence; titles that
@@ -520,7 +521,7 @@ const AppContent: React.FC = () => {
                       When you search a city we snap it to the nearest grid cell
                       centre rather than interpolating, so the number you see is a real
                       ERA5-Land cell and not a blend. We show daily maximum and minimum
-                      temperature, precipitation, and peak wind.
+                      temperature, precipitation, peak wind, and mean dew point.
                     </p>
                     <p>
                       <em>
@@ -598,7 +599,7 @@ const AppContent: React.FC = () => {
                     <p>
                       Every number here is a <strong>daily</strong> value, one figure
                       summarising a single 24-hour day, not an hourly reading or a
-                      monthly average. There are four:
+                      monthly average. There are five:
                     </p>
                     <p>
                       <strong>Max temperature</strong> is the hottest the air got that
@@ -621,6 +622,16 @@ const AppContent: React.FC = () => {
                       Fresh snow melts down at roughly <strong>ten to one</strong>, so
                       1 cm of snow is about 1 mm of precipitation, and a winter day
                       reading 15 mm had something like 15 cm of snow falling on it.
+                    </p>
+                    <p>
+                      <strong>Dew point</strong> is the day's average of the temperature
+                      the air would have to cool to before its moisture condenses —
+                      the honest measure of how much water vapour is actually in the
+                      air, and so of how humid a day <em>feels</em>. Unlike relative
+                      humidity it doesn't swing with the temperature: below about
+                      10 °C (50 °F) the air feels dry, the high teens (60s °F) start
+                      to feel sticky, and anything past 21 °C (70 °F) is oppressive.
+                      It's the number behind "it's not the heat, it's the humidity."
                     </p>
                   </div>
                 </details>

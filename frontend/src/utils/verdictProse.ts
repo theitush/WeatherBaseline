@@ -57,6 +57,9 @@ const METRIC_DIRECTION: Record<
   min_temperature: { high: ['hot', 'hotter', 'hottest'], low: ['cold', 'colder', 'coldest'] },
   precipitation_sum: { high: ['wet', 'wetter', 'wettest'], low: ['dry', 'drier', 'driest'] },
   wind_speed_10m_max: { high: ['windy', 'windier', 'windiest'], low: ['calm', 'calmer', 'calmest'] },
+  // Two-word forms read fine in every template: "were this humid", "the 3rd
+  // most humid day", "this humid or more humid", "top 5% most humid days".
+  dew_point_2m_mean: { high: ['humid', 'more humid', 'most humid'], low: ['dry', 'drier', 'driest'] },
 };
 
 // Comparative used in the mild "a bit ___ than most" line, per metric & side.
@@ -65,6 +68,7 @@ const METRIC_COMPARATIVE: Record<MetricKey, { high: string; low: string }> = {
   min_temperature: { high: 'warmer', low: 'colder' },
   precipitation_sum: { high: 'wetter', low: 'drier' },
   wind_speed_10m_max: { high: 'windier', low: 'calmer' },
+  dew_point_2m_mean: { high: 'more humid', low: 'drier' },
 };
 
 // Softeners for the mild "a ___ ___ than most" line.

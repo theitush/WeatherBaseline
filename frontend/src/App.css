@@ -655,17 +655,21 @@ body {
   .metric-selector label {
     min-width: 0;
   }
-  /* All four metrics on one line, compact */
+  /* All five metrics on one line, compact (short labels — see MetricSelector).
+     Sized so the widest label ("Dew Pt" ≈ 48px at 12px in Arial, the widest
+     fallback face) still clears the ~51px of text room a 360px phone leaves
+     per button, with a couple of px to spare. */
   .metric-buttons {
     width: 100%;
-    gap: 5px;
+    gap: 3px;
     flex-wrap: nowrap;
   }
   .metric-button {
     flex: 1 1 0;
     min-width: 0;
-    padding: 8px 4px;
-    font-size: 13px;
+    padding: 8px 2px;
+    font-size: 12px;
+    letter-spacing: -0.01em;
     text-align: center;
     white-space: nowrap;
   }
@@ -677,6 +681,18 @@ body {
   }
   .section-title {
     font-size: 24px;
+  }
+}
+
+/* Very narrow phones (iPhone SE 1st gen class): one more notch down so all five
+   metric labels still fit on one row without an ellipsis. */
+@media (max-width: 349px) {
+  .metric-buttons {
+    gap: 2px;
+  }
+  .metric-button {
+    padding: 8px 0;
+    font-size: 11px;
   }
 }
 

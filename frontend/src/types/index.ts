@@ -36,6 +36,10 @@ export interface WeatherDataPoint {
   min_temperature?: number;
   precipitation_sum?: number;
   wind_speed_10m_max?: number;
+  // Daily MEAN 2 m dew point (°C): ERA5-Land d2m averaged over the local solar
+  // day (archive/recent), IFS-HRES daily mean in the forecast tier. Undefined on
+  // rows written before the column shipped.
+  dew_point_2m_mean?: number;
   // Forecast-uncertainty band per metric (forecast rows only).
   band?: Partial<Record<MetricKey, MetricBand>>;
 }

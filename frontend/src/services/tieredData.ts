@@ -78,6 +78,9 @@ interface RawRow {
   tmin_C: string;
   precip_mm: string;
   wind_max_ms: string;
+  // Not in the cell files yet — the real ERA5-Land d2m column, once the
+  // pipeline ships it. Absent → the mock series fills in (see apply below).
+  dewpt_mean_C?: string;
 }
 
 /**
@@ -260,6 +263,10 @@ export async function loadCellTimeline(
         precipitation_sum:
           precip === null ? undefined : precip < PRECIP_TRACE_MM ? 0 : precip,
         wind_speed_10m_max: numOrNull(r.wind_max_ms) ?? undefined,
+        // Daily MEAN dew point: ERA5-Land d2m in archive + recent (settled, like
+        // temperature), IFS in forecast. Absent from rows written before the
+        // column shipped — those days simply have no dew point.
+        dew_point_2m_mean: numOrNull(r.dewpt_mean_C) ?? undefined,
       });
     }
   };

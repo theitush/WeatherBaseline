@@ -177,13 +177,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       // WHICH ROWS GET CORRECTED — the model scale (IFS-HRES) differs from the
       // archive/percentile scale (ERA5-Land), so anything HRES-derived MUST be
       // debiased:
-      //   • forecast rows -> every metric is HRES model output -> correct all four.
+      //   • forecast rows -> every metric is HRES model output -> correct them all.
       //   • recent rows   -> precip AND wind ARE STILL FORECASTS here. The recent
       //     seam pulls those two from the IFS historical-forecast API because
       //     ERA5-Land lags the present frontier, so recent precip/wind carry the
       //     SAME HRES bias as a forecast and MUST be corrected. Recent TEMPERATURE,
       //     by contrast, is already settled ERA5-Land reanalysis (real, not a guess)
-      //     -> NO correction, NO snap, it keeps its real observed value.
+      //     -> NO correction, NO snap, it keeps its real observed value. Recent
+      //     DEW POINT is era5_land too (same call as temperature) -> same rule.
       // So RECENT_MODEL_METRICS is precip+wind ONLY. fetchBands is tier-agnostic (it
       // returns a band for every value it is handed, temperature included); THIS
       // filter is what enforces the recent-temperature exception.
@@ -207,6 +208,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             min_temperature: d.min_temperature,
             precipitation_sum: d.precipitation_sum,
             wind_speed_10m_max: d.wind_speed_10m_max,
+            dew_point_2m_mean: d.dew_point_2m_mean,
           }))
         );
         for (const d of bandRows) {

@@ -20,7 +20,7 @@
 
 // Valid metric tokens (match urlState.ts) — used only to validate a share path,
 // since the description no longer depends on the metric.
-const METRIC_TOKENS = new Set(['tmax', 'tmin', 'precip', 'wind']);
+const METRIC_TOKENS = new Set(['tmax', 'tmin', 'precip', 'wind', 'dew']);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
