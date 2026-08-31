@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
 
-BIAS_STUDY = Path("/home/ita/HowHotWasIt/scripts/bias_study")
+BIAS_STUDY = Path(__file__).resolve().parent
 sys.path.insert(0, str(BIAS_STUDY))
 import train_quantile_debias as tqd
 import make_debias_tables as mdt
