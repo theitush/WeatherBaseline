@@ -41,14 +41,17 @@ OUTPUT (one gzip per cell, --out-dir) — EVERY cell gets a file (model surface
 where trusted, empirical band where gated):
   debias_{lat}_{lon}.csv.gz
     columns: var,doy,hres,d01,dlo,d10,d25,dmid,d75,d90,dhi,d99
-  (deltas, 2 dp)  ~4 x 53 x 15 ~= 3K rows ~= 48 KB/cell, ~415 MB for the grid.
+  (deltas, 2 dp)  ~5 x 53 x 15 ~= 3.8K rows ~= 62 KB/cell, ~523 MB for the grid
+  (precip's anchors are quantile-spaced and dedupe, so it contributes fewer).
 
 The R2 prefix is VERSIONED — never rebake into a dir that already shipped.
 Each regen goes to a NEW `data/debias-vN/`, is uploaded under that same prefix
 (add it to r2_upload.DEBIAS_TIERS, `r2_upload.py --dir data --tiers debias-vN`,
 prove it with r2_verify_prefix.py), and is promoted by flipping the one-line
 default of DEBIAS_PREFIX in frontend/src/services/ci.ts + a Pages deploy. Rollback
-is the previous build. debias-v9 = this 9-level qn8620_s0_q9 bake (2026-08-26).
+is the previous build. debias-v9 = the 4-var 9-level qn8620_s0_q9 bake
+(2026-08-26); debias-v10 = the same plus dew point (2026-08-31, still unpromoted
+-- v9 is what ci.ts points at).
 
 REGEN at the next IFS cutover: fc_version is pinned to the current cycle below.
 
