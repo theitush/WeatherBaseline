@@ -1,7 +1,13 @@
 """Benchmark the EarthDataHub zarr method against the CDS download pipeline.
 
 Status task #1: compare a single cloud-zarr `.sel()`+`.interp()` against the
-A/B/C CDS bbox strategies measured in `benchmark.py`.
+A/B/C CDS bbox strategies measured by the old `benchmark.py`.
+
+The CDS side of that comparison is gone: `benchmark.py`, `era5.py`,
+`fetch_era5.py` and `benchmark_results*.json` were removed in `61a2c0ae`
+(2026-06-03) once the Zarr store won, and live only in git history. Its
+numbers survive in `STATUS.md`; this file and `benchmark_zarr_results*.json`
+are the Zarr half of the record.
 
 Dataset (HOURLY ERA5-Land, ARCO zarr; Zarr v3 store since the July 2026 revamp):
   https://earthdatahub.destine.eu/collections/era5/datasets/era5-land
@@ -24,7 +30,7 @@ Chunking (inspected via the store's t2m encoding):
      schedules far more chunk reads and times out.
 
 This script reuses the same 3 cities and produces the same tmin/tmax that
-`benchmark.py` measures, so the numbers are comparable. It records wall time
+`benchmark.py` measured, so the numbers are comparable. It records wall time
 broken into open / select / compute / save phases (with per-city compute
 timings), plus peak memory and on-disk parquet-vs-csv sizes.
 
@@ -38,7 +44,7 @@ Usage:
   pip install "zarr>3" fsspec aiohttp     # not in requirements.txt yet
   python benchmark_zarr.py --year 2020
 
-Output: benchmark_zarr_results.json (sits next to benchmark_results.json)
+Output: benchmark_zarr_results.json (`_prev.json` is the run before it)
 """
 from __future__ import annotations
 
@@ -50,8 +56,23 @@ from pathlib import Path
 
 import numpy as np
 
-# Same 3 cities benchmark.py uses by default (--n-cities 3).
-from benchmark import CITIES
+# The city list the CDS benchmark used, inlined verbatim from `benchmark.py`
+# at its last revision (`61a2c0ae^`) — that file was removed with the rest of
+# the CDS pipeline, and `from benchmark import CITIES` has raised
+# ModuleNotFoundError ever since. Keep the ORDER: the committed results were
+# measured on `--n-cities 3`, i.e. New York, London, Tokyo.
+CITIES = [
+    (40.71, -74.01, "New York"),
+    (51.52, -0.09, "London"),
+    (35.68, 139.69, "Tokyo"),
+    (32.09, 34.78, "Tel Aviv"),
+    (34.05, -118.24, "Los Angeles"),
+    (30.04, 31.24, "Cairo"),
+    (55.75, 37.62, "Moscow"),
+    (13.75, 100.49, "Bangkok"),
+    (28.61, 77.21, "Delhi"),
+    (52.52, 13.40, "Berlin"),
+]
 
 HERE = Path(__file__).resolve().parent
 OUT_JSON = HERE / "benchmark_zarr_results.json"
@@ -314,7 +335,7 @@ def main() -> int:
     ap.add_argument("--year", type=int, default=2020)
     ap.add_argument(
         "--n-cities", type=int, default=3,
-        help="number of cities from benchmark.CITIES; default 3 to match the CDS bench",
+        help="number of cities from CITIES; default 3 to match the CDS bench",
     )
     args = ap.parse_args()
 
@@ -358,7 +379,7 @@ def main() -> int:
                   f"tmax∈[..{s['tmax_hi_C']:7.2f}]  "
                   f"mean_tmin={s['mean_tmin_C']:6.2f}  mean_tmax={s['mean_tmax_C']:6.2f}  "
                   f"min<=max:{s['tmin_le_tmax']}  nan={s['nan_days']}")
-        print("\n  Compare to benchmark_results.json (CDS A/B/C strategies):")
+        print("\n  Compare to the CDS A/B/C strategies in STATUS.md:")
         print("  zarr is 1 'request' (HTTP-range-addressed) — no CDS queue.")
     else:
         print(f"  FAILED: {result['error']}")
