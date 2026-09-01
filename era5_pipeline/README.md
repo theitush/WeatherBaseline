@@ -113,7 +113,7 @@ change, not run routinely.
 | `audit_snap_distances.py` | Measures, for every cell, where the snap actually lands and how far it moved — the data the 25 km cap was chosen from. Caches per-tile land masks so reruns are free. Output: `snap_audit.csv`. |
 | `build_snap_rewrite_plan.py` → `verify_snap_rewrite.py` → `apply_snap_rewrite.py` | The 2026-08 rewrite: coordinates now point at the gridpoint the data actually comes from. Plan (`snap_rewrite_plan.csv`, the manifest) → verify against real bytes *before* touching R2 → apply in idempotent phases (`--copy`, `--write-csv`, `--deprecate`/`--delete-old`). Full write-up in `SNAP_REWRITE.md`. |
 | `rename_snapped_cells.py` | Re-applies the naming rule at the 121 pins the rewrite moved — targeted, because a full `name_cells.py` rerun would undo the dedupe pass on 3,498 untouched cells. |
-| `benchmark_zarr.py` | The measurement that chose the Zarr store over the CDS API, with `benchmark_zarr_results*.json` kept as the decision record. |
+| `benchmark_zarr.py` | The measurement that chose the Zarr store over the CDS API, with `benchmark_zarr_results*.json` kept as the decision record. The two files straddle the `f5d84851` v3 migration: `benchmark_zarr_results.json` is the current `era5-land-v0.zarr` (re-measured 2026-09-01), `_prev.json` the frozen v2 `reanalysis-era5-land-no-antartica-v0.zarr` (2026-06-06). Same year, cities and method, and identical tmin/tmax to the last decimal — only the timings moved (97s → 120s wall, but two months and a different network apart, so treat that as two samples, not a controlled comparison). |
 
 ## Tests
 

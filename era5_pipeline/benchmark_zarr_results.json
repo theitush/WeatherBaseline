@@ -2,22 +2,22 @@
   "ok": true,
   "year": 2020,
   "n_cities": 3,
-  "zarr_url": "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr",
+  "zarr_url": "https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr",
   "var": "t2m",
   "method": "hourly t2m -> resample(D) min/max",
   "timings_s": {
-    "open": 5.515,
-    "select": 2.806,
-    "compute": 88.559,
-    "save": 0.023,
-    "total": 96.903
+    "open": 12.675,
+    "select": 0.327,
+    "compute": 103.905,
+    "save": 0.143,
+    "total": 117.05
   },
   "error": null,
-  "peak_mem_mb": 447.9,
+  "peak_mem_mb": 418.0,
   "per_city_s": {
-    "New York": 24.12,
-    "London": 38.39,
-    "Tokyo": 25.89
+    "New York": 39.28,
+    "London": 34.71,
+    "Tokyo": 29.01
   },
   "n_days": 366,
   "payload_mb_est": 0.0176,
@@ -52,5 +52,5 @@
       "nan_days": 0
     }
   },
-  "wall_s": 96.933
+  "wall_s": 119.658
 }

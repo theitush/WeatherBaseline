@@ -3,33 +3,45 @@
   "year": 2020,
   "n_cities": 3,
   "zarr_url": "https://data.earthdatahub.destine.eu/era5/reanalysis-era5-land-no-antartica-v0.zarr",
+  "note": "Measured 2026-06-06 on the PRE-MIGRATION Zarr v2 store (reanalysis-era5-land-no-antartica-v0.zarr, 2880x64x64 chunks), which EarthDataHub froze at 2026-05-31. Kept as the before half of the f5d84851 v3 migration; the current store's numbers are in benchmark_zarr_results.json.",
   "var": "t2m",
   "method": "hourly t2m -> resample(D) min/max",
   "timings_s": {
-    "open": 5.888,
-    "select": 0.023,
-    "compute": 69.875,
-    "save": 0.008,
-    "total": 75.794
+    "open": 5.515,
+    "select": 2.806,
+    "compute": 88.559,
+    "save": 0.023,
+    "total": 96.903
   },
   "error": null,
-  "peak_mem_mb": 242.1,
+  "peak_mem_mb": 447.9,
   "per_city_s": {
-    "New York": 24.79,
-    "London": 24.06,
-    "Tokyo": 20.88
+    "New York": 24.12,
+    "London": 38.39,
+    "Tokyo": 25.89
   },
   "n_days": 366,
   "payload_mb_est": 0.0176,
-  "save_error": "ImportError: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.\nA suitable version of pyarrow or fastparquet is required for parquet support.\nTrying to import the above resulted in these errors:\n - `Import pyarrow` failed. pyarrow is required for parquet support. Use pip or conda to install the pyarrow package.\n - `Import fastparquet` failed. fastparquet is required for parquet support. Use pip or conda to install the fastparquet package.",
+  "parquet_mb": 0.018,
+  "csv_mb": 0.0444,
   "sample": {
     "New York": {
-      "all_nan": true,
-      "nan_days": 366
+      "all_nan": false,
+      "tmin_lo_C": -10.9,
+      "tmax_hi_C": 34.85,
+      "mean_tmin_C": 9.32,
+      "mean_tmax_C": 17.45,
+      "tmin_le_tmax": true,
+      "nan_days": 0
     },
     "London": {
-      "all_nan": true,
-      "nan_days": 366
+      "all_nan": false,
+      "tmin_lo_C": -3.43,
+      "tmax_hi_C": 32.78,
+      "mean_tmin_C": 7.9,
+      "mean_tmax_C": 15.06,
+      "tmin_le_tmax": true,
+      "nan_days": 0
     },
     "Tokyo": {
       "all_nan": false,
@@ -41,5 +53,5 @@
       "nan_days": 0
     }
   },
-  "wall_s": 75.841
+  "wall_s": 96.933
 }
