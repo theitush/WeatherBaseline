@@ -34,6 +34,8 @@ Some work is finished but cannot be *signed off* by the thing that did it. Anyth
 
 Those go to **Review** instead of Done: Status `784755d5`, **issue stays open**, and you do not close it. The reviewer closes it and sets Done once they have looked.
 
+Nothing else may close it either. A commit message carrying `Closes #n` or `Fixes #n` auto-closes the issue the moment it lands on the default branch, and a closed issue reads as Done on the board — the review request is erased before anyone sees it. Reference the issue without a closing keyword: `Refs #n`.
+
 Review is worthless unless the issue says what to look at and who is looking, so write both into the body when you set it — as the **first line of the body**, above the details:
 
 ```bash
