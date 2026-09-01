@@ -37,6 +37,7 @@ import io
 import json
 import sys
 import time
+import unicodedata
 from collections import Counter
 import urllib.request
 import zipfile
@@ -262,6 +263,36 @@ def nearest_city_join(cell_lats, cell_lons, gaz_lats, gaz_lons, names, pops, ccs
         return out_names, out_cc, out_a1, out_dist
 
 
+def fold(s: str) -> str:
+    """Casefold + strip accents, so "Punākha" in a label matches "Punakha" in a dump."""
+    norm = unicodedata.normalize("NFKD", s.casefold())
+    return "".join(c for c in norm if not unicodedata.combining(c)).strip()
+
+
+def build_place_index(names: list[str]) -> dict[str, list[int]]:
+    """fold(city name) -> gazetteer row indices, for looking a label segment back up."""
+    index: dict[str, list[int]] = {}
+    for j, n in enumerate(names):
+        index.setdefault(fold(n), []).append(j)
+    return index
+
+
+def place_country_codes(index, gaz_lats, gaz_lons, ccs, lat, lon, place,
+                        within_km: float = FAR_KM) -> list[str]:
+    """Country codes of every gazetteer city named `place` within `within_km` of a pin.
+
+    Empty when the gazetteer knows no such place there — it then says nothing about
+    which country the place is in, and a caller must conclude nothing from it.
+    """
+    out: list[str] = []
+    for j in index.get(fold(place), ()):
+        if abs(gaz_lats[j] - lat) * 111.0 > within_km:   # cheap reject before haversine
+            continue
+        if haversine_km(lat, lon, gaz_lats[j], gaz_lons[j]) <= within_km:
+            out.append(ccs[j])
+    return out
+
+
 def load_revgeo_cache() -> dict:
     if REVGEO_CACHE.exists():
         try:
@@ -399,8 +430,36 @@ def main() -> int:
     # with a deterministic bearing/coord backstop, so every cell ends up unique.
     if not args.no_dedupe:
         from disambiguate_dupes import disambiguate
+
+        # A 0.1deg cell on a national border reverse-geocodes to the far side, and
+        # prepending that sub-district gives a name whose leading place and country
+        # tail disagree — "Taba, Eilat, Southern District, Israel", where Taba is in
+        # Egypt (#38). Veto a refinement in another country than the label's own tail;
+        # the scan falls through to a coarser field, and to the bearing/coord backstop
+        # when the whole address is across the line, as it is whenever the pin is.
+        #
+        # Two authorities, in order. The gazetteer decides when it knows the place —
+        # it is what named the cell in the first place. Otherwise the reverse-geocoder's
+        # own country for the pin decides, since the sub-district came out of that same
+        # address. That second test also fires where the two sources merely render one
+        # territory differently (OSM says "United States" over Puerto Rico), costing a
+        # neighbourhood prefix the cell does not need; a wrong prefix costs a name that
+        # contradicts itself, so the veto errs strict.
+        place_index = build_place_index(names)
+        country_to_cc = {v: k for k, v in cc_to_country.items()}
+
+        def reject_foreign(i: int, place: str, addr: dict) -> bool:
+            tail_cc = country_to_cc.get(rows[i]["name"].rsplit(",", 1)[-1].strip())
+            if not tail_cc:
+                return False                  # no country tail to contradict
+            near = place_country_codes(place_index, gaz_lats, gaz_lons, ccs,
+                                       cell_lats[i], cell_lons[i], place)
+            if near:
+                return tail_cc not in near
+            return (addr.get("country_code") or "").upper() not in ("", tail_cc)
+
         print("  dedupe: refining same-metro duplicate names ...", file=sys.stderr)
-        for i, _old, new in disambiguate(rows):
+        for i, _old, new in disambiguate(rows, reject_foreign=reject_foreign):
             rows[i]["name"] = new
 
     if "name" not in fieldnames:

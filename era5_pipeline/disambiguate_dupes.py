@@ -96,12 +96,22 @@ def is_latin_label(v: str) -> bool:
     return any("a" <= c <= "z" or "A" <= c <= "Z" for c in v)
 
 
-def fine_place(addr: dict, existing: str) -> str:
-    """Finest usable sub-district in `addr` not already in `existing`, else ""."""
+def fine_place(addr: dict, existing: str, reject=None) -> str:
+    """Finest usable sub-district in `addr` not already in `existing`, else "".
+
+    `reject(place, addr)` vetoes a candidate that belongs to a different country than
+    the label being refined. A cell on a national border reverse-geocodes to the far
+    side, and prepending that place gives a name whose leading place and country tail
+    disagree ("Taba, Eilat, Southern District, Israel" — Taba is in Egypt; #38). A
+    vetoed field falls through to a coarser one, and to the caller's bearing/coord
+    backstop when the whole address is across the line — as it is whenever the pin is.
+    """
     have = segments(existing)
     for k in FINE_KEYS:
         v = (addr.get(k) or "").strip()
         if v and v.casefold() not in have and is_latin_label(v):
+            if reject and reject(v, addr):
+                continue
             return v
     return ""
 
@@ -126,14 +136,16 @@ def load_cache() -> dict:
 
 
 def disambiguate(rows: list[dict], *, limit: int = 0, fetch: bool = True,
-                 verbose: bool = True) -> list[tuple[int, str, str]]:
+                 verbose: bool = True, reject_foreign=None) -> list[tuple[int, str, str]]:
     """Compute unique sub-district labels for every duplicated-name cell.
 
     Pure w.r.t. cells.csv -- reads rows (each a dict with lat/lon/population/name),
     returns the list of (row_index, old_name, new_name) edits WITHOUT mutating rows
     or the file. The reverse-geocode SUBDIST_CACHE is read and (when fetch=True)
     extended on disk, so repeat calls are instant. Set fetch=False to use only what
-    is already cached (offline / idempotency checks).
+    is already cached (offline / idempotency checks). `reject_foreign(row_index, place,
+    addr)` vetoes a refinement that sits in another country than the label's country
+    tail (see fine_place); name_cells.py supplies one.
 
     Used both by this script's CLI and as name_cells.py's final naming step.
     """
@@ -175,7 +187,8 @@ def disambiguate(rows: list[dict], *, limit: int = 0, fetch: bool = True,
         addr = cache.get(f"{lat:.2f},{lon:.2f}")
         if not addr:
             continue
-        sub = fine_place(addr, rows[i]["name"])
+        sub = fine_place(addr, rows[i]["name"],
+                         (lambda p, a, i=i: reject_foreign(i, p, a)) if reject_foreign else None)
         if sub:
             new_name[i] = f"{sub}, {rows[i]['name']}"
 
