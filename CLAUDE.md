@@ -13,26 +13,28 @@ A task is the issue title; the issue body holds up to three sections, in the ord
 Working one:
 
 1. Read it: `gh issue view <n>`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
-2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project field, not an issue label, so it is set by item id:
+2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project field, not an issue label, so it is set on the project item — point at the item with the issue's own URL and name the field:
    ```bash
-   n=<n>; item=$(gh project item-list 2 --owner theitush -L 500 --format json -q ".items[] | select(.content.repository==\"theitush/WeatherBaseline\" and .content.number==$n) | .id")
-   gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id 36ef7d70
+   n=<n>
+   gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value "In Progress"
    ```
-   Status option ids: backlog `72269122` · Queued `93fc0ce3` · In Progress `36ef7d70` · Blocked `d50a3e21` · Review `784755d5` · Done `bef6703c` · Cancelled `bf4d973d`.
+   It prints nothing on success. Status values, spelled and cased exactly like this: `backlog` · `Queued` · `In Progress` · `Blocked` · `Review` · `Done` · `Cancelled`. The same one-liner sets the other columns — `--field Priority --value high` (ASAP / high / medium / low), `--field Worker --value opus`.
+
+   **Never look the item id up first.** `gh project item-list 2 --owner theitush -L 500` costs about 100 GraphQL points per 100 items on the board, against the 5000 an hour every agent and the board itself share; a handful of them locks everyone out of the project for the rest of the hour. `--url` resolves the item server-side instead, and it reads the item fresh, so it works on an issue added to the board seconds ago.
 3. Do the work; commit and push per **Committing and pushing** below.
 4. Finish: file whatever you could not do (see **What you could not do becomes a task**), write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
    ```bash
    { gh issue view $n --json body -q .body; printf '\n---\n**Result**\n\n%s\n' "<what was done and how it was verified>"; } > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
    gh issue close $n
-   gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id bef6703c
+   gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value Done
    ```
-   Blocked instead: Status `d50a3e21`, the blocker written into the body, issue left open.
+   Blocked instead: `--value Blocked`, the blocker written into the body, issue left open.
 
 ### When the work needs a human eye: Review, not Done
 
 Some work is finished but cannot be *signed off* by the thing that did it. Anything visual is the usual case — a new screen or component, a layout, spacing, colour, an animation, copy a person will read, a chart, a print or export layout — because "the tests pass" says nothing about whether it looks right. It is not only frontend: a judgement call between two defensible designs, an irreversible or outward-facing change, a heuristic or threshold whose output only a person can call good, a migration you cannot dry-run.
 
-Those go to **Review** instead of Done: Status `784755d5`, **issue stays open**, and you do not close it. The reviewer closes it and sets Done once they have looked.
+Those go to **Review** instead of Done: Status `Review`, **issue stays open**, and you do not close it. The reviewer closes it and sets Done once they have looked.
 
 Nothing else may close it either. A commit message carrying `Closes #n` or `Fixes #n` auto-closes the issue the moment it lands on the default branch, and a closed issue reads as Done on the board — the review request is erased before anyone sees it. Reference the issue without a closing keyword: `Refs #n`.
 
@@ -42,7 +44,7 @@ Review is worthless unless the issue says what to look at and who is looking, so
 { printf '**Review:** %s\n\n' "ita — the empty state on the cockpit list, branch \`task-6-empty-state\`, npm run dev → /cockpit with no filters"
   gh issue view $n --json body -q .body | sed '/^\*\*Review:\*\*/d'   # replace an existing line, never stack two
 } > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
-gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id PVTSSF_lAHOAsyv184Bh3P-zhgxYh8 --single-select-option-id 784755d5
+gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value Review
 ```
 
 **One line. Not two, not a bullet list** — it is the bottom line of what a person has to look at, and it is the field Ita reads first on the card. Everything else you want to say belongs in the details or the result. That one line carries:
