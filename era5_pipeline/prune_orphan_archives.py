@@ -71,7 +71,9 @@ def main() -> int:
     print(f"\norphans (in R2, not in cells.csv): {len(orphans)} objects, "
           f"{orphan_bytes / 1e6:.1f} MB")
 
-    out = REPO / "scripts" / "era5_pipeline" / "orphan_archives.txt"
+    # Next to this script, like every other output in this dir — the pre-promotion
+    # "scripts/era5_pipeline" spelling of the same place no longer exists.
+    out = HERE / "orphan_archives.txt"
     out.write_text("\n".join(sorted(orphans)) + ("\n" if orphans else ""))
     print(f"full list written to {out}")
     for k in sorted(orphans)[:20]:
