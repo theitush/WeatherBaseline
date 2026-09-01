@@ -45,7 +45,11 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE.parents[1] / "data"
+# Repo root — walked up to the dir holding data/cells.csv rather than counting
+# levels off HERE: era5_pipeline/ sits at the repo root since the 2026-08-30
+# promotion, but the VM's rsync'd mirror is still the old scripts/<dir>/
+# layout, and both have to keep working (#35).
+DATA = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file()) / "data"
 CELLS = DATA / "cells.csv"
 GAZ_DIR = DATA / "era5-land"
 GAZ_ZIP = GAZ_DIR / "cities500.zip"
