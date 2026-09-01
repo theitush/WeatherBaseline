@@ -256,10 +256,7 @@ const AppContent: React.FC = () => {
                   strokeLinecap="round"
                 />
               </svg>
-              <span className="brand-word">
-                WeatherBaseline.com
-                <sup className="brand-beta">BETA</sup>
-              </span>
+              WeatherBaseline.com
             </h1>
             <SettingsMenu />
             <ShareButton
@@ -554,9 +551,8 @@ const AppContent: React.FC = () => {
                       same grid, so we run the forecast through a debiasing model of our
                       own. For those days you're therefore seeing not the raw forecast
                       but the model's estimate of the distribution (and median) of how
-                      that forecast typically lands in the ERA5-Land record. It's still
-                      a beta version of the model, and it's open source along with the
-                      rest of the site:{' '}
+                      that forecast typically lands in the ERA5-Land record. The model
+                      is open source along with the rest of the site:{' '}
                       <a
                         href="https://github.com/theitush/WeatherBaseline"
                         target="_blank"
@@ -579,16 +575,6 @@ const AppContent: React.FC = () => {
                       behind, which means a rainy day a fortnight back may still be a
                       forecast rather than a settled reading. You can always tell which
                       is which from the chart, or by hovering a data point.
-                    </p>
-                    <p>
-                      <strong>Caveat 3:</strong> This site is still in beta, and part of what that
-                      means is that the biases between the historical ERA5-Land archive and
-                      the ECMWF forecast tier are still under review, so{' '}
-                      <strong className="faq-caution">
-                        the forecast number should be taken with extra caution until the
-                        beta period is over
-                      </strong>
-                      .
                     </p>
                   </div>
                 </details>
