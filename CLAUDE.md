@@ -20,7 +20,7 @@ Working one:
    ```
    Status option ids: backlog `72269122` · Queued `93fc0ce3` · In Progress `36ef7d70` · Blocked `d50a3e21` · Review `784755d5` · Done `bef6703c` · Cancelled `bf4d973d`.
 3. Do the work; commit and push per **Committing and pushing** below.
-4. Finish: write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
+4. Finish: file whatever you could not do (see **What you could not do becomes a task**), write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
    ```bash
    { gh issue view $n --json body -q .body; printf '\n---\n**Result**\n\n%s\n' "<what was done and how it was verified>"; } > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
    gh issue close $n
@@ -54,6 +54,14 @@ gh project item-edit --project-id PVT_kwHOAsyv184Bh3P- --id "$item" --field-id P
 Don't use Review to hedge. Work you are simply unsure about is Done with the doubt written into the result, or Blocked if you actually cannot proceed. Review means *this is finished and a person has to look at it before it counts*.
 
 New tasks that come out of the work become issues here and go on the project: `gh issue create ...`, then `gh project item-add 2 --owner theitush --url <issue url>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `item-edit` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
+
+### What you could not do becomes a task
+
+Few tasks land whole. Before you close one, read your own result back and ask what it admits to: a step you skipped, a check you could not run, a number you estimated instead of measuring, a case you left uncovered, a follow-up the work made obvious. **Each one becomes its own issue here, on the project, before this task closes** — same shape as a pin: a title, where it is, the symptom, a one-line hunch, a one-line "done when", and a line saying it is left over from #n.
+
+Then name them in the result: `Left over: #40 (the extended tier was never run end to end), #41 (d5_queue_check has no pinned numbers)`. A limitation that lives only as prose in a result is lost — nobody drains a paragraph, and the next reader takes the task for finished.
+
+Filing the remainder is what lets you close. It is not Blocked, which is for work you cannot proceed with at all, and not Review, which is for work a person has to look at. Work that went as far as it goes, with the rest named and queued, is Done.
 
 ### Committing and pushing
 
