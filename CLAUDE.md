@@ -1,8 +1,6 @@
 # WeatherBaseline
 
-This file is thin on purpose: it grows a line at a time, when something proves worth writing down. Otherwise orient by reading the repo. One standing rule: **nothing deploys to prod without Ita's explicit green light** — never run `scripts/deploy_prod.sh` on your own judgement.
-
-## Tasks
+This file is thin on purpose: it grows a line at a time, when something proves worth writing down. Otherwise orient by reading the repo. One standing rule: **nothing deploys to prod without Ita's explicit green light** — never run `scripts/deploy_prod.sh` on your own judgement.## Tasks
 
 This repo's tasks are its **GitHub issues**. When Ita says **"task 5"** he means **issue #5 of this repo** — `gh issue view 5`. Every issue here is also an item on his cross-project board, GitHub Project #2 `COO` (https://github.com/users/theitush/projects/2 — the same data https://coo-board.pages.dev shows), and the project is where a task's status, priority, worker and queue position live. Don't read the queue at startup; look a task up when one is named. `gh issue list` shows what is open here.
 
@@ -21,6 +19,13 @@ Working one:
    It prints nothing on success. Status values, spelled and cased exactly like this: `backlog` · `Queued` · `In Progress` · `Blocked` · `Review` · `Done` · `Cancelled`. The same one-liner sets the other columns — `--field Priority --value high` (ASAP / high / medium / low), `--field Worker --value opus`.
 
    **Never look the item id up first.** `gh project item-list 2 --owner theitush -L 500` costs about 100 GraphQL points per 100 items on the board, against the 5000 an hour every agent and the board itself share; a handful of them locks everyone out of the project for the rest of the hour. `--url` resolves the item server-side instead, and it reads the item fresh, so it works on an issue added to the board seconds ago.
+
+   **When a board write fails, never retry it in a loop.** That budget does run out — and when it has, `gh project` reports it as `unknown owner type`, which reads like a malformed command rather than a rate limit. It can be an hour before it clears, so retrying spends your time and learns nothing. Two things stay true through a blackout, and between them you are never actually blocked:
+
+   - **Issues are REST**, on a separate budget that a GraphQL outage does not touch. Read one with `gh api repos/theitush/WeatherBaseline/issues/<n> -q .body`, write its body with `-X PATCH -F body=@file`, close it by adding `-f state=closed` (`-f state_reason=not_planned` to cancel), file a new one with `gh api repos/theitush/WeatherBaseline/issues -X POST -f title=... -f body=...`. Only the project *columns* need GraphQL at all.
+   - **On Ita's machine, `/home/ita/coo/tools/board` records the write instead of losing it** — `tools/board set WeatherBaseline <n> Status Done`, and `tools/board add WeatherBaseline <n>` to put a newly filed issue on the project. It sends immediately when it can and queues to a file when it cannot, so it never fails and never blocks; the COO flushes the queue when the budget returns. Running that script is the one thing you may do outside this repo's directory.
+
+   If neither is available to you, write down which board writes you could not make and say so in your report. An unmade board write is bookkeeping the COO can drain; an agent sat in a retry loop is the task not getting done.
 3. Do the work; commit and push per **Committing and pushing** below.
 4. Finish: file whatever you could not do (see **What you could not do becomes a task**), write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
    ```bash
