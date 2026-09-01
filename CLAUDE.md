@@ -4,38 +4,45 @@ This file is thin on purpose: it grows a line at a time, when something proves w
 
 ## Tasks
 
-This repo's tasks are its **GitHub issues**. When Ita says **"task 5"** he means **issue #5 of this repo** — `gh issue view 5`. Every issue here is also an item on his cross-project board, GitHub Project #2 `COO` (https://github.com/users/theitush/projects/2 — the same data https://coo-board.pages.dev shows), and the project is where a task's status, priority, worker and queue position live. Don't read the queue at startup; look a task up when one is named. `gh issue list` shows what is open here.
+This repo's tasks are its **GitHub issues**. When Ita says **"task 5"** he means **issue #5 of this repo**. Every issue here is also an item on his cross-project board, GitHub Project #2 `COO` (https://github.com/users/theitush/projects/2 — the same data https://coo-board.pages.dev shows), and the project is where a task's status, priority, worker and queue position live. Don't read the queue at startup; look a task up when one is named.
+
+**Read and write issues over REST, not `gh issue`.** Every `gh issue view`, `edit`, `close` and `list` goes out over GraphQL, whose 5000-point hourly budget is shared by every agent and the board and does run out. The REST bucket is a separate 5000 an hour that nothing here touches, and it does the same work:
+
+```bash
+gh api repos/theitush/WeatherBaseline/issues/<n> -q .body            # read one — this is "task 5"
+gh api "repos/theitush/WeatherBaseline/issues?state=open&per_page=100" \
+  -q '.[] | select(.pull_request == null) | "#\(.number) \(.title)"'   # what is open here
+gh api repos/theitush/WeatherBaseline/issues -X POST -f title="..." -F body=@file -q .number   # file one
+```
+
+`gh issue create` looks like it should be safe and is not: it makes a GraphQL call for the repo's metadata before it posts anything, so it fails outright when the budget is gone. Use the POST above. Only the project's *columns* genuinely need GraphQL, and step 2 below is how those get written.
 
 A task is the issue title; the issue body holds up to three sections, in the order they are read: a one-line **review** at the top (`**Review:** <who> — <what to look at>`, only once the work needs a human eye), the **details**, and once finished the **result**, behind a `---` rule and a `**Result**` heading. Ita reads and edits all three on the board. The project's columns are `Status` (backlog / Queued / In Progress / Blocked / Review / Done / Cancelled), `Priority` (ASAP / high / medium / low), `Worker` (ita / fable / opus / sonnet / haiku) and `Due`.
 
-**Every piece of work starts from a task.** If Ita names an issue, that is your task. If he asks for something with no issue behind it, write the issue here first — a title and a few lines of what he asked for — `gh project item-add` it, set it In Progress, and *then* start. Filing it afterwards defeats the point: In Progress before the work is what a crashed session leaves behind. A task is for work that ends in a commit; a question, a read or a five-minute look is not work and must not be filed, or the board becomes a log and buries the queue.
+**Every piece of work starts from a task.** If Ita names an issue, that is your task. If he asks for something with no issue behind it, write the issue here first — a title and a few lines of what he asked for — `tools/board add` it, set it In Progress, and *then* start. Filing it afterwards defeats the point: In Progress before the work is what a crashed session leaves behind. A task is for work that ends in a commit; a question, a read or a five-minute look is not work and must not be filed, or the board becomes a log and buries the queue.
 
 Working one:
 
-1. Read it: `gh issue view <n>`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
-2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project field, not an issue label, so it is set on the project item — point at the item with the issue's own URL and name the field:
+1. Read it: `gh api repos/theitush/WeatherBaseline/issues/<n> -q .body`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
+2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project *column*, not an issue label, and the columns are the one thing here that needs the GraphQL budget. `/home/ita/coo/tools/board` is how you write one:
    ```bash
    n=<n>
-   gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value "In Progress"
+   /home/ita/coo/tools/board set WeatherBaseline $n Status "In Progress"
    ```
-   It prints nothing on success. Status values, spelled and cased exactly like this: `backlog` · `Queued` · `In Progress` · `Blocked` · `Review` · `Done` · `Cancelled`. The same one-liner sets the other columns — `--field Priority --value high` (ASAP / high / medium / low), `--field Worker --value opus`.
+   It answers `sent:` when the write landed and `queued:` when the budget was spent — either way it returns at once and never fails, and the COO flushes what was queued when the hour turns. Running that script is the one thing you may do outside this repo's directory. The same line writes the other columns: `Priority high` (ASAP / high / medium / low), `Worker opus`, `Due 2026-09-05`. Status values, spelled and cased exactly like this: `backlog` · `Queued` · `In Progress` · `Blocked` · `Review` · `Done` · `Cancelled`. `tools/board add WeatherBaseline $n` puts a newly filed issue on the project — though a `set` does it for you if the issue isn't an item yet.
 
-   **Never look the item id up first.** `gh project item-list 2 --owner theitush -L 500` costs about 100 GraphQL points per 100 items on the board, against the 5000 an hour every agent and the board itself share; a handful of them locks everyone out of the project for the rest of the hour. `--url` resolves the item server-side instead, and it reads the item fresh, so it works on an issue added to the board seconds ago.
+   **Don't reach for `gh project` instead.** A write through `tools/board` costs 2 of the 5000 hourly points; the same write as `gh project item-edit` costs ~104, and `gh project item-list` about one point per item on the board. A handful of either locks every agent *and the board itself* out of the project for the rest of the hour. (Measured 2026-09-01, coo#32.)
 
-   **When a board write fails, never retry it in a loop.** That budget does run out — and when it has, `gh project` reports it as `unknown owner type`, which reads like a malformed command rather than a rate limit. It can be an hour before it clears, so retrying spends your time and learns nothing. Two things stay true through a blackout, and between them you are never actually blocked:
-
-   - **Issues are REST**, on a separate budget that a GraphQL outage does not touch. Read one with `gh api repos/theitush/WeatherBaseline/issues/<n> -q .body`, write its body with `-X PATCH -F body=@file`, close it by adding `-f state=closed` (`-f state_reason=not_planned` to cancel), file a new one with `gh api repos/theitush/WeatherBaseline/issues -X POST -f title=... -f body=...`. Only the project *columns* need GraphQL at all.
-   - **On Ita's machine, `/home/ita/coo/tools/board` records the write instead of losing it** — `tools/board set WeatherBaseline <n> Status Done`, and `tools/board add WeatherBaseline <n>` to put a newly filed issue on the project. It sends immediately when it can and queues to a file when it cannot, so it never fails and never blocks; the COO flushes the queue when the budget returns. Running that script is the one thing you may do outside this repo's directory.
-
-   If neither is available to you, write down which board writes you could not make and say so in your report. An unmade board write is bookkeeping the COO can drain; an agent sat in a retry loop is the task not getting done.
+   **And never retry a board write in a loop.** That budget does run out — and when it has, `gh project` reports it as `unknown owner type`, which reads like a malformed command rather than a rate limit. It can be an hour before it clears, so retrying spends your time and learns nothing. You are not blocked by it either: the script has already recorded the write, and issues are REST, so the work itself carries on untouched. On a machine with no `tools/board`, write down which board writes you could not make and say so in your report — an unmade board write is bookkeeping the COO can drain; an agent sat in a retry loop is the task not getting done.
 3. Do the work; commit and push per **Committing and pushing** below.
-4. Finish: file whatever you could not do (see **What you could not do becomes a task**), write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so all three happen:
+4. Finish: file whatever you could not do (see **What you could not do becomes a task**), write the result into the issue body, close the issue, and set Status to Done. Closing alone does not move the board, so both happen — the body and the close are one REST call:
    ```bash
-   { gh issue view $n --json body -q .body; printf '\n---\n**Result**\n\n%s\n' "<what was done and how it was verified>"; } > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
-   gh issue close $n
-   gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value Done
+   { gh api repos/theitush/WeatherBaseline/issues/$n -q .body
+     printf '\n---\n**Result**\n\n%s\n' "<what was done and how it was verified>"; } > /tmp/task-$n.md
+   gh api -X PATCH repos/theitush/WeatherBaseline/issues/$n -F body=@/tmp/task-$n.md -f state=closed
+   /home/ita/coo/tools/board set WeatherBaseline $n Status Done
    ```
-   Blocked instead: `--value Blocked`, the blocker written into the body, issue left open.
+   Cancelled instead: add `-f state_reason=not_planned` and set `Status Cancelled`. Blocked instead: `Status Blocked`, the blocker written into the body, issue left open and not PATCHed closed.
 
 ### When the work needs a human eye: Review, not Done
 
@@ -49,9 +56,10 @@ Review is worthless unless the issue says what to look at and who is looking, so
 
 ```bash
 { printf '**Review:** %s\n\n' "ita — the empty state on the cockpit list, branch \`task-6-empty-state\`, npm run dev → /cockpit with no filters"
-  gh issue view $n --json body -q .body | sed '/^\*\*Review:\*\*/d'   # replace an existing line, never stack two
-} > /tmp/task-$n.md && gh issue edit $n --body-file /tmp/task-$n.md
-gh project item-edit 2 --owner theitush --url https://github.com/theitush/WeatherBaseline/issues/$n --field Status --value Review
+  gh api repos/theitush/WeatherBaseline/issues/$n -q .body | sed '/^\*\*Review:\*\*/d'   # replace an existing line, never stack two
+} > /tmp/task-$n.md
+gh api -X PATCH repos/theitush/WeatherBaseline/issues/$n -F body=@/tmp/task-$n.md
+/home/ita/coo/tools/board set WeatherBaseline $n Status Review
 ```
 
 **One line. Not two, not a bullet list** — it is the bottom line of what a person has to look at, and it is the field Ita reads first on the card. Everything else you want to say belongs in the details or the result. That one line carries:
@@ -62,7 +70,7 @@ gh project item-edit 2 --owner theitush --url https://github.com/theitush/Weathe
 
 Don't use Review to hedge. Work you are simply unsure about is Done with the doubt written into the result, or Blocked if you actually cannot proceed. Review means *this is finished and a person has to look at it before it counts*.
 
-New tasks that come out of the work become issues here and go on the project: `gh issue create ...`, then `gh project item-add 2 --owner theitush --url <issue url>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `item-edit` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
+New tasks that come out of the work become issues here and go on the project: the REST POST above, then `tools/board add WeatherBaseline <n>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `tools/board set` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
 
 ### What you could not do becomes a task
 
@@ -83,7 +91,7 @@ A pushed feature branch is written into its task the moment it exists: one line 
 
 ### Staying focused
 
-Work the task you were given, and only it. When something unrelated turns up mid-task — a bug somewhere else, a perf stall, a dead file, a good idea for later — **pin it**: one `gh issue create` in the repo it belongs to, `gh project item-add` it, and go straight back to what you were doing. A pin is a title plus three to five lines: where you saw it, the symptom, a one-line hunch, a one-line "done when". Don't chase it, don't name every code path, don't design the fix — that is the job of whoever picks the issue up. The issue is what makes dropping it safe; nothing is lost, so there is never a reason to chase it now.
+Work the task you were given, and only it. When something unrelated turns up mid-task — a bug somewhere else, a perf stall, a dead file, a good idea for later — **pin it**: one REST POST in the repo it belongs to, `tools/board add` it, and go straight back to what you were doing. A pin is a title plus three to five lines: where you saw it, the symptom, a one-line hunch, a one-line "done when". Don't chase it, don't name every code path, don't design the fix — that is the job of whoever picks the issue up. The issue is what makes dropping it safe; nothing is lost, so there is never a reason to chase it now.
 
 Related is not a detour. If the thing you found is part of the task, blocks it, or would be broken by the change you are about to make, handle it now — that *is* the task. The test is whether the current task can be finished and be correct without it, not whether it is interesting.
 
