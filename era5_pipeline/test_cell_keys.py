@@ -21,7 +21,10 @@ import pytest
 
 from cell_keys import cell_base, coord_str, tier_key, tier_name
 
-CELLS_CSV = Path(__file__).resolve().parents[2] / "data" / "cells.csv"
+HERE = Path(__file__).resolve().parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 
 
 # --------------------------------------------------------------------------- #

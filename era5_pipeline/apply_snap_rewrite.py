@@ -60,8 +60,10 @@ def _load_r2_env() -> None:
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 PLAN_CSV = SCRIPT_DIR / "snap_rewrite_plan.csv"
-CELLS_CSV = SCRIPT_DIR.parent.parent / "data" / "cells.csv"
-FRONTEND_CELLS_CSV = SCRIPT_DIR.parent.parent / "frontend" / "public" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in SCRIPT_DIR.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
+FRONTEND_CELLS_CSV = REPO / "frontend" / "public" / "cells.csv"
 
 # The debias prefix is versioned (r2_upload.DEBIAS_TIERS); rewrite keys in the
 # LIVE one only — keep in sync with frontend/src/services/ci.ts DEBIAS_PREFIX.

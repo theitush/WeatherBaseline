@@ -70,10 +70,12 @@ sys.path.insert(0, str(HERE.parent / "era5_pipeline"))
 from cell_keys import cell_base  # noqa: E402
 from r2_upload import R2Uploader  # noqa: E402
 
-CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 # Where download_cells.py writes each cell's full-history archive on local disk —
 # the source for --local (mirrors the R2 archive/ prefix read in the default mode).
-LOCAL_ARCHIVE_DIR = HERE.parent.parent / "data" / "era5-land" / "archive"
+LOCAL_ARCHIVE_DIR = REPO / "data" / "era5-land" / "archive"
 OUT_DIR = HERE / "data" / "archive-overlap"
 ARCHIVE_PREFIX = "archive"
 HRES_PREFIX = "hres-forecast-ifs-hres"

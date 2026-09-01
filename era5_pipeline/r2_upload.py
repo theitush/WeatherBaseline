@@ -40,6 +40,10 @@ from pathlib import Path
 import boto3
 from botocore.config import Config
 
+HERE = Path(__file__).resolve().parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+
 DEFAULT_BUCKET = "weather-baseline"
 TIERS = ("archive", "recent", "forecast")
 # Tiers this CLI can upload but that aren't part of the default era5-land set:
@@ -217,7 +221,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Upload tier files to R2 (S3 API).")
     ap.add_argument(
         "--dir",
-        default=str(Path(__file__).resolve().parents[2] / "data" / "era5-land"),
+        default=str(REPO / "data" / "era5-land"),
         help="root containing archive/ recent/ forecast/ (default: data/era5-land)",
     )
     ap.add_argument(

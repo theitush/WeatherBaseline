@@ -41,7 +41,9 @@ import pandas as pd
 import xarray as xr
 
 HERE = Path(__file__).resolve().parent
-CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 GEO_GRIB = HERE / "data" / "geo.grib"
 OUT_CSV = HERE / "data" / "cell_elevation.csv"
 GRAVITY = 9.80665  # m/s^2, WMO standard

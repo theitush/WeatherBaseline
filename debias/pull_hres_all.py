@@ -172,7 +172,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "era5_pipeline"))
 from r2_upload import R2Uploader  # noqa: E402
 
-CELLS_CSV = HERE.parent.parent / "data" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS_CSV = REPO / "data" / "cells.csv"
 DEFAULT_R2_PREFIX = "hres-forecast"
 
 FREE_HOST = "https://historical-forecast-api.open-meteo.com/v1/forecast"

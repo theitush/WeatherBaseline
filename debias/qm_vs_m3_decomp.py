@@ -1,6 +1,6 @@
 # §12c — M3 vs QM for precip: separate the win by metric, season, cell, fc_version.
 # Run INSIDE the notebook's live kernel (reuses err/te_qm/THR — no reload, no retrain):
-#     %run -i /home/ita/HowHotWasIt/scripts/bias_study/qm_vs_m3_decomp.py
+#     %run -i qm_vs_m3_decomp.py
 #
 # The puzzle this answers: the signed-error HISTOGRAM says M3 wins (fewer/smaller
 # per-day misses) while the QQ plots say QM wins (its quantiles sit on the 45 line).

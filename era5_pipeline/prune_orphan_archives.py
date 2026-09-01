@@ -26,7 +26,9 @@ from pathlib import Path
 
 from r2_upload import R2Uploader
 
-REPO = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
 CELLS = REPO / "data" / "cells.csv"
 KEY_RE = re.compile(r"^archive/archive_(-?\d+\.\d)_(-?\d+\.\d)\.csv\.gz$")
 

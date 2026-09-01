@@ -67,7 +67,8 @@ import numpy as np
 from cell_keys import coord_str, tier_name
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
 CELLS_CSV = REPO / "data" / "cells.csv"
 OUT_DIR = REPO / "data" / "era5-land" / "archive"
 

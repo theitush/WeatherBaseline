@@ -7,7 +7,10 @@ cache them once next to the gazetteer instead of hitting the host repeatedly.
 import sys, urllib.request
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parents[2] / "data" / "era5-land"
+HERE = Path(__file__).resolve().parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+DATA = REPO / "data" / "era5-land"
 FILES = {
     "countryInfo.txt": "https://download.geonames.org/export/dump/countryInfo.txt",
     "admin1CodesASCII.txt": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",

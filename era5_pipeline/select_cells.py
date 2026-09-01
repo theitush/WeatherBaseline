@@ -63,8 +63,10 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE.parents[1] / "data" / "era5-land"
-OUT = HERE.parents[1] / "data" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+DATA = REPO / "data" / "era5-land"
+OUT = REPO / "data" / "cells.csv"
 # Cached aggregated population grid. Computing it means reading a multi-GB
 # GHS-POP raster and scatter-adding ~1e9 pixels -- slow. Cache it so re-running
 # with a different --top-n is instant. Keyed by raster name+epoch so a

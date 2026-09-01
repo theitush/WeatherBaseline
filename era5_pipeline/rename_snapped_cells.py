@@ -46,9 +46,11 @@ from pathlib import Path
 import name_cells as nc
 
 HERE = Path(__file__).resolve().parent
-CELLS = HERE.parents[1] / "data" / "cells.csv"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+CELLS = REPO / "data" / "cells.csv"
 PLAN = HERE / "snap_rewrite_plan.csv"
-AUX = HERE.parents[1] / "data" / "era5-land"
+AUX = REPO / "data" / "era5-land"
 
 
 def load_aux(fname: str, key_col: int, val_col: int) -> dict[str, str]:

@@ -66,7 +66,8 @@ import pandas as pd
 from catboost import CatBoostRegressor, Pool
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
 CELLS_CSV = REPO / "data" / "cells.csv"
 ARC_DIR = HERE / "data" / "archive-overlap"
 HRES_DIR = HERE / "data" / "hres-forecast-ifs-hres"

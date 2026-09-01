@@ -36,7 +36,9 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE.parents[1] / "data"
+# Root by search, not by depth: this dir sits at a different level on the VM mirror.
+REPO = next(p for p in HERE.parents if (p / "data" / "cells.csv").is_file())
+DATA = REPO / "data"
 CELLS = DATA / "cells.csv"
 REVGEO_CACHE = DATA / "era5-land" / "revgeo_cache.json"
 
