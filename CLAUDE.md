@@ -24,7 +24,7 @@ A task is the issue title; the issue body holds up to three sections, in the ord
 Working one:
 
 1. Read it: `gh api repos/theitush/WeatherBaseline/issues/<n> -q .body`. If its `Worker` is `ita`, it is Ita's own work — don't do it and don't close it.
-2. Set Status to In Progress before starting, so a crashed session leaves evidence. Status is a project *column*, not an issue label, and the columns are the one thing here that needs the GraphQL budget. `/home/ita/coo/tools/board` is how you write one:
+2. Set Status to In Progress before starting, so a crashed session leaves evidence, and sign the task in the same breath (see **Who took this task: sign it**). Status is a project *column*, not an issue label, and the columns are the one thing here that needs the GraphQL budget. `/home/ita/coo/tools/board` is how you write one:
    ```bash
    n=<n>
    /home/ita/coo/tools/board set WeatherBaseline $n Status "In Progress"
@@ -43,6 +43,26 @@ Working one:
    /home/ita/coo/tools/board set WeatherBaseline $n Status Done
    ```
    Cancelled instead: add `-f state_reason=not_planned` and set `Status Cancelled`. Blocked instead: `Status Blocked`, the blocker written into the body, issue left open and not PATCHed closed.
+
+### Who took this task: sign it
+
+`Worker: opus` names a model, not a worker. When a result looks wrong an hour later there is nothing to go back to — no session to resume, no transcript to read, nobody to ask. So whoever takes a task signs it.
+
+Pick yourself a first name before you start — one word, yours to choose, not a job title. It is what Ita calls you, so make it something he can say, and don't worry about whether someone already has it: models reach for the same handful of names, and being told to go away and think of another is a poor greeting. Then sign, **before any work**, in the same breath as setting Status to In Progress:
+
+```bash
+/home/ita/coo/tools/sign WeatherBaseline $n Pike     # a surname is drawn for you: Pike Vance
+```
+
+That writes one line into the issue body — your name, this machine, the directory you are working in, the command that resumes your session, and the path to the transcript that is your memory of this task. Sign before the work for the same reason Status goes to In Progress before it: whoever dies mid-task has still left an address. Signing again replaces that line rather than stacking a second one, so the card always names whoever holds the task *now*.
+
+Two people may share a first name; the surname is drawn for you, so both Pikes get to be Pike and the pair are still tellable apart. If you are revived onto a task already signed, **keep the full name** — pass both words, `/home/ita/coo/tools/sign WeatherBaseline $n "Pike Vance"` — and you are the same worker you were. A bare first name on a task already signed by that first name keeps the surname it had, so nobody is renamed halfway through their own task. Sign your **Result** with the full name too (`— Pike Vance`): the `**Agent:**` line names whoever holds the task now, so only the result keeps naming whoever wrote it.
+
+Where there is no `/home/ita/coo/tools/sign` — a cloud or remote run — write the line by hand as the first line of the body, and be honest that there is nothing to resume:
+
+```
+**Agent:** Pike Vance · <hostname> · in `<pwd>` · no resumable session (cloud or remote run)
+```
 
 ### When the work needs a human eye: Review, not Done
 
@@ -89,6 +109,8 @@ Never end a session with unpushed work. If a file was written or changed, it is 
 
 A pushed feature branch is written into its task the moment it exists: one line in the issue body — `In flight on branch task-<n>-<slug>`. That line is what makes the branch findable from the board or a phone; a branch nobody wrote down is a branch nobody knows to look at. Merge it per this repo's rules when the work lands, delete it when the task closes.
 
+**Commit by path** — `git add <the files you changed> && git commit`, never `-A` or `-a` — because this working tree is shared. Another session's agents, the COO's, or Ita's own may be mid-change in it while you are, and their half-done files look exactly like yours to `git add -A`. For the same reason never run anything that takes the whole tree with it: no `stash`, no switching branches while the tree holds files that are not yours, no `pull --rebase` or `--autostash`, no `reset`, `restore` or `clean`. A plain `git pull` is safe — it refuses rather than overwrites — and if it refuses over a file you did not change, that file is someone's: leave it, work from what you have, and say so. A feature branch is still fine: `git checkout -b` from where you stand carries the dirty files along untouched, and they are no more yours to commit there than on trunk.
+
 ### Staying focused
 
 Work the task you were given, and only it. When something unrelated turns up mid-task — a bug somewhere else, a perf stall, a dead file, a good idea for later — **pin it**: one REST POST in the repo it belongs to, `tools/board add` it, and go straight back to what you were doing. A pin is a title plus three to five lines: where you saw it, the symptom, a one-line hunch, a one-line "done when". Don't chase it, don't name every code path, don't design the fix — that is the job of whoever picks the issue up. The issue is what makes dropping it safe; nothing is lost, so there is never a reason to chase it now.
@@ -98,3 +120,5 @@ Related is not a detour. If the thing you found is part of the task, blocks it, 
 Same rule for scope: the task is what the issue says. Improvements you notice along the way are pins, not extras.
 
 Same rule for the filesystem: **stay inside this repo's directory**. Everything you write — code, scratch files, test output, downloads — lands in this working tree (or your session scratchpad for throwaways), never in `~`, another project's directory, or anywhere else on the machine.
+
+And the tree itself is shared: **you hold what you dirty, and you touch nothing dirty that is not yours.** A file `git status` reports changed that you did not change is someone's work in progress — another session's agent, the COO's, Ita's own — whatever it looks like, and it is not yours to edit, stage, commit or revert. Check the file, not the tree, and check when you first reach for it, not at the start of the task: a check made at the top was accurate when it ran and wrong twenty minutes later (coo#39, 2026-09-01). `git status --short -- <path>` is the whole check — empty means yours, and it stays yours until you commit it. Held? Put your change in a new file; that costs nothing, never goes stale, and ends in a merge rather than a lost edit. Has to be that file? Ask, never guess: `ListAgents` shows the sessions on this machine and `SendMessage` reaches them, and the one working in this tree can say whether the file is its agent's. Nobody alive claims it? It is still not yours — it is Ita's to keep or drop, so tell him.
