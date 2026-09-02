@@ -44,6 +44,14 @@ Working one:
    ```
    Cancelled instead: add `-f state_reason=not_planned` and set `Status Cancelled`. Blocked instead: `Status Blocked`, the blocker written into the body, issue left open and not PATCHed closed.
 
+### One task, one agent
+
+One task is held by one agent, start to finish, and that agent works nothing else while it holds it. That is what makes the signature below mean anything — one name, one transcript, one thing to resume — and what keeps a result honest about what was actually done. An agent working several tasks in one run is the rare exception, and it is only right when they are genuinely one piece of work split across issues: the same change to the same files, where doing them apart would mean doing them twice.
+
+**"Drain the queue" means this repo's queue, one subagent per task.** When Ita asks a session here to drain, he means *this repo's* open issues — not another repo's, not the whole board — and he means spawn them, not work them yourself down one long thread. Go in project order and give each task its own subagent, which owns it end to end: read the issue, sign it, In Progress, do the work, write the result, close it. You are the dispatcher — you choose what goes next, you skip `Worker: ita` items because they are his, and you verify what comes back before anything reads Done. What you cannot verify by looking goes to `Review` with what and who written into the body, exactly as if you had done the work yourself.
+
+Two subagents in this tree at once is fine only when their paths are disjoint, and naming that split in each one's prompt is your job — they hold what they dirty, same as you (below). Where the paths cannot be split, run them one after the other.
+
 ### Who took this task: sign it
 
 `Worker: opus` names a model, not a worker. When a result looks wrong an hour later there is nothing to go back to — no session to resume, no transcript to read, nobody to ask. So whoever takes a task signs it.
