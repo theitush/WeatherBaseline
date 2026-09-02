@@ -56,6 +56,8 @@ One task is held by one agent, start to finish, and that agent works nothing els
 
 **Review the priority your subagents choose.** A subagent picks the `Priority` of the issues it files from inside its own task, where everything it has just been staring at looks important. You are the one holding the whole queue, so read every issue your subagents filed and set the priority yourself. That is also what lets a super drain end: a drain that consumes its own output cannot terminate if what it files keeps landing at or above the floor.
 
+**How a drain is executed is the `drain` skill**, not this section — `.claude/skills/drain/SKILL.md`, invoked `/drain`, or `/drain super <floor>` for the other mode. It holds the order of a pass and the per-item ritual, and restates none of the definitions above; this section defines none of its steps. It is generated from `coo/templates/drain-SKILL.md` and propagated exactly like this tail, so every repo runs the same drain (coo#60).
+
 Two subagents in this tree at once is fine only when their paths are disjoint, and naming that split in each one's prompt is your job — they hold what they dirty, same as you (below). Where the paths cannot be split, run them one after the other.
 
 ### Who took this task: sign it
