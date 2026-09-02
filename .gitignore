@@ -51,8 +51,12 @@ __pycache__/
 # WSL "downloaded from the internet" sidecars
 *:Zone.Identifier
 
-# Local Claude Code config + worktree checkouts (machine-specific)
-/.claude/
+# Local Claude Code config + worktree checkouts (machine-specific), except the
+# shared hook config, which is the same in all six repos and belongs in a diff
+# (coo#55). The directory itself must stay un-excluded for the negation to be
+# reachable: git cannot re-include a file under an excluded directory.
+/.claude/*
+!/.claude/settings.json
 
 # Ad-hoc analytics scratch: a root-level notebook and the raw hit exports
 # that analytics/report.py pulls from Cloudflare.

@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ita/coo/tools/tree-watch pre >/dev/null 2>&1; exit 0",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ita/coo/tools/tree-watch start >/dev/null 2>&1; exit 0",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
