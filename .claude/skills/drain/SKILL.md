@@ -36,7 +36,7 @@ Then drop, in this order:
 - `Worker: ita` — skip.
 - `Blocked` — skip; name the blocker in your report. If it has since cleared, unblock it and work it.
 - `Review` — skip; it is waiting on its named human. If no human is named, that is the bug: name one in the body and leave it there.
-- `backlog` — skip.
+- `backlog` — skip, *unless* this is a super drain and this drain filed it: those it works, and no other backlog item.
 - On a super drain only: everything below the floor.
 
 What survives is worked in project order.
@@ -52,7 +52,7 @@ gh api repos/theitush/WeatherBaseline/issues/$n -q .body     # REST; gh issue vi
 /home/ita/coo/tools/board set WeatherBaseline $n Status "In Progress"  # before the work, so a crash leaves evidence
 ```
 
-Do the work. Verify it — tests, build, a read of the diff — because the result is a claim you are signing. Then file whatever the work did not reach as its own issue *before* this one closes — `CLAUDE.md` has that rule — and finish it exactly one of three ways:
+Do the work. Verify it — tests, build, a read of the diff — because the result is a claim you are signing. Then file whatever the work did not reach as its own issue *before* this one closes — at `Status backlog`, per `CLAUDE.md` — and finish it exactly one of three ways:
 
 **Done** — verified, remainder filed and named in the result:
 
@@ -71,7 +71,7 @@ gh api -X PATCH repos/theitush/WeatherBaseline/issues/$n -F body=@/tmp/task-$n.m
 
 Before you report, and every time:
 
-1. **Set the priority of every issue this drain filed yourself.** Read each one against the whole board, not from inside the task that produced it. Say in the report which you changed and why.
+1. **Set the priority of every issue this drain filed yourself.** Read each one against the whole board, not from inside the task that produced it. Say in the report which you changed and why. They stay in `backlog`; promoting one to `Queued` is a call you make deliberately and name in the report, not a default.
 2. Reorder the queue if the work changed what should run next.
 3. `/home/ita/coo/tools/board pending` — flush anything a budget blackout queued.
 4. Whatever your `CLAUDE.md` asks of a session before it ends.
@@ -79,7 +79,7 @@ Before you report, and every time:
 
 ## 5. Super drain only: go round again
 
-Re-read the board and repeat from step 2 while anything of yours sits at or above the floor — including what this drain just filed. Step 4.1 is what makes that terminate: leftovers priced from inside their parent task will otherwise keep landing at or above the floor forever.
+Re-read the board and repeat from step 2 while anything of yours sits at or above the floor — including what this drain just filed, which is in `backlog` and which only this mode reaches. Step 4.1 is what makes that terminate: leftovers priced from inside their parent task will otherwise keep landing at or above the floor forever.
 
 ## 6. Report
 
