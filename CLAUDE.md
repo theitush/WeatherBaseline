@@ -4,6 +4,8 @@ This file is thin on purpose: it grows a line at a time, when something proves w
 
 ## Tasks
 
+*This section is generated from `coo/templates/CLAUDE-tasks.md`: everything from this heading to the end of the file is replaced wholesale whenever that template changes, so **nothing repo-specific may live here.** A rule true only of this repo goes **above** this heading — including one that amends or supersedes a rule below, which says which rule it supersedes and is then read first, the right order for a supersession. `coo/tools/tasks-tail propagate` refuses to overwrite a tail it does not recognise and stops the run for every repo, so a line slipped in here blocks the whole fleet's next update until someone moves it (coo#46).*
+
 This repo's tasks are its **GitHub issues**. When Ita says **"task 5"** he means **issue #5 of this repo**. Every issue here is also an item on his cross-project board, GitHub Project #2 `COO` (https://github.com/users/theitush/projects/2 — the same data https://coo-board.pages.dev shows), and the project is where a task's status, priority, worker and queue position live. Don't read the queue at startup; look a task up when one is named.
 
 **Read and write issues over REST, not `gh issue`.** Every `gh issue view`, `edit`, `close` and `list` goes out over GraphQL, whose 5000-point hourly budget is shared by every agent and the board and does run out. The REST bucket is a separate 5000 an hour that nothing here touches, and it does the same work:
