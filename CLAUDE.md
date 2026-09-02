@@ -52,6 +52,10 @@ One task is held by one agent, start to finish, and that agent works nothing els
 
 **"Drain the queue" means this repo's queue, one subagent per task.** When Ita asks a session here to drain, he means *this repo's* open issues — not another repo's, not the whole board — and he means spawn them, not work them yourself down one long thread. Go in project order and give each task its own subagent, which owns it end to end: read the issue, sign it, In Progress, do the work, write the result, close it. You are the dispatcher — you choose what goes next, you skip `Worker: ita` items because they are his, and you verify what comes back before anything reads Done. What you cannot verify by looking goes to `Review` with what and who written into the body, exactly as if you had done the work yourself.
 
+**Two drains.** A plain *drain* works the queue as it stood when it started; issues the drain itself files are left for the next one. **"super drain `<priority>`"** keeps going until nothing at or above that floor is left, including what the drain itself filed — `super drain low` takes low, medium, high and ASAP; `super drain high` takes high and ASAP only. The floor is required: a bare "super drain" is not a command, so ask which floor. Either way `Blocked` is skipped with the blocker noted, `Review` waits on its named human, `Worker: ita` is his, and `backlog` is outside both.
+
+**Review the priority your subagents choose.** A subagent picks the `Priority` of the issues it files from inside its own task, where everything it has just been staring at looks important. You are the one holding the whole queue, so read every issue your subagents filed and set the priority yourself. That is also what lets a super drain end: a drain that consumes its own output cannot terminate if what it files keeps landing at or above the floor.
+
 Two subagents in this tree at once is fine only when their paths are disjoint, and naming that split in each one's prompt is your job — they hold what they dirty, same as you (below). Where the paths cannot be split, run them one after the other.
 
 ### Who took this task: sign it
