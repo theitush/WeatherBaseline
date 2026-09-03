@@ -129,6 +129,31 @@ A pushed feature branch is written into its task the moment it exists: one line 
 
 **Commit by path** — `git add <the files you changed> && git commit`, never `-A` or `-a` — because this working tree is shared. Another session's agents, the COO's, or Ita's own may be mid-change in it while you are, and their half-done files look exactly like yours to `git add -A`. For the same reason never run anything that takes the whole tree with it: no `stash`, no switching branches while the tree holds files that are not yours, no `pull --rebase` or `--autostash`, no `reset`, `restore` or `clean`. A plain `git pull` is safe — it refuses rather than overwrites — and if it refuses over a file you did not change, that file is someone's: leave it, work from what you have, and say so. A feature branch is still fine: `git checkout -b` from where you stand carries the dirty files along untouched, and they are no more yours to commit there than on trunk.
 
+### Checks run before the commit, not in GitHub Actions
+
+**Never add a GitHub Actions workflow.** Not a test job, not a lint job, not one that only
+runs on pull requests, and not as the automatic half of a check you have just written. The
+only workflow this repo has is `mirror-sync.yml`, which copies trunk into the COO's `mirror/`
+and wakes nobody — plus, where the repo genuinely deploys somewhere, the workflow that
+deploys it. That is the whole list, and adding to it is Ita's call, asked for in advance.
+
+The reason is that a runner here has nobody to report to: one machine, no second contributor,
+and — unless this repo has a real deploy target — no production. The entire effect of a red
+tick is an email to Ita, and the only thing he can do with that email is paste it back into
+an agent. So a fact a script settles in seconds travels through the one person who cannot act
+on it, and arrives as an interruption rather than as a check. `theitush/inbar` ran a
+unit-suite workflow for three days, and every failure it ever reported was one the committing
+agent could have seen thirteen seconds earlier on its own machine (inbar#96, coo#65 — the
+same call as coo#59, which deleted coo's own two workflows the day they were added).
+
+A check worth running automatically therefore runs **before the commit exists, on the machine
+making it**: a git `pre-commit` hook, tracked in the repo rather than left in `.git/hooks` so
+that it is reviewable and it travels, installed per clone with `git config core.hooksPath
+<dir>`. It needs no network, no token and no runner, and its failure reaches the agent that
+caused it, in that agent's own terminal, while the fix is still one edit away.
+`git commit --no-verify` skips it when you mean to. If you think this repo is the exception,
+say so and ask — don't push a workflow and find out.
+
 ### Staying focused
 
 Work the task you were given, and only it. When something unrelated turns up mid-task — a bug somewhere else, a perf stall, a dead file, a good idea for later — **pin it**: one REST POST in the repo it belongs to, `tools/board add` it, set it to `backlog`, and go straight back to what you were doing. A pin is a title plus three to five lines: where you saw it, the symptom, a one-line hunch, a one-line "done when". Don't chase it, don't name every code path, don't design the fix — that is the job of whoever picks the issue up. The issue is what makes dropping it safe; nothing is lost, so there is never a reason to chase it now.
