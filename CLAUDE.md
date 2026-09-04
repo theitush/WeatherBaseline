@@ -21,6 +21,17 @@ gh api repos/theitush/WeatherBaseline/issues -X POST -f title="..." -F body=@fil
 
 A task is the issue title; the issue body holds up to three sections, in the order they are read: a one-line **review** at the top (`**Review:** <who> — <what to look at>`, only once the work needs a human eye), the **details**, and once finished the **result**, behind a `---` rule and a `**Result**` heading. Ita reads and edits all three on the board. The project's columns are `Status` (backlog / Queued / In Progress / Blocked / Review / Done / Cancelled), `Priority` (ASAP / high / medium / low), `Worker` (ita / fable / opus / sonnet / haiku) and `Due`.
 
+**The title starts with what kind of work it is** — one of six words, capitals and a colon, before anything else:
+
+- `BUG:` behaves wrong today. A doc or a rule that is wrong, and slowness that hurts, are bugs too.
+- `FEATURE:` a new capability, or a visible change to one — including a change to how we work, a new doc, and a speed-up that is an improvement rather than a fix.
+- `RESEARCH:` a question answered by measuring; the result is a finding, not code.
+- `RUN:` existing machinery executed — a sweep, a bake, a sync, a campaign, a post.
+- `CLEANUP:` housekeeping with no behaviour change — deletes, gitignore, pins, stale comments, missing tests.
+- `DECIDE:` a call only a person can make; `Worker: ita` by definition.
+
+An area tag this repo already uses follows the type, never precedes it: `BUG: backtest(#61): …`, `FEATURE: Cockpit: …`. There is no seventh word — if none fits, the title is not yet saying what the work is. `/home/ita/coo/tools/board list` names every open title that has no prefix, so a missing one is caught by something every session runs. Issues closed before 2026-09-05 keep the titles they had (Ita, 2026-09-05, coo#68).
+
 **Every piece of work starts from a task.** If Ita names an issue, that is your task. If he asks for something with no issue behind it, write the issue here first — a title and a few lines of what he asked for — `tools/board add` it, set it In Progress, and *then* start. Filing it afterwards defeats the point: In Progress before the work is what a crashed session leaves behind. A task is for work that ends in a commit; a question, a read or a five-minute look is not work and must not be filed, or the board becomes a log and buries the queue.
 
 **Every other issue you file lands in `backlog`.** A pin, a leftover, anything you notice and write down: `tools/board add WeatherBaseline $n && /home/ita/coo/tools/board set WeatherBaseline $n Status backlog`. The one exception is the paragraph above — work you are about to do, which goes straight to `In Progress`. Set `Priority` honestly, because it is the triage signal, but understand that it promotes nothing: **`Queued` is a promotion a person or a triage pass makes deliberately.** That is the difference between a queue that says what to work next and a list of everything anyone ever noticed — the queue held 58 filed-and-never-queued items on 2026-09-02, which is what this rule exists to stop. If you think a finding genuinely cannot wait for triage, **say so** — in your report, to Ita, to whoever dispatched you — rather than putting it in the queue yourself (Ita, 2026-09-02, coo#62).
