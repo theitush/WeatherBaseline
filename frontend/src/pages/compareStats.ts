@@ -7,8 +7,8 @@
 import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint } from '../types';
-import type { BandKey, Period, Series } from './compareTypes';
-import { BAND_SPECS, seriesPeriods } from './compareTypes';
+import type { BandKey, Period, Series } from './compareTypes.ts';
+import { BAND_SPECS, seriesPeriods } from './compareTypes.ts';
 
 /** Day-of-year buckets. Leap day collapses onto ~Mar 1, so 365 of them. */
 export const DOY_COUNT = 365;

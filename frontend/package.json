@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types src/utils/permutationTest.test.ts && node --experimental-strip-types src/utils/recordScale.test.ts && node --experimental-strip-types src/utils/dataProcessor.test.ts && node --experimental-strip-types src/utils/verdictProse.test.ts"
+    "test": "node --experimental-strip-types src/utils/permutationTest.test.ts && node --experimental-strip-types src/utils/recordScale.test.ts && node --experimental-strip-types src/utils/dataProcessor.test.ts && node --experimental-strip-types src/utils/verdictProse.test.ts && node --experimental-strip-types src/pages/comparePeriodTest.test.ts"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",

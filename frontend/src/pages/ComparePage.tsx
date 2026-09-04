@@ -17,6 +17,8 @@ import {
 } from './compareTypes';
 import { buildDialTracks, drawnExtent } from './compareStats';
 import type { TrackInput } from './compareStats';
+import { useComparePeriodTests } from './useComparePeriodTests';
+import PeriodVerdict from './PeriodVerdict';
 import './ComparePage.css';
 
 const MAX_YEAR = new Date().getFullYear();
@@ -83,6 +85,8 @@ const ComparePage: React.FC = () => {
     setBands((prev) => (prev.includes(k) ? prev.filter((b) => b !== k) : [...prev, k]));
 
   const dataMap = useArchiveTimelines(series);
+  // One year-shuffle test per split chart, off the main thread.
+  const periodTests = useComparePeriodTests(series, dataMap, system);
 
   const resolved: ResolvedSeries[] = useMemo(
     () =>
@@ -280,6 +284,18 @@ const ComparePage: React.FC = () => {
                     pointMode={pointMode}
                     bands={bands}
                   />
+                  {grp.items.map(({ series: s }) =>
+                    s.split ? (
+                      <PeriodVerdict
+                        key={s.id}
+                        test={periodTests[s.id]?.result ?? null}
+                        pending={periodTests[s.id]?.pending ?? false}
+                        periods={seriesPeriods(s)}
+                        metric={s.metric}
+                        system={system}
+                      />
+                    ) : null
+                  )}
                 </div>
               ))}
             </div>
@@ -309,6 +325,15 @@ const ComparePage: React.FC = () => {
                     pointMode={pointMode}
                     bands={bands}
                   />
+                  {rs.series.split && (
+                    <PeriodVerdict
+                      test={periodTests[rs.series.id]?.result ?? null}
+                      pending={periodTests[rs.series.id]?.pending ?? false}
+                      periods={seriesPeriods(rs.series)}
+                      metric={rs.series.metric}
+                      system={system}
+                    />
+                  )}
                 </div>
               ))}
             </div>
