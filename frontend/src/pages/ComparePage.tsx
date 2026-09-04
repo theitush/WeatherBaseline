@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import * as d3 from 'd3';
 import CompareRadialChart, { type ResolvedSeries } from './CompareRadialChart';
 import SeriesEditor from './SeriesEditor';
 import { useArchiveTimelines } from './useArchiveTimelines';
@@ -7,8 +6,17 @@ import { useUnits } from '../hooks/useUnits';
 import { useTheme } from '../hooks/useTheme';
 import { convert, unitLabel } from '../utils/units';
 import type { MetricKey } from '../utils/config';
-import type { LayoutMode, Series } from './compareTypes';
-import { SERIES_PALETTE } from './compareTypes';
+import type { BandKey, LayoutMode, Series } from './compareTypes';
+import {
+  BANDS_FOR_MODE,
+  BAND_LABEL,
+  BAND_SPECS,
+  DEFAULT_BANDS,
+  SERIES_PALETTE,
+  seriesPeriods,
+} from './compareTypes';
+import { buildDialTracks, drawnExtent } from './compareStats';
+import type { TrackInput } from './compareStats';
 import './ComparePage.css';
 
 const MAX_YEAR = new Date().getFullYear();
@@ -52,6 +60,12 @@ function makeSeries(index: number): Series {
     endYear: MAX_YEAR,
     color: SERIES_PALETTE[index % SERIES_PALETTE.length],
     markers: [],
+    split: false,
+    // A contrasting neighbour in the palette, so a fresh split reads as two
+    // periods without the user having to pick anything first.
+    lateColor: SERIES_PALETTE[(index + 1) % SERIES_PALETTE.length],
+    diffShade: true,
+    smoothDays: 0,
   };
 }
 
@@ -61,6 +75,12 @@ const ComparePage: React.FC = () => {
   const [series, setSeries] = useState<Series[]>(() => [makeSeries(0)]);
   const [layout, setLayout] = useState<LayoutMode>('overlay');
   const [pointMode, setPointMode] = useState<'all' | 'percentile'>('all');
+  // Which percentile layers the dials draw. Page-level, like the point mode:
+  // every dial shows the same layers so they stay comparable.
+  const [bands, setBands] = useState<BandKey[]>(DEFAULT_BANDS);
+
+  const toggleBand = (k: BandKey) =>
+    setBands((prev) => (prev.includes(k) ? prev.filter((b) => b !== k) : [...prev, k]));
 
   const dataMap = useArchiveTimelines(series);
 
@@ -78,29 +98,34 @@ const ComparePage: React.FC = () => {
   // each), so pooling by family means every dial of that family uses the same
   // [min,max] — directly comparable — and units never mix on one axis. Min and
   // max temp pool together since they share a unit.
+  //
+  // The extent covers the layers actually DRAWN rather than every raw day, so
+  // switching layers off zooms the dial onto what is left: with the cloud and
+  // the wide bands gone, half a degree between two periods fills a real slice
+  // of the radius instead of disappearing inside a fifty-degree spread.
   const domainByFamily = useMemo(() => {
     const out = new Map<UnitFamily, [number, number]>();
-    const valsByFamily = new Map<UnitFamily, number[]>();
+    const byFamily = new Map<UnitFamily, TrackInput[]>();
     for (const { series: s, data } of resolved) {
       const fam = unitFamily(s.metric);
-      const arr = valsByFamily.get(fam) ?? [];
-      for (const d of data.rows) {
-        const raw = d[s.metric];
-        if (raw === undefined) continue;
-        const yr = d.date.getFullYear();
-        if (yr < s.startYear || yr > s.endYear) continue;
-        arr.push(convert(raw, s.metric, system));
-      }
-      valsByFamily.set(fam, arr);
+      const arr = byFamily.get(fam) ?? [];
+      arr.push({ series: s, rows: data.rows });
+      byFamily.set(fam, arr);
     }
-    for (const [fam, arr] of valsByFamily) {
-      if (arr.length === 0) continue;
-      const ext = d3.extent(arr) as [number, number];
+    for (const [fam, inputs] of byFamily) {
+      const tracks = buildDialTracks(
+        inputs,
+        (raw, metric) => convert(raw, metric, system),
+        pointMode,
+        bands
+      );
+      const ext = drawnExtent(tracks, pointMode);
+      if (!ext) continue;
       const pad = (ext[1] - ext[0]) * 0.1 || 1;
       out.set(fam, [ext[0] - pad, ext[1] + pad]);
     }
     return out;
-  }, [resolved, system]);
+  }, [resolved, system, pointMode, bands]);
 
   const addSeries = () => setSeries((prev) => [...prev, makeSeries(prev.length)]);
 
@@ -193,12 +218,28 @@ const ComparePage: React.FC = () => {
               </button>
             </div>
 
+            {/* Each percentile layer on its own switch. */}
+            <div className="cmp-band-toggles">
+              <div className="cmp-band-head">Layers</div>
+              {BANDS_FOR_MODE[pointMode].map((k) => (
+                <label key={k} className="cmp-check">
+                  <input
+                    type="checkbox"
+                    checked={bands.includes(k)}
+                    onChange={() => toggleBand(k)}
+                  />
+                  <span>{BAND_LABEL[k]}</span>
+                </label>
+              ))}
+            </div>
+
             <button type="button" className="cmp-add-series" onClick={addSeries}>
               + Add chart
             </button>
 
             <p className="cmp-drag-hint">
-              Overlay groups charts by metric — different units get their own dial.
+              Overlay groups charts by metric — different units get their own
+              dial. Switching layers off also zooms the dial in on what is left.
             </p>
           </div>
 
@@ -226,6 +267,7 @@ const ComparePage: React.FC = () => {
                     axisMetric={grp.items[0].series.metric}
                     domain={domainByFamily.get(grp.family)}
                     pointMode={pointMode}
+                    bands={bands}
                     width={overlayGroups.length > 1 ? 420 : 520}
                     height={overlayGroups.length > 1 ? 420 : 520}
                   />
@@ -236,6 +278,7 @@ const ComparePage: React.FC = () => {
                     )}
                     system={system}
                     pointMode={pointMode}
+                    bands={bands}
                   />
                 </div>
               ))}
@@ -245,13 +288,17 @@ const ComparePage: React.FC = () => {
               {resolved.map((rs) => (
                 <div className="cmp-dial-block" key={rs.series.id}>
                   <div className="cmp-dial-title" style={{ color: rs.series.color }}>
-                    {rs.series.name} · {rs.series.startYear}–{rs.series.endYear}
+                    {rs.series.name} ·{' '}
+                    {seriesPeriods(rs.series)
+                      .map((p) => p.label)
+                      .join(' vs ')}
                   </div>
                   <CompareRadialChart
                     series={[rs]}
                     axisMetric={rs.series.metric}
                     domain={domainByFamily.get(unitFamily(rs.series.metric))}
                     pointMode={pointMode}
+                    bands={bands}
                     width={400}
                     height={400}
                   />
@@ -260,6 +307,7 @@ const ComparePage: React.FC = () => {
                     markers={rs.series.markers.map((m) => ({ series: rs.series, marker: m }))}
                     system={system}
                     pointMode={pointMode}
+                    bands={bands}
                   />
                 </div>
               ))}
@@ -277,9 +325,10 @@ interface LegendProps {
   markers: { series: Series; marker: { id: string; date: string; color: string } }[];
   system: ReturnType<typeof useUnits>['system'];
   pointMode: 'all' | 'percentile';
+  bands: BandKey[];
 }
 
-const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode }) => {
+const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode, bands }) => {
   // Resolve each marker's value so the legend can show what its dashed ring sits at.
   const markerValue = (
     date: string,
@@ -301,49 +350,54 @@ const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode }) 
 
   return (
     <div className="cmp-legend">
-      {entries.map(({ series: s }) => (
-        <React.Fragment key={s.id}>
-          <div className="cmp-legend-item">
-            <span className="cmp-legend-line" style={{ background: s.color }} />
-            <span className="cmp-legend-text">
-              {s.name} · {METRIC_NAME[s.metric]} · {s.startYear}–{s.endYear}
-              {pointMode === 'percentile' ? ' · median' : ''}
-            </span>
-          </div>
-          {pointMode === 'percentile' && (
-            <>
+      {entries.map(({ series: s }) => {
+        const periods = seriesPeriods(s);
+        return (
+          <React.Fragment key={s.id}>
+            {periods.map((p) => (
+              <React.Fragment key={p.half}>
+                <div className="cmp-legend-item">
+                  <span className="cmp-legend-line" style={{ background: p.color }} />
+                  <span className="cmp-legend-text">
+                    {s.name} · {METRIC_NAME[s.metric]} · {p.label}
+                    {bands.includes('median') ? ' · median' : ''}
+                  </span>
+                </div>
+                {pointMode === 'percentile' &&
+                  BAND_SPECS.filter((spec) => bands.includes(spec.key)).map((spec) => (
+                    <div className="cmp-legend-item cmp-legend-sub" key={spec.key}>
+                      <span
+                        className="cmp-legend-swatch"
+                        style={{ background: p.color, opacity: spec.opacity }}
+                      />
+                      <span className="cmp-legend-text">{spec.label}</span>
+                    </div>
+                  ))}
+                {pointMode === 'percentile' && bands.includes('outliers') && (
+                  <div className="cmp-legend-item cmp-legend-sub">
+                    <span className="cmp-legend-dot" style={{ background: p.color, opacity: 0.1 }} />
+                    <span className="cmp-legend-text">{BAND_LABEL.outliers}</span>
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+            {s.split && s.diffShade && periods.length === 2 && (
               <div className="cmp-legend-item cmp-legend-sub">
                 <span
-                  className="cmp-legend-swatch"
-                  style={{ background: s.color, opacity: 0.32 }}
+                  className="cmp-legend-swatch cmp-legend-split-swatch"
+                  style={{
+                    background: `linear-gradient(90deg, ${periods[0].color} 50%, ${periods[1].color} 50%)`,
+                    opacity: 0.4,
+                  }}
                 />
-                <span className="cmp-legend-text">25–75 percentile</span>
+                <span className="cmp-legend-text">
+                  shaded in whichever period runs higher that day
+                </span>
               </div>
-              <div className="cmp-legend-item cmp-legend-sub">
-                <span
-                  className="cmp-legend-swatch"
-                  style={{ background: s.color, opacity: 0.15 }}
-                />
-                <span className="cmp-legend-text">5–95 percentile</span>
-              </div>
-              <div className="cmp-legend-item cmp-legend-sub">
-                <span
-                  className="cmp-legend-swatch"
-                  style={{ background: s.color, opacity: 0.08 }}
-                />
-                <span className="cmp-legend-text">1–99 percentile</span>
-              </div>
-              <div className="cmp-legend-item cmp-legend-sub">
-                <span
-                  className="cmp-legend-dot"
-                  style={{ background: s.color, opacity: 0.1 }}
-                />
-                <span className="cmp-legend-text">outliers (&lt;1 / &gt;99)</span>
-              </div>
-            </>
-          )}
-        </React.Fragment>
-      ))}
+            )}
+          </React.Fragment>
+        );
+      })}
       {markers.map(({ series: s, marker }) => {
         const rs = entries.find((e) => e.series.id === s.id);
         const val = rs ? markerValue(marker.date, s.metric, rs.data.rows) : '—';

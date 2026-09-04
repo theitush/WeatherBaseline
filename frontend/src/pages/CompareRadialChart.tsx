@@ -3,7 +3,9 @@ import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
-import type { Series, SeriesData } from './compareTypes';
+import type { BandKey, Series, SeriesData } from './compareTypes';
+import { DOY_COUNT, buildDialTracks, dayFraction } from './compareStats';
+import type { BandPath, Pt } from './compareStats';
 import { placeTooltip } from '../utils/tooltip';
 import './CompareRadialChart.css';
 
@@ -20,16 +22,19 @@ interface CompareRadialChartProps {
   axisMetric: MetricKey;
   /**
    * Shared value domain [min, max] in DISPLAY units for the radius scale. Pooled
-   * across every series on this dial so they're directly comparable. When
-   * omitted the dial auto-scales to its own series.
+   * across every series on this dial so they're directly comparable, and taken
+   * from the layers actually drawn. When omitted the dial auto-scales to its own
+   * series.
    */
   domain?: [number, number];
   /**
    * 'all' draws every day as a faint dot. 'percentile' replaces the cloud with
-   * per-series 1–99, 5–95 and 25–75 bands (around the day-of-year), plus the
-   * dots that fall outside the 1–99 band drawn faintly as outliers.
+   * per-track quantile bands around the day of the year, plus the days falling
+   * outside the 1–99 band drawn faintly as outliers.
    */
   pointMode?: 'all' | 'percentile';
+  /** Which percentile layers to draw. Anything absent is simply not drawn. */
+  bands: BandKey[];
   width?: number;
   height?: number;
 }
@@ -37,19 +42,12 @@ interface CompareRadialChartProps {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Day-of-year [0,1) for the angular position (leap day collapses onto ~Mar 1).
-const dayFraction = (d: Date): number => {
-  const start = Date.UTC(d.getFullYear(), 0, 1);
-  const here = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  const len = Date.UTC(d.getFullYear() + 1, 0, 1) - start;
-  return (here - start) / len;
-};
-
 const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
   series,
   axisMetric,
   domain,
   pointMode = 'all',
+  bands,
   width: propWidth,
   height: propHeight,
 }) => {
@@ -64,7 +62,6 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
   useEffect(() => {
     if (!svgRef.current || !canvasRef.current) return;
 
-    const cv = (v: number) => convert(v, axisMetric, system);
     const unit = unitLabel(axisMetric, system);
 
     const svg = d3.select(svgRef.current);
@@ -83,23 +80,14 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
 
     const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 
-    // ---- gather every drawable point (archive only) across the series -------
-    type Pt = { date: Date; val: number; color: string };
-    const allPts: Pt[] = [];
-    const perSeriesPts = new Map<string, Pt[]>();
-    for (const { series: s, data } of series) {
-      const pts: Pt[] = [];
-      for (const d of data.rows) {
-        const raw = d[s.metric as MetricKey];
-        if (raw === undefined) continue;
-        const yr = d.date.getFullYear();
-        if (yr < s.startYear || yr > s.endYear) continue;
-        const p = { date: d.date, val: cv(raw), color: s.color };
-        pts.push(p);
-        allPts.push(p);
-      }
-      perSeriesPts.set(s.id, pts);
-    }
+    // ---- the drawable tracks (archive only), one per period ----------------
+    const tracks = buildDialTracks(
+      series.map(({ series: s, data }) => ({ series: s, rows: data.rows })),
+      (raw, metric) => convert(raw, metric, system),
+      pointMode,
+      bands
+    );
+    const allPts = tracks.flatMap((t) => t.pts);
 
     // ---- radius scale: shared domain if given, else this dial's own extent --
     let vMin: number;
@@ -178,76 +166,27 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
         .text(MONTHS[m]);
     }
 
-    // ---- per-series percentile bands (percentile mode only) ----------------
-    // Build, per series, the day-of-year quantile envelopes. Returns the set of
-    // points that fall OUTSIDE the 1–99 band so the cloud can draw them as
-    // faint outliers. Bands are nested radial areas, palest 1–99 outermost.
-    type Band = { frac: number; lo: number; hi: number };
+    // ---- per-track percentile bands (percentile mode only) -----------------
+    // Widest first, so the palest sits underneath the tighter ones.
     const radialArea = d3
-      .areaRadial<Band>()
+      .areaRadial<BandPath['points'][number]>()
       .angle((d) => d.frac * 2 * Math.PI)
       .innerRadius((d) => rScale(d.lo))
       .outerRadius((d) => rScale(d.hi))
       .curve(d3.curveCardinalClosed);
 
-    const outlierPts: Pt[] = [];
-    if (pointMode === 'percentile') {
-      for (const { series: s } of series) {
-        const pts = perSeriesPts.get(s.id) ?? [];
-        if (pts.length === 0) continue;
-        const byDoy = d3.group(pts, (p) => Math.floor(dayFraction(p.date) * 365));
-        const band199: Band[] = [];
-        const band595: Band[] = [];
-        const band2575: Band[] = [];
-        // thresholds[doy] = [p1, p99] for the outlier test below.
-        const thresh = new Map<number, [number, number]>();
-        for (const [doy, rows] of byDoy) {
-          const vals = rows.map((r) => r.val).sort(d3.ascending);
-          const p1 = d3.quantileSorted(vals, 0.01) as number;
-          const p5 = d3.quantileSorted(vals, 0.05) as number;
-          const p25 = d3.quantileSorted(vals, 0.25) as number;
-          const p75 = d3.quantileSorted(vals, 0.75) as number;
-          const p95 = d3.quantileSorted(vals, 0.95) as number;
-          const p99 = d3.quantileSorted(vals, 0.99) as number;
-          const frac = doy / 365;
-          band199.push({ frac, lo: p1, hi: p99 });
-          band595.push({ frac, lo: p5, hi: p95 });
-          band2575.push({ frac, lo: p25, hi: p75 });
-          thresh.set(doy, [p1, p99]);
-        }
-        if (band199.length <= 8) continue;
-        band199.sort((a, b) => a.frac - b.frac);
-        band595.sort((a, b) => a.frac - b.frac);
-        band2575.sort((a, b) => a.frac - b.frac);
-
+    for (const track of tracks) {
+      for (const band of track.bands) {
         g.append('path')
-          .datum(band199)
-          .attr('class', 'cmp-band cmp-band-199')
-          .attr('fill', s.color)
-          .attr('opacity', 0.08)
+          .datum(band.points)
+          .attr('class', `cmp-band cmp-band-${band.key}`)
+          .attr('fill', track.color)
+          .attr('opacity', band.opacity)
           .attr('d', radialArea as never);
-        g.append('path')
-          .datum(band595)
-          .attr('class', 'cmp-band cmp-band-595')
-          .attr('fill', s.color)
-          .attr('opacity', 0.15)
-          .attr('d', radialArea as never);
-        g.append('path')
-          .datum(band2575)
-          .attr('class', 'cmp-band cmp-band-2575')
-          .attr('fill', s.color)
-          .attr('opacity', 0.32)
-          .attr('d', radialArea as never);
-
-        for (const p of pts) {
-          const doy = Math.floor(dayFraction(p.date) * 365);
-          const t = thresh.get(doy);
-          if (t && (p.val < t[0] || p.val > t[1])) outlierPts.push(p);
-        }
       }
     }
 
-    // ---- per-series day cloud on CANVAS ------------------------------------
+    // ---- per-track day cloud on CANVAS --------------------------------------
     // In 'all' mode this is every day; in 'percentile' mode just the outliers.
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
@@ -258,11 +197,12 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, totalWidth, totalHeight);
       ctx.translate(cx, cy);
-      const cloudPts = pointMode === 'percentile' ? outlierPts : allPts;
-      // Lighter cloud when overlaying many series so they don't muddy together.
-      // Outliers (beyond 1–99) get a fixed 10% alpha.
+      const cloudPts: Pt[] =
+        pointMode === 'percentile' ? tracks.flatMap((t) => t.outliers) : allPts;
+      // Lighter cloud when overlaying several tracks so they don't muddy
+      // together. Outliers (beyond 1–99) get a fixed 10% alpha.
       const cloudAlpha =
-        pointMode === 'percentile' ? 0.1 : series.length > 1 ? 0.06 : 0.1;
+        pointMode === 'percentile' ? 0.1 : tracks.length > 1 ? 0.06 : 0.1;
       for (const p of cloudPts) {
         const [x, y] = polar(dayFraction(p.date), rScale(p.val));
         ctx.fillStyle = p.color;
@@ -278,31 +218,70 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
       .duration(400)
       .style('opacity', 1);
 
-    // ---- per-series median ring --------------------------------------------
+    // ---- difference shading: which half runs higher, day by day ------------
+    // Drawn between the two median rings of one split series and BELOW them.
+    // Two full-circle areas rather than clipped arcs: the "late higher" area
+    // spans early→max(early,late) and so collapses to nothing wherever the
+    // early half is on top, and the "early higher" area is the mirror. That
+    // makes the crossings seamless — no gap at the day the two rings swap.
+    type Diff = { frac: number; early: number; late: number };
     for (const { series: s } of series) {
-      const pts = perSeriesPts.get(s.id) ?? [];
-      if (pts.length === 0) continue;
-      const byDoy = d3.rollup(
-        pts,
-        (rows) => d3.median(rows, (p) => p.val) as number,
-        (p) => Math.floor(dayFraction(p.date) * 365)
-      );
-      const medianPath = Array.from(byDoy, ([doy, val]) => ({ frac: doy / 365, val }))
-        .sort((a, b) => a.frac - b.frac);
-      if (medianPath.length <= 8) continue;
+      if (!s.split || !s.diffShade) continue;
+      const mine = tracks.filter((t) => t.seriesId === s.id);
+      const early = mine.find((t) => t.half === 'early');
+      const late = mine.find((t) => t.half === 'late');
+      if (!early || !late) continue;
+
+      const diff: Diff[] = [];
+      for (const [doy, e] of early.medianByDoy) {
+        const l = late.medianByDoy.get(doy);
+        if (l === undefined) continue;
+        diff.push({ frac: doy / DOY_COUNT, early: e, late: l });
+      }
+      if (diff.length <= 8) continue;
+      diff.sort((a, b) => a.frac - b.frac);
+      // Repeat the first day at frac=1 so the ribbon closes across Dec 31→Jan 1.
+      diff.push({ ...diff[0], frac: 1 });
+
+      const shade = (inner: (d: Diff) => number, color: string, cls: string) =>
+        g
+          .append('path')
+          .datum(diff)
+          .attr('class', `cmp-diff-shade ${cls}`)
+          .attr('fill', color)
+          .attr('opacity', 0.75)
+          .attr(
+            'd',
+            d3
+              .areaRadial<Diff>()
+              .angle((d) => d.frac * 2 * Math.PI)
+              .innerRadius((d) => rScale(inner(d)))
+              .outerRadius((d) => rScale(Math.max(d.early, d.late)))
+              .curve(d3.curveLinear) as never
+          );
+
+      shade((d) => d.early, late.color, 'cmp-diff-late');
+      shade((d) => d.late, early.color, 'cmp-diff-early');
+    }
+
+    // ---- median rings on top of the shading --------------------------------
+    if (bands.includes('median')) {
       const radialLine = d3
         .lineRadial<{ frac: number; val: number }>()
         .angle((d) => d.frac * 2 * Math.PI)
         .radius((d) => rScale(d.val))
         .curve(d3.curveCardinalClosed);
-      g.append('path')
-        .datum(medianPath)
-        .attr('class', 'cmp-median')
-        .attr('fill', 'none')
-        .attr('stroke', s.color)
-        .attr('stroke-width', 1.75)
-        .attr('opacity', 0.9)
-        .attr('d', radialLine as never);
+      for (const track of tracks) {
+        if (!track.median) continue;
+        g.append('path')
+          .datum(track.median)
+          .attr('class', 'cmp-median')
+          .attr('fill', 'none')
+          .attr('stroke', track.color)
+          .attr('stroke-width', 1.75)
+          .attr('opacity', 0.9)
+          .attr('d', radialLine as never);
+      }
     }
 
     // ---- per-series date markers: dashed value ring + dot ------------------
@@ -317,7 +296,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
             d[s.metric as MetricKey] !== undefined
         );
         if (!row) continue;
-        const val = cv(row[s.metric as MetricKey] as number);
+        const val = convert(row[s.metric as MetricKey] as number, axisMetric, system);
         const tR = rScale(val);
         const [mx, my] = polar(dayFraction(row.date), tR);
 
@@ -350,7 +329,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
     }
-  }, [series, axisMetric, domain, pointMode, totalWidth, totalHeight, system]);
+  }, [series, axisMetric, domain, pointMode, bands, totalWidth, totalHeight, system]);
 
   return (
     <div className="cmp-radial-wrapper" style={{ width: totalWidth, height: totalHeight }}>
