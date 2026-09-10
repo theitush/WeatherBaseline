@@ -138,8 +138,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [forecastUnavailable, setForecastUnavailable] = useState<boolean>(false);
   const [forecastWarningDismissed, setForecastWarningDismissed] = useState<boolean>(false);
 
+  // Which fetch is the current one. The location and date controls stay live
+  // while a load runs (nothing covers them any more), so the user can start a
+  // second fetch before the first has landed — and the two are not ordered: a
+  // cold cell takes seconds where a warm one answers instantly, so the OLDER
+  // request routinely finishes last. Every fetch takes a ticket here and only
+  // the newest one is allowed to write state; a superseded one drops its result
+  // on the floor instead of repainting the page with the location or date the
+  // user has already moved off, and leaves the spinner to whoever replaced it.
+  const fetchSeq = useRef(0);
+
   // Fetch weather data
   const fetchData = useCallback(async () => {
+    const seq = ++fetchSeq.current;
+    const superseded = () => fetchSeq.current !== seq;
     setLoading(true);
     setError(null);
     setArchivePending(false);
@@ -162,6 +174,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         location.lon,
         viewUrl
       );
+      if (superseded()) return;
       setForecastUnavailable(!forecastFresh);
 
       // Attach bias-correction bands to model-output rows AND snap the row's value
@@ -209,6 +222,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             wind_speed_10m_max: d.wind_speed_10m_max,
           }))
         );
+        if (superseded()) return;
         for (const d of bandRows) {
           const b = bands[isoLocal(d.date)];
           if (!b) continue;
@@ -296,9 +310,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     } catch (err) {
       console.error('Error fetching data:', err);
+      if (superseded()) return;
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
-      setLoading(false);
+      // A superseded fetch must not clear the spinner: the load that replaced it
+      // is still running, and it owns the flag now.
+      if (!superseded()) setLoading(false);
     }
   }, [location, currentDate, currentMetric]);
 

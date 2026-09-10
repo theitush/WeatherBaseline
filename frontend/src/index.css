@@ -33,7 +33,6 @@
   --chart-label: #555;
   --tooltip-bg: rgba(0, 0, 0, 0.78);
   --tooltip-text: #fff;
-  --overlay-bg: rgba(255, 255, 255, 0.9);
   --spinner-track: #f3f3f3;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -90,7 +89,6 @@
   --chart-label: #9ca3af;
   --tooltip-bg: rgba(0, 0, 0, 0.85);
   --tooltip-text: #f3f4f6;
-  --overlay-bg: rgba(15, 16, 20, 0.9);
   --spinner-track: #2e303a;
 }
 
@@ -128,7 +126,6 @@
     --chart-label: #9ca3af;
     --tooltip-bg: rgba(0, 0, 0, 0.85);
     --tooltip-text: #f3f4f6;
-    --overlay-bg: rgba(15, 16, 20, 0.9);
     --spinner-track: #2e303a;
   }
 }

@@ -5,7 +5,7 @@ import LocationSelector from './components/LocationSelector';
 import DateSelector from './components/DateSelector';
 import MetricSelector from './components/MetricSelector';
 import TemperatureContextDisplay from './components/TemperatureContext';
-import LoadingOverlay from './components/LoadingOverlay';
+import LoadingPanel from './components/LoadingPanel';
 import MainChart from './components/MainChart';
 import HistogramChart from './components/HistogramChart';
 import PeriodHistogramChart, {
@@ -228,8 +228,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="app">
-      <LoadingOverlay show={loading} />
-
       <div className="app-container">
         <div className="sticky-bar">
           <header className="app-header">
@@ -299,6 +297,11 @@ const AppContent: React.FC = () => {
             <strong>Error:</strong> {error}
           </div>
         )}
+
+        {/* Below the pinned bar, never over it: the location and date controls
+            stay live while a load runs, and choosing a different one supersedes
+            the load in flight rather than queueing behind it. */}
+        <LoadingPanel show={loading} />
 
         {!loading && !error && archivePending && (
           <div className="archive-pending">
