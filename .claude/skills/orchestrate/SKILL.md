@@ -36,12 +36,32 @@ What survives is the pass, in project order. Read each survivor's body now (`gh 
 
 ## 2. Split it into lanes
 
-Parallelism is the point of this skill, and the tree is the constraint. Two workers in one checkout are safe only when the files they will reach for are disjoint, so:
+Parallelism is the point of this skill, and it has two constraints: **the tree** and **the box**. A split that ignores either one ends the pass early — the first as a clobbered file, the second as a dead session.
+
+### The tree
+
+Two workers in one checkout are safe only when the files they will reach for are disjoint, so:
 
 - Group the survivors by the paths their work will touch. Tasks whose paths are disjoint run **at the same time**, each in its own subagent. Tasks that share a path run **one after the other**, in project order, in one lane.
 - Name the split in every brief: the paths that worker owns, and the paths it must not touch because another worker holds them.
 - Where two tasks cannot be split by path and you still want both running, one of them gets `isolation: "worktree"`; its branch is merged when it reports — a merge, never a clobber.
 - Run as many lanes as the split allows and no more than you can watch. Model per worker is the card's `Worker` column.
+
+### The box
+
+Lanes share one machine's RAM, and the kernel does not care whose work it kills. On 2026-09-15 four uncapped workers ran at once on this box, one python reached **20.3 GB** of its 24 GB, and the OOM killer took `init.scope` — the cgroup holding the whole Claude Code process tree — **four times**, killing every agent session on the machine twice over (inbar#253). ~9 GB was pushed to swap first, so the box was unusable long before anything died. Ita, that day: *"ORCHESTRATE SO DO THINGS SIMULTANEOUSLY IF THEY ACTUALLY FIT IN MEM"*. So:
+
+- **Budget the box before you spawn.** `free -g` is what is free now; leave **~4 GB** to the OS and to the sessions themselves. What remains is the pass's budget, and the sum of the lanes' caps may not exceed it.
+- **Every heavy job runs capped, in its own cgroup, and never in swap.** Heavy is anything whose footprint you cannot bound by eye — a backtest, a training run, a dataset read, a build, a full test suite, any ad-hoc script over a large file:
+
+  ```bash
+  systemd-run --user --scope -q -p MemoryMax=<N>G -p MemorySwapMax=0 -- <command>
+  ```
+
+  `MemorySwapMax=0` matters as much as the cap: without it the job thrashes the whole machine before its own cgroup reclaims. A capped job that overruns dies with 137 and takes **only itself**; an uncapped one takes every session on the box. (Verified on this box 2026-09-15: a 600 MB allocation under `MemoryMax=256M` was killed, the shell that launched it untouched.)
+- **Size the cap from a measured peak, not an estimate.** Peaks live in the repo's own memory or an issue's result; where none is recorded, cap it at what you can afford and *measure it this run* — `/usr/bin/time -v <command>` prints `Maximum resident set size`, and the number goes into the result so the next dispatcher sizes from a fact.
+- **Run everything that fits, and no more.** Lanes whose caps fit the budget together run at once; the rest queue behind them, in project order. Narrowing a pass below what the box can hold wastes the machine — the point is simultaneous, not serial.
+- **A worker that hits its cap reports the number and never raises it.** A job needing more than its documented peak is news: it goes in the report and in the issue, and the dispatcher decides whether the pass still fits.
 
 Write the plan down before spawning anything — it is the first footer (§4), and it is what a reader compares the finished pass against.
 
@@ -57,7 +77,7 @@ date +%H:%M                                             # the start time you wil
 
 Then spawn its worker into this repo at the card's model with the issue body as context and this brief:
 
-> You hold `WeatherBaseline#n` and nothing else. Sign it (`/home/ita/coo/tools/sign WeatherBaseline n <YourName>`) before the work. You own these paths: `…`; do not touch `…`, another worker holds them. Do the work, verify it (tests, build, a read of the diff — the result is a claim you are signing), file whatever the work did not reach as its own issue at `Status backlog` before this one closes, and finish it exactly one of three ways per `CLAUDE.md`: **Done** (result block below a `---` rule, close the issue, `Status Done`), **Review** (issue stays open, one-line `**Review:** <who> — <what> — <where>` as the body's first line, `Status Review`, commit says `Refs #n`), or **Blocked** (blocker in the body, issue open, `Status Blocked`). Report back: what you did, how you verified, where it landed, which issues you filed, and the exact paths you left uncommitted.
+> You hold `WeatherBaseline#n` and nothing else. Sign it (`/home/ita/coo/tools/sign WeatherBaseline n <YourName>`) before the work. You own these paths: `…`; do not touch `…`, another worker holds them. Your memory budget is **`<N>` GB**: run anything heavy under `systemd-run --user --scope -q -p MemoryMax=<N>G -p MemorySwapMax=0 -- …`, never uncapped and never into swap, and report its peak (`/usr/bin/time -v`, `Maximum resident set size`) — if you hit the cap, report the number rather than raising it. Do the work, verify it (tests, build, a read of the diff — the result is a claim you are signing), file whatever the work did not reach as its own issue at `Status backlog` before this one closes, and finish it exactly one of three ways per `CLAUDE.md`: **Done** (result block below a `---` rule, close the issue, `Status Done`), **Review** (issue stays open, one-line `**Review:** <who> — <what> — <where>` as the body's first line, `Status Review`, commit says `Refs #n`), or **Blocked** (blocker in the body, issue open, `Status Blocked`). Report back: what you did, how you verified, where it landed, which issues you filed, and the exact paths you left uncommitted.
 
 When a worker reports, before starting anything else in its lane:
 
@@ -73,15 +93,16 @@ Every message you send during a pass ends with this block, whether the message i
 ```
 Ran      WeatherBaseline#71 BUG: board loses the middle page        Done    14:02→14:19 (17m)
          WeatherBaseline#73 FEATURE: lane carries its own backlog    Review  14:02→14:25 (23m) — ita
-Running  WeatherBaseline#74 CLEANUP: retire queue.json               since 14:20, ETA ~14:40
-Planned  WeatherBaseline#75 RUN: re-measure board cost               next in lane 2, ~20m
+Running  WeatherBaseline#74 CLEANUP: retire queue.json               since 14:20, ~20m left → ~14:40
+Planned  WeatherBaseline#75 RUN: re-measure board cost               lane 2, after #74, ~20m → ~15:00
          WeatherBaseline#76 BUG: sign drops the surname               skipped — Blocked on inbar#40
 ```
 
 - **Ran**: every task finished so far this pass, where it landed, and measured start→end with the duration. A Review line names its reviewer; a Blocked line names the blocker.
-- **Running**: every worker alive now, its start time, and an ETA marked `~`.
-- **Planned**: everything still to come, in the order it will run, with which lane and an estimate — plus every task you skipped and why, so the reader knows it was seen.
-- Times are wall-clock, measured with `date` at spawn and at the report — never guessed. ETAs are estimates and say so with `~`; once the first worker of the pass finishes, recalibrate the rest against what it actually took.
+- **Running**: every worker alive now, its start time, and how much longer it has.
+- **Planned**: everything still to come, in the order it will run, with which lane it is in and what it waits on — plus every task you skipped and why, so the reader knows it was seen.
+- **Every `Running` and `Planned` line ends in a wall-clock finish time, not only a duration** — `~20m → ~15:00`. A duration alone makes the reader do the arithmetic, and guess what time the dispatcher thinks it is; the clock time is the thing they actually want, which is when to come back. A planned line's clock assumes every lane ahead of it runs to its own ETA, so recalibrate the whole chain — not just the line that moved — whenever a worker lands early or late.
+- Times are wall-clock, measured with `date` at spawn and at the report — never guessed. Estimates say so with `~`; once the first worker of the pass finishes, recalibrate the rest against what it actually took.
 - A block with nothing running still prints all three headings, with `Running  —`.
 
 ## 5. Close out the pass
