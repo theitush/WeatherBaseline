@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Work this repo's queue (WeatherBaseline) as a dispatcher — one subagent per task, several at once when their paths are disjoint, and a pinned Ran / Running / Planned panel. Invoke as /orchestrate.
+description: Work this repo's queue (WeatherBaseline) as a dispatcher — one subagent per task, several at once when their paths are disjoint, and a pinned Running / Planned / Ran panel. Invoke as /orchestrate.
 ---
 
 <!-- Generated from coo/templates/orchestrate-SKILL.md — every repo carries the
@@ -118,22 +118,24 @@ The three lists — what ran, what is running, what is planned — are one file 
 ```
 
 ```
-Ran      WeatherBaseline#71 BUG: board loses the middle page       Done   14:02→14:19 (17m)
-         WeatherBaseline#73 FEATURE: lane carries its own backlog  Review 14:02→14:25 (23m) — ita
-Running  WeatherBaseline#74 CLEANUP: retire queue.json             since 14:20, ~20m left → ~14:40
-Planned  WeatherBaseline#75 RUN: re-measure board cost             lane 2, after #74, ~20m → ~15:00
-         WeatherBaseline#76 BUG: sign drops the surname            skipped — Blocked on inbar#40
+STAGE    TASK                                                      ETA
+Running  WeatherBaseline#74 CLEANUP: retire queue.json                         ~14:40  ~20m left, since 14:20
+Planned  WeatherBaseline#75 RUN: re-measure board cost                         ~15:00  ~20m, lane 2 after #74
+         WeatherBaseline#76 BUG: sign drops the surname                        skipped — Blocked on inbar#40
+Ran      WeatherBaseline#71 BUG: board loses the middle page                   14:02→14:19 (17m)  Done
+         WeatherBaseline#73 FEATURE: lane carries its own backlog              14:02→14:25 (23m)  Review — ita
 ```
 
-Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
+It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then Ran — with the TASK column a fixed width, so nothing jumps between renders (Ita, 2026-09-17, coo#90: *"running then planned then ran … stage, task, eta in fixed length columns"*). Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
 
-- **Every line names the task by id *and* title.**
-- **Ran** is every task finished so far this pass, where it landed, and the measured `start→end (Nm)`. A Review line names its reviewer; a Blocked line names its blocker.
+- **Every line names the task by id *and* title.** A title longer than the column is cut with an ellipsis; the id never is.
+- **The ETA column leads with the clock** — the finish time for running and planned work, the measured `start→end (Nm)` for finished work — so it reads straight down.
+- **Ran** is every task finished so far this pass, the measured span, and where it landed. A Review line names its reviewer; a Blocked line names its blocker.
 - **Running** counts itself down. `~20m left` is `start + eta − now`, recomputed every time the panel re-renders, so it is true between your messages as well as in them — and a worker past its estimate reads `~12m past ~14:40` instead of sitting at "20m left" forever.
 - **Planned** clocks are chained down each lane from whatever is running in it, so a worker landing early or late moves every line behind it. That is the whole-chain recalibration this section used to ask you to do by hand, and it is the part that was always wrong when you did.
-- **Every `Running` and `Planned` line ends in a wall-clock finish time, not only a duration** — `~20m → ~15:00`. A duration alone makes the reader do the arithmetic and guess what time the dispatcher thinks it is; the clock time is what they actually want, which is when to come back.
+- **Every `Running` and `Planned` line carries a wall-clock finish time, not only a duration** — `~15:00  ~20m`. A duration alone makes the reader do the arithmetic and guess what time the dispatcher thinks it is; the clock time is what they actually want, which is when to come back.
 - Skipped tasks stay on **Planned** with the reason, so the reader knows they were seen.
-- Nothing running still prints all three headings, with `Running  —`.
+- Nothing running still prints the header and all three stages, with `Running  —`.
 - Times are measured, never guessed: `start` and `land` stamp the clock themselves. Estimates are the `--eta` you gave and say so with `~`; once the first worker lands, re-run `plan` to re-estimate the rest against what it actually took.
 
 **The file is per session, not per repo**, because the panel has to be true of the terminal it is pinned to — two sessions open in the same repo (Ita's and yours) would otherwise overwrite each other's pass. It is keyed by `CLAUDE_CODE_SESSION_ID`, which is in the environment of every shell the skill runs, and which a subagent inherits from the session that spawned it — so a worker that stamps itself writes into its dispatcher's file, which is the right one. The renderer takes the session id off the status line's own input instead. You never name it: `/home/ita/coo/tools/orchestrate-status where` prints the path if you want to look.
