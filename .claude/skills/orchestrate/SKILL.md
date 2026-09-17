@@ -118,15 +118,15 @@ The three lists — what ran, what is running, what is planned — are one file 
 ```
 
 ```
-STAGE    TASK                                                      ETA
-Running  WeatherBaseline#74 CLEANUP: retire queue.json                         ~14:40  ~20m left, since 14:20
-Planned  WeatherBaseline#75 RUN: re-measure board cost                         ~15:00  ~20m, lane 2 after #74
-         WeatherBaseline#76 BUG: sign drops the surname                        skipped — Blocked on inbar#40
-Ran      WeatherBaseline#71 BUG: board loses the middle page                   14:02→14:19 (17m)  Done
-         WeatherBaseline#73 FEATURE: lane carries its own backlog              14:02→14:25 (23m)  Review — ita
+STAGE    TASK                                                     ETA
+Running  WeatherBaseline#74 CLEANUP: retire queue.json                        ~14:40  ~20m left, since 14:20
+Planned  WeatherBaseline#75 RUN: re-measure board cost                        ~15:00  ~20m, lane 2 after #74
+Planned  WeatherBaseline#76 BUG: sign drops the surname                       skipped — Blocked on inbar#40
+Ran      WeatherBaseline#71 BUG: board loses the middle page                  14:02→14:19 (17m)  Done
+Ran      WeatherBaseline#73 FEATURE: lane carries its own backlog             14:02→14:25 (23m)  Review — ita
 ```
 
-It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then Ran — with the TASK column a fixed width, so nothing jumps between renders (Ita, 2026-09-17, coo#90: *"running then planned then ran … stage, task, eta in fixed length columns"*). Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
+It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then Ran, the stage written on every row — with the ETA column a fixed width and TASK taking the rest of the terminal, so nothing jumps between renders (Ita, 2026-09-17, coo#90: *"running then planned then ran … stage, task, eta in fixed length columns"*). A status line cannot ask the terminal how wide it is, so `/home/ita/coo/tools/orchestrate-status width <cols>` tells it once per machine (`! tput cols` at the prompt says the number); unset, it lays out for 120. Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
 
 - **Every line names the task by id *and* title.** A title longer than the column is cut with an ellipsis; the id never is.
 - **The ETA column leads with the clock** — the finish time for running and planned work, the measured `start→end (Nm)` for finished work — so it reads straight down.
