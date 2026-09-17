@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Work this repo's queue (WeatherBaseline) as a dispatcher — one subagent per task, several at once when their paths are disjoint, and a status footer on every message. Invoke as /orchestrate.
+description: Work this repo's queue (WeatherBaseline) as a dispatcher — one subagent per task, several at once when their paths are disjoint, and a pinned Ran / Running / Planned panel. Invoke as /orchestrate.
 ---
 
 <!-- Generated from coo/templates/orchestrate-SKILL.md — every repo carries the
@@ -63,7 +63,17 @@ Lanes share one machine's RAM, and the kernel does not care whose work it kills.
 - **Run everything that fits, and no more.** Lanes whose caps fit the budget together run at once; the rest queue behind them, in project order. Narrowing a pass below what the box can hold wastes the machine — the point is simultaneous, not serial.
 - **A worker that hits its cap reports the number and never raises it.** A job needing more than its documented peak is news: it goes in the report and in the issue, and the dispatcher decides whether the pass still fits.
 
-Write the plan down before spawning anything — it is the first footer (§4), and it is what a reader compares the finished pass against.
+Write the plan down before spawning anything — one line per task, the ones you skipped included:
+
+```bash
+/home/ita/coo/tools/orchestrate-status plan <<'EOF'
+WeatherBaseline#74 | CLEANUP: retire queue.json            | 2 | 20
+WeatherBaseline#75 | RUN: re-measure board cost            | 2 | 20
+WeatherBaseline#76 | BUG: sign drops the surname           | skip |  | Blocked on inbar#40
+EOF
+```
+
+The columns are id, title, lane, your estimate in whole minutes, and a note; `skip` in the lane column is a task you saw and passed over, and the note is why. That file *is* the pass — it is what the panel renders and what §4's footer is printed from, so it is also what a reader compares the finished pass against. Re-run `plan` whenever the shape of the pass changes (a task added, a lane re-cut, an estimate you now know better): it re-orders and re-estimates, and it never un-runs anything that has already started or landed.
 
 ## 3. Spawn, watch, land
 
@@ -71,8 +81,8 @@ For each task, in this order:
 
 ```bash
 n=<n>
-/home/ita/coo/tools/board set WeatherBaseline $n Status "In Progress"   # before the spawn, so a crash leaves evidence
-date +%H:%M                                             # the start time you will report
+/home/ita/coo/tools/board set WeatherBaseline $n Status "In Progress"        # before the spawn, so a crash leaves evidence
+/home/ita/coo/tools/orchestrate-status start WeatherBaseline#$n --eta 20     # stamps the real start; the panel counts down from it
 ```
 
 Then spawn its worker into this repo at the card's model with the issue body as context and this brief:
@@ -81,29 +91,54 @@ Then spawn its worker into this repo at the card's model with the issue body as 
 
 When a worker reports, before starting anything else in its lane:
 
-1. Note the finish time. Read its result against the issue — you are the one who verifies before anything reads Done; what you cannot verify by looking goes to `Review` with what and who in the body.
-2. Commit **by path** the paths its report names, and nothing else. Never `-A`: the tree is shared.
-3. Start the next task in that lane.
-4. Send a message: it ends with the footer, and the footer now carries this task's actual timing.
+1. Read its result against the issue — you are the one who verifies before anything reads Done; what you cannot verify by looking goes to `Review` with what and who in the body.
+2. Stamp the finish, which measures the duration for you:
 
-## 4. The footer — on every message
+   ```bash
+   /home/ita/coo/tools/orchestrate-status land WeatherBaseline#$n Done
+   /home/ita/coo/tools/orchestrate-status land WeatherBaseline#$n Review  --note ita
+   /home/ita/coo/tools/orchestrate-status land WeatherBaseline#$n Blocked --note "inbar#40"
+   ```
 
-Every message you send during a pass ends with this block, whether the message is the plan, a one-line update, a question, or the final report. It is how Ita follows a pass from another device without reading transcripts. **Every line names the task by id *and* title.**
+   Exactly the three ways a task is allowed to finish. `--at HH:MM` is for when you notice a few minutes late; without it the clock is now.
+3. Commit **by path** the paths its report names, and nothing else. Never `-A`: the tree is shared.
+4. Start the next task in that lane.
+5. Send a message: it ends with the footer, and the footer now carries this task's actual timing.
+
+## 4. The panel, and the footer on every message
+
+The three lists — what ran, what is running, what is planned — are one file now, written by the commands in §2 and §3 and rendered in two places.
+
+**The panel** is the status line: Claude Code re-runs it on every assistant message and pins each line of its output to the bottom of the terminal. So the three headings sit in one place and stop scrolling away, which is what Ita asked for (coo#87): *"i just want to have the running, ran, planned in a fixed format that doesnt go anywhere instead of the text written at the end of every msg."* There is nothing to set up per pass — `plan` brings the panel up, §5's `clear` takes it down, and a session with no pass shows no headings at all.
+
+**The footer stays, and stays whole.** Every message you send during a pass still ends with the block, whether it is the plan, a one-line update, a question, or the final report. The panel lives only in this terminal; Ita follows a pass from his phone, where there is no status line, and a single notification has to be readable on its own — so a footer trimmed to "what changed since last time" is unreadable to exactly the reader it exists for. What has changed is that you no longer *retype* it. Print it and paste it:
+
+```bash
+/home/ita/coo/tools/orchestrate-status show
+```
 
 ```
-Ran      WeatherBaseline#71 BUG: board loses the middle page        Done    14:02→14:19 (17m)
-         WeatherBaseline#73 FEATURE: lane carries its own backlog    Review  14:02→14:25 (23m) — ita
-Running  WeatherBaseline#74 CLEANUP: retire queue.json               since 14:20, ~20m left → ~14:40
-Planned  WeatherBaseline#75 RUN: re-measure board cost               lane 2, after #74, ~20m → ~15:00
-         WeatherBaseline#76 BUG: sign drops the surname               skipped — Blocked on inbar#40
+Ran      WeatherBaseline#71 BUG: board loses the middle page       Done   14:02→14:19 (17m)
+         WeatherBaseline#73 FEATURE: lane carries its own backlog  Review 14:02→14:25 (23m) — ita
+Running  WeatherBaseline#74 CLEANUP: retire queue.json             since 14:20, ~20m left → ~14:40
+Planned  WeatherBaseline#75 RUN: re-measure board cost             lane 2, after #74, ~20m → ~15:00
+         WeatherBaseline#76 BUG: sign drops the surname            skipped — Blocked on inbar#40
 ```
 
-- **Ran**: every task finished so far this pass, where it landed, and measured start→end with the duration. A Review line names its reviewer; a Blocked line names the blocker.
-- **Running**: every worker alive now, its start time, and how much longer it has.
-- **Planned**: everything still to come, in the order it will run, with which lane it is in and what it waits on — plus every task you skipped and why, so the reader knows it was seen.
-- **Every `Running` and `Planned` line ends in a wall-clock finish time, not only a duration** — `~20m → ~15:00`. A duration alone makes the reader do the arithmetic, and guess what time the dispatcher thinks it is; the clock time is the thing they actually want, which is when to come back. A planned line's clock assumes every lane ahead of it runs to its own ETA, so recalibrate the whole chain — not just the line that moved — whenever a worker lands early or late.
-- Times are wall-clock, measured with `date` at spawn and at the report — never guessed. Estimates say so with `~`; once the first worker of the pass finishes, recalibrate the rest against what it actually took.
-- A block with nothing running still prints all three headings, with `Running  —`.
+Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
+
+- **Every line names the task by id *and* title.**
+- **Ran** is every task finished so far this pass, where it landed, and the measured `start→end (Nm)`. A Review line names its reviewer; a Blocked line names its blocker.
+- **Running** counts itself down. `~20m left` is `start + eta − now`, recomputed every time the panel re-renders, so it is true between your messages as well as in them — and a worker past its estimate reads `~12m past ~14:40` instead of sitting at "20m left" forever.
+- **Planned** clocks are chained down each lane from whatever is running in it, so a worker landing early or late moves every line behind it. That is the whole-chain recalibration this section used to ask you to do by hand, and it is the part that was always wrong when you did.
+- **Every `Running` and `Planned` line ends in a wall-clock finish time, not only a duration** — `~20m → ~15:00`. A duration alone makes the reader do the arithmetic and guess what time the dispatcher thinks it is; the clock time is what they actually want, which is when to come back.
+- Skipped tasks stay on **Planned** with the reason, so the reader knows they were seen.
+- Nothing running still prints all three headings, with `Running  —`.
+- Times are measured, never guessed: `start` and `land` stamp the clock themselves. Estimates are the `--eta` you gave and say so with `~`; once the first worker lands, re-run `plan` to re-estimate the rest against what it actually took.
+
+**The file is per session, not per repo**, because the panel has to be true of the terminal it is pinned to — two sessions open in the same repo (Ita's and yours) would otherwise overwrite each other's pass. It is keyed by `CLAUDE_CODE_SESSION_ID`, which is in the environment of every shell the skill runs, and which a subagent inherits from the session that spawned it — so a worker that stamps itself writes into its dispatcher's file, which is the right one. The renderer takes the session id off the status line's own input instead. You never name it: `/home/ita/coo/tools/orchestrate-status where` prints the path if you want to look.
+
+The pinned rows need `statusLine` in `~/.claude/settings.json` to run `/home/ita/coo/tools/orchestrate-status statusline -- <whatever held the status line before>`, which is set up on this machine. Where it is not — a cloud session, another box — `plan`, `start`, `land` and `show` all still work and the footer is unaffected; only the pinned rows are missing.
 
 ## 5. Close out the pass
 
@@ -117,4 +152,12 @@ Before the final report, and every time:
 
 ## 6. Report
 
-Per item: what it was, what its worker did, how it was verified, where it landed (Done / Review-and-who / Blocked-and-why), and what it left behind. Then the queue's new state, anything you skipped with the reason, the priorities you changed — and the footer, with every line now carrying its actual timing.
+Per item: what it was, what its worker did, how it was verified, where it landed (Done / Review-and-who / Blocked-and-why), and what it left behind. Then the queue's new state, anything you skipped with the reason, the priorities you changed — and the footer one last time, with every line now carrying its actual timing.
+
+Then, and only after that footer is written:
+
+```bash
+/home/ita/coo/tools/orchestrate-status clear    # the pass is over; the panel comes down
+```
+
+A pass left uncleared pins its own history to the bottom of the terminal for the rest of the session, which is the one way this panel can lie.
