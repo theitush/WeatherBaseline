@@ -91,7 +91,7 @@ export type ThemeMode = 'light' | 'dark';
  * recency. The same hexes cannot serve both, which is why there are two rows.
  *
  * GENERATED, NOT HAND-PICKED. Each ramp holds its metric's OKLCH hue with
- * chroma capped at 0.16 and lightness pinned at L 0.74 / 0.61 / 0.48 (light)
+ * chroma capped at 0.16 and lightness pinned at L 0.75 / 0.665 / 0.58 (light)
  * and 0.47 / 0.67 / 0.75 (dark), gamut-clipped by reducing chroma; every ramp
  * passes the dataviz skill's `validate_palette.js --ordinal` in its own mode,
  * checked 2026-09-18, with the pale end at ≥2.2:1 on #fff and ≥2.4:1 on
@@ -102,7 +102,11 @@ export type ThemeMode = 'light' | 'dark';
  * (the satellite cut is the big one). They replace d3 brighter()/darker() steps
  * off the base colour, which drifted orange's hue 43° (so it was not one hue at
  * all) and left the oldest era at 1.3:1 — invisible on white — and were reused
- * unchecked in dark mode.
+ * unchecked in dark mode. The light steps were lifted the same evening (from
+ * 0.74 / 0.61 / 0.48) after Ita read them on white: at L 0.48 orange is brown
+ * and blue is grey-navy, so the newest era now sits at 0.58 — a burnt orange /
+ * a real blue — and the three steps close up to 0.085 L apart, still clear of
+ * the validator's 0.06 floor.
  *
  * DO NOT hand-edit a value here, and do not add a metric by eye: regenerate and
  * re-run the validator, or the guarantees above quietly stop being true.
@@ -112,19 +116,19 @@ const ERA_RAMPS: Record<
   { light: [string, string, string]; dark: [string, string, string] }
 > = {
   max_temperature: {
-    light: ['#f98941', '#cc6001', '#934300'],
+    light: ['#fc8c44', '#df7124', '#be5901'],
     dark: ['#8f4203', '#e07326', '#fc8c44'],
   },
   min_temperature: {
-    light: ['#6baeff', '#3f85d6', '#115dab'],
+    light: ['#71b1fe', '#5096e8', '#357ccc'],
     dark: ['#0c5aa8', '#5198ea', '#71b1fe'],
   },
   precipitation_sum: {
-    light: ['#b495fe', '#8d6bd7', '#6843ac'],
+    light: ['#b69afe', '#9d7cea', '#8462cd'],
     dark: ['#6540a8', '#9f7deb', '#b69afe'],
   },
   wind_speed_10m_max: {
-    light: ['#a6abb4', '#7e838c', '#595e66'],
+    light: ['#a9aeb7', '#8f949d', '#767a83'],
     dark: ['#565b63', '#90959e', '#a9aeb7'],
   },
 };
