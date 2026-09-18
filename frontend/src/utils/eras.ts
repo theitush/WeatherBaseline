@@ -92,12 +92,17 @@ export type ThemeMode = 'light' | 'dark';
  *
  * GENERATED, NOT HAND-PICKED. Each ramp holds its metric's OKLCH hue with
  * chroma capped at 0.16 and lightness pinned at L 0.74 / 0.61 / 0.48 (light)
- * and 0.52 / 0.66 / 0.80 (dark), gamut-clipped by reducing chroma; every ramp
+ * and 0.47 / 0.67 / 0.75 (dark), gamut-clipped by reducing chroma; every ramp
  * passes the dataviz skill's `validate_palette.js --ordinal` in its own mode,
- * checked 2026-09-18, with the pale end at ≥2.2:1 on #fff and ≥2.9:1 on
- * #16171d. They replace d3 brighter()/darker() steps off the base colour, which
- * drifted orange's hue 43° (so it was not one hue at all) and left the oldest
- * era at 1.3:1 — invisible on white — and were reused unchecked in dark mode.
+ * checked 2026-09-18, with the pale end at ≥2.2:1 on #fff and ≥2.4:1 on
+ * #16171d. The dark steps were regenerated that day after Ita read the chart in
+ * dark mode: the pre/post-satellite pair sat too close together and the newest
+ * era too bright, so era 0 drops and era 2 dims — the gap between 0 and 1 is now
+ * 0.20 L against 0.08 between 1 and 2, which is the order of the split itself
+ * (the satellite cut is the big one). They replace d3 brighter()/darker() steps
+ * off the base colour, which drifted orange's hue 43° (so it was not one hue at
+ * all) and left the oldest era at 1.3:1 — invisible on white — and were reused
+ * unchecked in dark mode.
  *
  * DO NOT hand-edit a value here, and do not add a metric by eye: regenerate and
  * re-run the validator, or the guarantees above quietly stop being true.
@@ -108,19 +113,19 @@ const ERA_RAMPS: Record<
 > = {
   max_temperature: {
     light: ['#f98941', '#cc6001', '#934300'],
-    dark: ['#a44c02', '#dd7022', '#fea571'],
+    dark: ['#8f4203', '#e07326', '#fc8c44'],
   },
   min_temperature: {
     light: ['#6baeff', '#3f85d6', '#115dab'],
-    dark: ['#2169b8', '#4e94e7', '#8fc1ff'],
+    dark: ['#0c5aa8', '#5198ea', '#71b1fe'],
   },
   precipitation_sum: {
     light: ['#b495fe', '#8d6bd7', '#6843ac'],
-    dark: ['#734fb9', '#9c7ae8', '#c4affe'],
+    dark: ['#6540a8', '#9f7deb', '#b69afe'],
   },
   wind_speed_10m_max: {
     light: ['#a6abb4', '#7e838c', '#595e66'],
-    dark: ['#646972', '#8d929b', '#b9bec7'],
+    dark: ['#565b63', '#90959e', '#a9aeb7'],
   },
 };
 
