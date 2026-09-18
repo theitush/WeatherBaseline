@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import CONFIG from '../utils/config';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint, YearlyAggregate, Location, TemperatureContext } from '../types';
@@ -114,13 +114,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [fullData, setFullData] = useState<WeatherDataPoint[]>([]);
   const [yearTimeline, setYearTimeline] = useState<WeatherDataPoint[]>([]);
   const [filteredData, setFilteredData] = useState<WeatherDataPoint[]>([]);
-  const [fullYearlyAggregates, setFullYearlyAggregates] = useState<YearlyAggregate[]>([]);
-  const [yearlyAggregates, setYearlyAggregates] = useState<YearlyAggregate[]>([]);
+  // The yearly aggregates are DERIVED, declared below the year range they are
+  // filtered by — see the note there.
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   // Year range filter (default to all available years)
   const [startYear, setStartYear] = useState<number>(1940);
   const [endYear, setEndYear] = useState<number>(new Date().getFullYear());
+
+  /**
+   * The yearly aggregates — DERIVED from the data, the metric and the date, not
+   * held in state and refreshed by an effect.
+   *
+   * They used to be state, written from three places (the fetch, setYearRange,
+   * and an effect keyed on the metric). The effect is what hurt: a metric switch
+   * rendered ONCE with the new metric but the PREVIOUS metric's aggregates, and
+   * only the render after that had the right ones. MainChart is the only
+   * consumer, and it redraws on either — so every metric switch tore the chart
+   * down and rebuilt it TWICE, ~150-250ms apart, and the second teardown
+   * restarted the entrance fade from nothing. That was the flicker (#70).
+   *
+   * Derived, the first render of a switch already has the right aggregates:
+   * one render, one draw. Both are still computed from exactly what the three
+   * setters computed them from, so nothing about the values changes.
+   */
+  const fullYearlyAggregates = useMemo(
+    () => (fullData.length > 0 ? calculateYearlyAggregates(fullData, currentMetric, currentDate) : []),
+    [fullData, currentMetric, currentDate]
+  );
+  const yearlyAggregates = useMemo(
+    () => filterAggregatesByYearRange(fullYearlyAggregates, startYear, endYear),
+    [fullYearlyAggregates, startYear, endYear]
+  );
 
   // Temperature context
   const [temperatureContext, setTemperatureContext] = useState<TemperatureContext | null>(null);
@@ -280,10 +305,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const years = getAvailableYears(data);
       setAvailableYears(years);
 
-      // Calculate full aggregates
-      const aggregates = calculateYearlyAggregates(data, currentMetric, currentDate);
-      setFullYearlyAggregates(aggregates);
-
       // Set default year range if not set
       if (years.length > 0) {
         const minYear = Math.min(...years);
@@ -294,10 +315,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         // Filter data with full range
         const filtered = filterDataByYearRange(data, minYear, maxYear);
         setFilteredData(filtered);
-
-        // Filter aggregates
-        const filteredAggs = filterAggregatesByYearRange(aggregates, minYear, maxYear);
-        setYearlyAggregates(filteredAggs);
 
         // Calculate temperature context for current date
         const currentDateData = getCurrentDateData(filtered, currentDate);
@@ -329,10 +346,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const filtered = filterDataByYearRange(fullData, start, end);
       setFilteredData(filtered);
 
-      // Filter aggregates
-      const filteredAggs = filterAggregatesByYearRange(fullYearlyAggregates, start, end);
-      setYearlyAggregates(filteredAggs);
-
       // Recalculate temperature context
       const currentDateData = getCurrentDateData(filtered, currentDate);
       if (currentDateData.length > 0) {
@@ -341,7 +354,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setTemperatureContext(context);
       }
     },
-    [fullData, fullYearlyAggregates, currentDate, currentMetric]
+    [fullData, currentDate, currentMetric]
   );
 
   const dismissForecastWarning = useCallback(() => {
@@ -353,16 +366,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     await fetchData();
   }, [fetchData]);
 
-  // Recalculate aggregates when metric changes
+  // Recalculate the temperature context when the metric changes. The aggregates
+  // used to be recomputed here too; they are derived above now (#70).
   useEffect(() => {
     if (fullData.length > 0) {
-      const aggregates = calculateYearlyAggregates(fullData, currentMetric, currentDate);
-      setFullYearlyAggregates(aggregates);
-
-      const filteredAggs = filterAggregatesByYearRange(aggregates, startYear, endYear);
-      setYearlyAggregates(filteredAggs);
-
-      // Recalculate temperature context
       const currentDateData = getCurrentDateData(filteredData, currentDate);
       if (currentDateData.length > 0) {
         const currentTemp = currentDateData[0][currentMetric];
@@ -370,7 +377,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setTemperatureContext(context);
       }
     }
-  }, [currentMetric, fullData, currentDate, filteredData, startYear, endYear]);
+  }, [currentMetric, fullData, currentDate, filteredData]);
 
   // Auto-fetch whenever location or target date changes — but on a bare-root
   // visit, wait for the IP lookup below to resolve first (geoResolved) so we

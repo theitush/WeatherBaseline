@@ -53,6 +53,11 @@ const MainChart: React.FC<MainChartProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  // What the last completed draw was OF. A draw whose key differs from the last
+  // one is a redraw of a chart the reader is already looking at; a re-run with
+  // the SAME key is React replaying the effect (StrictMode does exactly this on
+  // mount in dev), which is still the arrival. See `entrance` below.
+  const lastDrawKeyRef = useRef<string | null>(null);
 
   const { system } = useUnits();
   const { eraStyle } = useEraStyle();
@@ -76,6 +81,40 @@ const MainChart: React.FC<MainChartProps> = ({
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+
+    // What the READER chose: metric, date, units, era style, theme, size. Data
+    // is deliberately NOT in here. A draw whose key differs from the last one is
+    // a switch the reader asked for, on a chart already in front of them; a draw
+    // with the same key is the chart still arriving (the tiers land in stages,
+    // so a first load draws several times) or React replaying the effect. See
+    // `entrance`.
+    const drawKey = [
+      currentMetric, currentDate, system, eraStyle, theme, isVertical,
+      totalWidth, totalHeight,
+    ].join('|');
+    const isRedraw = lastDrawKeyRef.current !== null && lastDrawKeyRef.current !== drawKey;
+
+    /**
+     * Fade a mark in on ARRIVAL, and never on a redraw.
+     *
+     * Every draw tears the whole svg down and rebuilds it, so a redraw used to
+     * replay the arrival animation: switching metric left the band, the dots,
+     * the rolling median and the record stars at opacity 0 and faded them back
+     * over half a second, with the chart visibly EMPTY for the first ~300ms of
+     * it. Ita called it a flicker (#70), and it reads as one because the
+     * histogram beside it — whose bars have never faded — is already complete
+     * while this chart is still blank.
+     *
+     * So the fade keeps the case it was written for, a chart appearing out of
+     * nothing, and a redraw of a chart already on screen paints straight to
+     * full opacity. Nothing about the FINISHED chart changes either way.
+     */
+    const entrance = <E extends d3.BaseType, D, PE extends d3.BaseType, PD>(
+      sel: d3.Selection<E, D, PE, PD>
+    ) => {
+      if (isRedraw) sel.style('opacity', 1);
+      else sel.style('opacity', 0).transition().duration(500).style('opacity', 1);
+    };
 
     const g = svg
       .append('g')
@@ -385,7 +424,7 @@ const MainChart: React.FC<MainChartProps> = ({
         // and the whole-band path to the same, but the two selections are not
         // the same type to d3's typings.
         const paint = <T,>(sel: d3.Selection<SVGPathElement, T, null, undefined>) =>
-          sel.style('opacity', 0).transition().duration(500).style('opacity', 1);
+          entrance(sel);
         if (segments) {
           segments.forEach((seg, i) => {
             if (seg.length < 2) return;
@@ -427,17 +466,15 @@ const MainChart: React.FC<MainChartProps> = ({
               .y((d) => tsv(d.movingMedian as number))
               .curve(d3.curveMonotoneX);
 
-        g.append('path')
-          .datum(trendData)
-          .attr('class', 'trend-line')
-          .attr('fill', 'none')
-          .attr('stroke', CONFIG.getColorForElement(currentMetric, 'trendLine'))
-          .attr('stroke-width', 2.5)
-          .attr('d', line)
-          .style('opacity', 0)
-          .transition()
-          .duration(500)
-          .style('opacity', 1);
+        entrance(
+          g.append('path')
+            .datum(trendData)
+            .attr('class', 'trend-line')
+            .attr('fill', 'none')
+            .attr('stroke', CONFIG.getColorForElement(currentMetric, 'trendLine'))
+            .attr('stroke-width', 2.5)
+            .attr('d', line)
+        );
       }
     }
 
@@ -488,10 +525,9 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('r', (d) => (isForecastLike(d) ? 3.2 : 2.8))
       .attr('fill', (d) => (isForecastLike(d) ? 'var(--surface)' : dotColor))
       .attr('stroke', (d) => (isForecastLike(d) ? dotColor : 'none'))
-      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : 0))
-      .style('opacity', 0);
+      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : 0));
 
-    dotSelection.transition().duration(500).style('opacity', 1);
+    entrance(dotSelection);
 
     // Invisible larger hit-targets so the hover doesn't require pixel-perfect aim
     // on the 2px dots. Appended before the record stars / current-date marker so
@@ -550,7 +586,8 @@ const MainChart: React.FC<MainChartProps> = ({
         { d: recordLoRow, color: '#2f6fb8', label: 'Record low' },
       ].filter((r) => !isTargetDay(r.d));
 
-      g.selectAll('.record-point')
+      const recordSelection = g
+        .selectAll('.record-point')
         .data(recs)
         .enter()
         .append('path')
@@ -563,7 +600,6 @@ const MainChart: React.FC<MainChartProps> = ({
         .attr('fill', (r) => r.color)
         .attr('stroke', 'var(--surface)')
         .attr('stroke-width', 1.5)
-        .style('opacity', 0)
         .on('mouseover', (event, r) => {
           tooltip
             .style('opacity', 1)
@@ -572,10 +608,9 @@ const MainChart: React.FC<MainChartProps> = ({
             );
           place(event);
         })
-        .on('mouseout', () => tooltip.style('opacity', 0))
-        .transition()
-        .duration(500)
-        .style('opacity', 1);
+        .on('mouseout', () => tooltip.style('opacity', 0));
+
+      entrance(recordSelection);
     }
 
     // Current date indicator
@@ -699,6 +734,8 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('text-anchor', 'end');
       }
     }
+
+    lastDrawKeyRef.current = drawKey;
   }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle, theme]);
 
   return (
