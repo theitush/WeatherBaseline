@@ -14,7 +14,7 @@ import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
-import { erasForPool, eraIndex, eraInk } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, eraColor } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './HistogramChart.css';
@@ -774,28 +774,56 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             regLo = Math.max(domLo2, Math.min(domHi2, regLo));
             regHi = Math.max(domLo2, Math.min(domHi2, regHi));
 
+            // TEXTURE INK — tone-on-tone off the metric's own validated ramp,
+            // never text colour. The hatch used to be var(--text-h) at 0.5,
+            // which is white on the dark theme: the loudest thing on the chart,
+            // and reading as chrome rather than as this metric's forecast.
+            // Light takes the ramp's darkest step, dark its mid step — bright
+            // enough on #16171d to read without glowing — so the texture is
+            // equally loud in both themes. One ink for the whole mark: the
+            // wash, the lines and the % label all take it.
+            const hatchInk =
+              theme === 'dark'
+                ? eraColor(currentMetric, 1, 'dark')
+                : eraColor(currentMetric, 2, 'light');
+
             // Clip the full-support fill to the region — a rect in g-local coords,
             // so the fill edge lands exactly on the reference line's pixel.
             const clipId = `conf-shade-${uid}`;
             const hatchId = `conf-hatch-${uid}`;
             const defs = svg.append('defs');
-            // Diagonal-hatch fill in the KDE-line ink so the claimed region reads
-            // as a textured overlay, denser than a flat wash but not a solid block.
-            defs
+            // ONE directional fill at 45°, never both diagonals: the direction
+            // carries a meaning here ("the region the verdict claims") and a
+            // second angle would imply a second one. The tile is a flat wash of
+            // the ink with a line over it, so the region reads as a tinted
+            // SURFACE that happens to be textured rather than as scratches on
+            // nothing — and it stays a single fill: url(#…), so the clip path
+            // and the 500ms fade below are untouched.
+            const PITCH = 7;
+            const hatch = defs
               .append('pattern')
               .attr('id', hatchId)
               .attr('patternUnits', 'userSpaceOnUse')
-              .attr('width', 6)
-              .attr('height', 6)
-              .attr('patternTransform', 'rotate(45)')
+              .attr('width', PITCH)
+              .attr('height', PITCH)
+              .attr('patternTransform', 'rotate(45)');
+            hatch
+              .append('rect')
+              .attr('width', PITCH)
+              .attr('height', PITCH)
+              .attr('fill', hatchInk)
+              .attr('fill-opacity', 0.12);
+            // x at 0.5, not 0: a 1px stroke on the tile's own edge is clipped in
+            // half by every tile, which renders the whole hatch at half weight.
+            hatch
               .append('line')
-              .attr('x1', 0)
+              .attr('x1', 0.5)
               .attr('y1', 0)
-              .attr('x2', 0)
-              .attr('y2', 6)
-              .attr('stroke', 'var(--text-h)')
-              .attr('stroke-width', 1.4)
-              .attr('stroke-opacity', 0.5);
+              .attr('x2', 0.5)
+              .attr('y2', PITCH)
+              .attr('stroke', hatchInk)
+              .attr('stroke-width', 1)
+              .attr('stroke-opacity', 0.55);
             const clipRect = defs.append('clipPath').attr('id', clipId).append('rect');
             if (isVertical) {
               clipRect
@@ -838,8 +866,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             // to the shaded region rather than buried inside the hatch. Anchor it at
             // the GEOMETRIC middle of the visibly-shaded extent: trim the near-zero
             // density tail (the KDE's padded shoulder), take the midpoint of what's
-            // left, then step just past the curve at that point. Inked to match the
-            // hatch exactly — KDE ink at the stripes' own opacity, no outline.
+            // left, then step just past the curve at that point. Takes the hatch's
+            // own ink at FULL opacity — the stripes' 0.55 is right for texture and
+            // too faint for 12px glyphs — so it reads in either theme, no outline.
             // Rounded to 5% / capped at 95% to match the card.
             const regionPts = density.filter((pt) => pt.t >= regLo && pt.t <= regHi);
             if (regionPts.length) {
@@ -867,8 +896,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
                 .attr('dy', isVertical ? '0' : '0.35em')
                 .attr('text-anchor', isVertical ? 'middle' : 'start')
                 .style('font-size', '12px')
-                .style('fill', 'var(--text-h)')
-                .style('fill-opacity', 0.5)
+                .style('fill', hatchInk)
                 .style('opacity', 0)
                 .text(`~${chance}%`)
                 .transition()
