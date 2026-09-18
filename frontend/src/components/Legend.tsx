@@ -1,8 +1,9 @@
 import React from 'react';
 import type { Selection } from 'd3';
 import CONFIG, { type MetricKey } from '../utils/config';
-import { eraInk, hasOutline, type Era, type EraStyle } from '../utils/eras';
+import { eraInk, hasOutline, type Era, type EraStyle, type ThemeMode } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
+import { useThemeMode } from '../hooks/useTheme';
 
 export type LegendItem =
   | { type: 'rect'; color: string; label: string; op: number; stroke?: string; strokeWidth?: number }
@@ -58,6 +59,7 @@ export const getLegendData = (
   isForecast?: boolean,
   eras?: Era[],
   eraStyle: EraStyle = 'shade',
+  theme: ThemeMode = 'light',
 ): LegendItem[] => {
   const items: LegendItem[] = [];
 
@@ -67,7 +69,7 @@ export const getLegendData = (
   // the shade its bars are drawn in.
   if (eras && eras.length) {
     eras.forEach((era, i) => {
-      const ink = eraInk(metric, i, eraStyle);
+      const ink = eraInk(metric, i, eraStyle, theme);
       // An era with no contour ink (contour style's oldest) is fill only — it
       // must not get an outlined swatch, or the legend claims a line the chart
       // doesn't draw. `stroke: undefined` is what suppresses the swatch rect.
@@ -210,7 +212,10 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
 
 export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForecast?: boolean; eras?: Era[] }> = ({ metric, currentDate, isForecast, eras }) => {
   const { eraStyle } = useEraStyle();
-  const items = getLegendData(metric, currentDate, isForecast, eras, eraStyle);
+  // The era swatches come off the same theme-specific ramp the charts paint
+  // with, so the legend has to re-render on a theme flip too.
+  const theme = useThemeMode();
+  const items = getLegendData(metric, currentDate, isForecast, eras, eraStyle, theme);
   // The binned-data swatch(es) + the target-day marker form the first row on
   // mobile; the break sits after the marker (or after the last swatch when no
   // date is selected).

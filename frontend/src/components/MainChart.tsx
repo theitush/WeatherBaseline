@@ -9,6 +9,7 @@ import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
 import { erasForPool, eraIndex, eraInk, hasOutline, type EraInk } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
+import { useThemeMode } from '../hooks/useTheme';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -55,6 +56,8 @@ const MainChart: React.FC<MainChartProps> = ({
 
   const { system } = useUnits();
   const { eraStyle } = useEraStyle();
+  // Era colours are chosen in JS per theme, so the chart redraws on a flip.
+  const theme = useThemeMode();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -220,7 +223,7 @@ const MainChart: React.FC<MainChartProps> = ({
     if (eras) {
       const eraG = g.append('g').attr('class', 'era-bands');
       eras.forEach((era, i) => {
-        const ink = eraInk(currentMetric, i, eraStyle);
+        const ink = eraInk(currentMetric, i, eraStyle, theme);
         if (!isContour) {
           // Band spans [start-of-first-year, end-of-last-year], clamped to the axis.
           const [t0, t1] = timeScale.domain();
@@ -274,7 +277,7 @@ const MainChart: React.FC<MainChartProps> = ({
       const boundaryPos = timeScale(satelliteDate);
       // In the era-split view the 1979 cut is the second era's start, so its
       // dash takes that era's ink (#62); the neutral axis colour otherwise.
-      const satEraInk = eras ? eraInk(currentMetric, 1, eraStyle) : null;
+      const satEraInk = eras ? eraInk(currentMetric, 1, eraStyle, theme) : null;
       const satInk = satEraInk && hasOutline(satEraInk) ? satEraInk : null;
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
@@ -445,7 +448,7 @@ const MainChart: React.FC<MainChartProps> = ({
     // then keeps exactly the styling it always had.
     const eraDotInk = (d: WeatherDataPoint): EraInk | null => {
       if (!eras || !isContour) return null;
-      const ink = eraInk(currentMetric, eraIndex(d.year, eras), eraStyle);
+      const ink = eraInk(currentMetric, eraIndex(d.year, eras), eraStyle, theme);
       return hasOutline(ink) ? ink : null;
     };
     const dotSelection = g.selectAll('.data-point')
@@ -671,7 +674,7 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('text-anchor', 'end');
       }
     }
-  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle]);
+  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle, theme]);
 
   return (
     <div className="main-chart-wrapper">

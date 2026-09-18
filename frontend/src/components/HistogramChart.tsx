@@ -16,6 +16,7 @@ import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
 import { erasForPool, eraIndex, eraInk, hasOutline } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
+import { useThemeMode } from '../hooks/useTheme';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -139,6 +140,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
   const { system } = useUnits();
   const { eraStyle } = useEraStyle();
+  // The era ramps are picked in JS, not off CSS variables, so a theme flip
+  // has to redraw the chart — hence `theme` in the effect deps below.
+  const theme = useThemeMode();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -267,7 +271,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // silhouette of the shape — appended after the bars below.
     const isContour = eraStyle === 'contour';
     eraBins.forEach((eb, i) => {
-      const ink = eraInk(currentMetric, i, eraStyle);
+      const ink = eraInk(currentMetric, i, eraStyle, theme);
       const barSel = g.selectAll(`.bar.era-${i}`)
         .data(eb.filter((d) => d.length > 0))
         .enter()
@@ -341,7 +345,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .y((p) => (isVertical ? height - countLen(p[1]) : tempScale(p[0])));
 
       eraBins.forEach((eb, i) => {
-        const ink = eraInk(currentMetric, i, eraStyle);
+        const ink = eraInk(currentMetric, i, eraStyle, theme);
         // The oldest era carries no contour ink (its old one read as black), so
         // it is fill only — no silhouette for it.
         if (!hasOutline(ink)) return;
@@ -353,6 +357,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('stroke', ink.stroke)
           .attr('stroke-width', ink.strokeWidth)
           .attr('stroke-opacity', 0.9)
+          .attr('stroke-linejoin', 'round')
           .attr('pointer-events', 'none')
           .attr('d', silhouetteLine(silhouettePoints(eb, true)) as string)
           .transition()
@@ -370,10 +375,11 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       const perEra = eras
         .map((era, i) => {
           const n = eraBins[i][binIdx]?.length ?? 0;
-          const ink = eraInk(currentMetric, i, eraStyle);
-          const border = hasOutline(ink)
-            ? `${ink.strokeWidth}px solid ${ink.stroke}`
-            : '1.5px solid transparent'; // keeps the rows aligned
+          const ink = eraInk(currentMetric, i, eraStyle, theme);
+          // A 9px chip can't carry the chart's own 2px stroke, so the border
+          // width is fixed here and only its colour changes — transparent for
+          // an outline-less era, which keeps the three rows aligned.
+          const border = `1.5px solid ${hasOutline(ink) ? ink.stroke : 'transparent'}`;
           const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:${border};vertical-align:-1px`;
           return `<span style="${sw}"></span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
         })
@@ -1020,7 +1026,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // Legend is rendered as an HTML element above the charts for both
     // mobile and desktop (see App.tsx).
 
-  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system, eraStyle]);
+  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system, eraStyle, theme]);
 
   return (
     <div className="histogram-chart-wrapper">

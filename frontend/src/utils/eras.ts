@@ -1,4 +1,3 @@
-import * as d3 from 'd3';
 import CONFIG, { type MetricKey } from './config';
 import type { WeatherDataPoint } from '../types';
 import { comparablePool } from './dataProcessor';
@@ -12,17 +11,19 @@ export const SATELLITE_YEAR = 1979;
 export const ERA_FILL_ALPHA = 0.45;
 
 /**
- * How the eras are told apart:
- *   shade   — three shades of the metric hue, each era's fill AND outline.
- *   contour — one fill (the metric hue, same alpha for all) and only the
- *             outline colour changes per era.
+ * How the eras are told apart. Both styles ink from the SAME ordinal ramp
+ * (ERA_RAMPS) — one hue per metric, lightness carrying the order — and differ
+ * only in which mark wears it:
+ *   shade   — the ramp is each era's fill AND its thin outline.
+ *   contour — one shared fill (the metric base at ERA_FILL_ALPHA) and the ramp
+ *             is the outline alone.
  *
  * In contour style the histogram's bars carry NO stroke: `stroke` inks a single
  * step path along the tops of that era's bars — the silhouette of the shape —
  * rather than a box around every bin, and on the main chart it rings that era's
  * daily dots and dashes its boundary line. The OLDEST era has no contour ink at
- * all (see CONTOUR_INKS), so in this style `stroke` can be `'none'`: test it
- * with hasOutline() before drawing anything with it.
+ * all (see eraInk), so in this style `stroke` can be `'none'`: test it with
+ * hasOutline() before drawing anything with it.
  */
 export type EraStyle = 'shade' | 'contour';
 
@@ -77,27 +78,62 @@ export function eraIndex(year: number, eras: Era[]): number {
   return 0;
 }
 
-/**
- * The era's shade: three lightnesses of the metric hue, lighter for the older
- * eras and the full base colour for the most recent one, so "darker = more
- * recent" reads the same way across every metric (including wind's grey).
- */
-export function eraColor(metric: MetricKey, era: number): string {
-  const base = d3.color(CONFIG.metricColors[metric]?.base ?? '#888888')!;
-  if (era === 0) return base.brighter(1.3).formatHex();
-  if (era === 1) return base.brighter(0.55).formatHex();
-  return base.darker(0.35).formatHex();
-}
+export type ThemeMode = 'light' | 'dark';
 
 /**
- * Contour-mode outline inks, one per era — hues off the metric palette so the
- * outline, not the fill, is what says which era a mark belongs to.
+ * The ordinal era ramps: ONE hue per metric, three monotone lightness steps,
+ * and a SEPARATE set per theme.
  *
- * `null` means NO outline. The oldest era gets one: its former ink (#5B6470)
- * read as black on the page (Ita, 2026-09-18), and the pre-satellite record is
- * perfectly legible as the plain fill underneath the two contours that remain.
+ * The eras are ordinal — three time buckets in order — so order has to be
+ * carried by lightness along a single hue, never by three unrelated categorical
+ * hues. Light mode runs pale → dark oldest → newest; dark mode runs dark →
+ * bright, because against #16171d it is brightness that has to rise with
+ * recency. The same hexes cannot serve both, which is why there are two rows.
+ *
+ * GENERATED, NOT HAND-PICKED. Each ramp holds its metric's OKLCH hue with
+ * chroma capped at 0.16 and lightness pinned at L 0.74 / 0.61 / 0.48 (light)
+ * and 0.52 / 0.66 / 0.80 (dark), gamut-clipped by reducing chroma; every ramp
+ * passes the dataviz skill's `validate_palette.js --ordinal` in its own mode,
+ * checked 2026-09-18, with the pale end at ≥2.2:1 on #fff and ≥2.9:1 on
+ * #16171d. They replace d3 brighter()/darker() steps off the base colour, which
+ * drifted orange's hue 43° (so it was not one hue at all) and left the oldest
+ * era at 1.3:1 — invisible on white — and were reused unchecked in dark mode.
+ *
+ * DO NOT hand-edit a value here, and do not add a metric by eye: regenerate and
+ * re-run the validator, or the guarantees above quietly stop being true.
  */
-const CONTOUR_INKS: (string | null)[] = [null, '#1F7A8C', '#B3236B'];
+const ERA_RAMPS: Record<
+  MetricKey,
+  { light: [string, string, string]; dark: [string, string, string] }
+> = {
+  max_temperature: {
+    light: ['#f98941', '#cc6001', '#934300'],
+    dark: ['#a44c02', '#dd7022', '#fea571'],
+  },
+  min_temperature: {
+    light: ['#6baeff', '#3f85d6', '#115dab'],
+    dark: ['#2169b8', '#4e94e7', '#8fc1ff'],
+  },
+  precipitation_sum: {
+    light: ['#b495fe', '#8d6bd7', '#6843ac'],
+    dark: ['#734fb9', '#9c7ae8', '#c4affe'],
+  },
+  wind_speed_10m_max: {
+    light: ['#a6abb4', '#7e838c', '#595e66'],
+    dark: ['#646972', '#8d929b', '#b9bec7'],
+  },
+};
+
+/**
+ * The era's step on its metric's ordinal ramp, in the theme being painted. The
+ * index is clamped, so an era array longer than the ramp keeps the newest step
+ * rather than running off the end; an unknown metric falls back to wind's
+ * neutral grey ramp rather than a colour it has no claim to.
+ */
+export function eraColor(metric: MetricKey, era: number, theme: ThemeMode): string {
+  const ramp = (ERA_RAMPS[metric] ?? ERA_RAMPS.wind_speed_10m_max)[theme];
+  return ramp[Math.min(Math.max(era, 0), ramp.length - 1)];
+}
 
 export interface EraInk {
   fill: string;
@@ -116,17 +152,31 @@ export function hasOutline(ink: EraInk): boolean {
 }
 
 /** What to draw an era's marks (bars, silhouette, dots, boundary) in, per style. */
-export function eraInk(metric: MetricKey, era: number, style: EraStyle): EraInk {
+export function eraInk(
+  metric: MetricKey,
+  era: number,
+  style: EraStyle,
+  theme: ThemeMode
+): EraInk {
   if (style === 'contour') {
-    const outline =
-      era < CONTOUR_INKS.length ? CONTOUR_INKS[era] : CONTOUR_INKS[CONTOUR_INKS.length - 1];
+    // The outlines are steps 1 and 2 of the SAME ordinal ramp the shades use —
+    // one hue, 0.13 L apart, so the pair reads as ordered rather than as two
+    // unrelated colours. That is also why they are not tellable apart by colour
+    // alone, and the legend labels each era by its years.
+    //
+    // The oldest era has no outline at all: it is the fill the other two sit
+    // over, which keeps the contour pair an ordered PAIR and settles the "the
+    // old one reads as black" complaint at the source.
     return {
       fill: CONFIG.metricColors[metric]?.base ?? '#888888',
       fillOpacity: ERA_FILL_ALPHA,
-      stroke: outline ?? 'none',
-      strokeWidth: outline ? 1.5 : 0,
+      stroke: era > 0 ? eraColor(metric, era, theme) : 'none',
+      // 2px is the mark spec for a line carrying identity. Callers drawing on
+      // something too small for it say so themselves — MainChart's 2.8px dots
+      // ring at 1 — rather than this returning a second width.
+      strokeWidth: era > 0 ? 2 : 0,
     };
   }
-  const shade = eraColor(metric, era);
+  const shade = eraColor(metric, era, theme);
   return { fill: shade, fillOpacity: ERA_FILL_ALPHA, stroke: shade, strokeWidth: 1 };
 }
