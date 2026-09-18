@@ -1,6 +1,9 @@
-import CONFIG, { type MetricKey } from './config';
+// The `.ts` specifiers are load-bearing, not a style: the compare page's tests
+// import this module through `node --experimental-strip-types`, which resolves
+// ESM specifiers literally and cannot find an extensionless one.
+import CONFIG, { type MetricKey } from './config.ts';
 import type { WeatherDataPoint } from '../types';
-import { comparablePool } from './dataProcessor';
+import { comparablePool } from './dataProcessor.ts';
 
 /** The year continuous global satellite coverage begins in the reanalysis —
  *  the same boundary MainChart draws its "Satellites!" line at. */

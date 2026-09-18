@@ -13,6 +13,8 @@ import {
   BAND_TOGGLES,
   DEFAULT_BANDS,
   SERIES_PALETTE,
+  periodTestWindows,
+  seriesPeriodRanges,
   seriesPeriods,
 } from './compareTypes';
 import { buildDialTracks, drawnExtent } from './compareStats';
@@ -63,9 +65,9 @@ function makeSeries(index: number): Series {
     color: SERIES_PALETTE[index % SERIES_PALETTE.length],
     markers: [],
     split: false,
-    // A contrasting neighbour in the palette, so a fresh split reads as two
-    // periods without the user having to pick anything first.
-    lateColor: SERIES_PALETTE[(index + 1) % SERIES_PALETTE.length],
+    // No overrides: a fresh split takes the main page's era colors for this
+    // metric, so the dial and the histogram open in the same three shades.
+    eraColors: {},
     diffShade: true,
     smoothDays: 0,
   };
@@ -117,7 +119,8 @@ const ComparePage: React.FC = () => {
       const tracks = buildDialTracks(
         inputs,
         (raw, metric) => convert(raw, metric, system),
-        bands
+        bands,
+        theme
       );
       const ext = drawnExtent(tracks);
       if (!ext) continue;
@@ -125,7 +128,7 @@ const ComparePage: React.FC = () => {
       out.set(fam, [ext[0] - pad, ext[1] + pad]);
     }
     return out;
-  }, [resolved, system, bands]);
+  }, [resolved, system, bands, theme]);
 
   const addSeries = () => setSeries((prev) => [...prev, makeSeries(prev.length)]);
 
@@ -236,6 +239,7 @@ const ComparePage: React.FC = () => {
               canRemove={series.length > 1}
               onChange={updateSeries}
               onRemove={() => removeSeries(s.id)}
+              theme={theme}
             />
           ))}
         </aside>
@@ -251,6 +255,7 @@ const ComparePage: React.FC = () => {
                     axisMetric={grp.items[0].series.metric}
                     domain={domainByFamily.get(grp.family)}
                     bands={bands}
+                    theme={theme}
                     width={overlayGroups.length > 1 ? 420 : 520}
                     height={overlayGroups.length > 1 ? 420 : 520}
                   />
@@ -261,6 +266,7 @@ const ComparePage: React.FC = () => {
                     )}
                     system={system}
                     bands={bands}
+                    theme={theme}
                   />
                   {grp.items.map(({ series: s }) =>
                     s.split ? (
@@ -268,7 +274,7 @@ const ComparePage: React.FC = () => {
                         key={s.id}
                         test={periodTests[s.id]?.result ?? null}
                         pending={periodTests[s.id]?.pending ?? false}
-                        periods={seriesPeriods(s)}
+                        windows={periodTestWindows(seriesPeriodRanges(s))}
                         metric={s.metric}
                         system={system}
                       />
@@ -283,7 +289,7 @@ const ComparePage: React.FC = () => {
                 <div className="cmp-dial-block" key={rs.series.id}>
                   <div className="cmp-dial-title" style={{ color: rs.series.color }}>
                     {rs.series.name} ·{' '}
-                    {seriesPeriods(rs.series)
+                    {seriesPeriodRanges(rs.series)
                       .map((p) => p.label)
                       .join(' vs ')}
                   </div>
@@ -292,6 +298,7 @@ const ComparePage: React.FC = () => {
                     axisMetric={rs.series.metric}
                     domain={domainByFamily.get(unitFamily(rs.series.metric))}
                     bands={bands}
+                    theme={theme}
                     width={400}
                     height={400}
                   />
@@ -300,12 +307,13 @@ const ComparePage: React.FC = () => {
                     markers={rs.series.markers.map((m) => ({ series: rs.series, marker: m }))}
                     system={system}
                     bands={bands}
+                    theme={theme}
                   />
                   {rs.series.split && (
                     <PeriodVerdict
                       test={periodTests[rs.series.id]?.result ?? null}
                       pending={periodTests[rs.series.id]?.pending ?? false}
-                      periods={seriesPeriods(rs.series)}
+                      windows={periodTestWindows(seriesPeriodRanges(rs.series))}
                       metric={rs.series.metric}
                       system={system}
                     />
@@ -326,9 +334,10 @@ interface LegendProps {
   markers: { series: Series; marker: { id: string; date: string; color: string } }[];
   system: ReturnType<typeof useUnits>['system'];
   bands: BandKey[];
+  theme: ReturnType<typeof useTheme>['theme'];
 }
 
-const Legend: React.FC<LegendProps> = ({ entries, markers, system, bands }) => {
+const Legend: React.FC<LegendProps> = ({ entries, markers, system, bands, theme }) => {
   // Resolve each marker's value so the legend can show what its dashed ring sits at.
   const markerValue = (
     date: string,
@@ -351,11 +360,11 @@ const Legend: React.FC<LegendProps> = ({ entries, markers, system, bands }) => {
   return (
     <div className="cmp-legend">
       {entries.map(({ series: s }) => {
-        const periods = seriesPeriods(s);
+        const periods = seriesPeriods(s, theme);
         return (
           <React.Fragment key={s.id}>
             {periods.map((p) => (
-              <React.Fragment key={p.half}>
+              <React.Fragment key={p.era}>
                 <div className="cmp-legend-item">
                   <span className="cmp-legend-line" style={{ background: p.color }} />
                   <span className="cmp-legend-text">
@@ -374,17 +383,25 @@ const Legend: React.FC<LegendProps> = ({ entries, markers, system, bands }) => {
                 ))}
               </React.Fragment>
             ))}
-            {s.split && s.diffShade && periods.length === 2 && (
+            {s.split && s.diffShade && periods.length > 1 && (
               <div className="cmp-legend-item cmp-legend-sub">
                 <span
                   className="cmp-legend-swatch cmp-legend-split-swatch"
                   style={{
-                    background: `linear-gradient(90deg, ${periods[0].color} 50%, ${periods[1].color} 50%)`,
+                    // One hard-edged stripe per period, so the swatch says how
+                    // many rings the shading runs between.
+                    background: `linear-gradient(90deg, ${periods
+                      .map(
+                        (p, i) =>
+                          `${p.color} ${(i * 100) / periods.length}% ${((i + 1) * 100) / periods.length}%`
+                      )
+                      .join(', ')})`,
                     opacity: 0.4,
                   }}
                 />
                 <span className="cmp-legend-text">
-                  shaded in whichever period runs higher that day
+                  each gap shaded in whichever of its two periods runs higher
+                  that day
                 </span>
               </div>
             )}

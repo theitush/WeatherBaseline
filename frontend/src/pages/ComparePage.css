@@ -417,6 +417,22 @@
   color: var(--text-tertiary);
   white-space: nowrap;
 }
+/* Only shown once a period carries an override: the way back to the era color. */
+.cmp-era-reset {
+  font-size: 0.66rem;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cmp-era-reset:hover {
+  color: var(--text-h);
+  border-color: var(--border-strong);
+}
 /* The shared color picker keeps its margin-left:auto, so the label sits left
    and the swatches ride the right edge of the row. */
 

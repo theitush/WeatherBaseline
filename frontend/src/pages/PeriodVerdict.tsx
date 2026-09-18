@@ -1,4 +1,11 @@
-// The sentence under a split dial: did the two periods actually differ?
+// The sentence under a split dial: has the latest era actually moved away from
+// the ones before it?
+//
+// A split dial draws up to three rings, which pose three pairwise questions.
+// This panel asks one of them — the latest era against everything older, pooled
+// (compareTypes' periodTestWindows) — because that is the question the dial is
+// drawn to answer and because one sentence under a chart is worth more than
+// three. The gap shading still compares each adjacent pair.
 //
 // Two lines, because "different" is two questions, and each carries its own
 // p-value:
@@ -16,7 +23,7 @@ import type { MetricKey } from '../utils/config';
 import { unitLabel } from '../utils/units';
 import type { UnitSystem } from '../utils/units';
 import type { PeriodTest } from './comparePeriodTest';
-import type { Period } from './compareTypes';
+import type { PeriodRange } from './compareTypes';
 
 /** Direction words per metric — "0.8 °C warmer" reads better than "higher". */
 const DIRECTION: Record<MetricKey, [up: string, down: string]> = {
@@ -36,7 +43,9 @@ const gap = (v: number, metric: MetricKey, system: UnitSystem): string =>
 interface PeriodVerdictProps {
   test: PeriodTest | null;
   pending: boolean;
-  periods: Period[];
+  /** The two piles the test compared — the latest era and everything older
+   *  pooled. Null when there was nothing to compare. */
+  windows: { early: PeriodRange; late: PeriodRange } | null;
   metric: MetricKey;
   system: UnitSystem;
 }
@@ -44,20 +53,20 @@ interface PeriodVerdictProps {
 const PeriodVerdict: React.FC<PeriodVerdictProps> = ({
   test,
   pending,
-  periods,
+  windows,
   metric,
   system,
 }) => {
   if (pending) {
     return (
       <p className="cmp-verdict cmp-verdict-pending">
-        Testing whether the two periods differ…
+        Testing whether the latest era differs from what came before…
       </p>
     );
   }
-  if (!test || periods.length !== 2) return null;
+  if (!test || !windows) return null;
 
-  const [early, late] = periods;
+  const { early, late } = windows;
   const [up, down] = DIRECTION[metric];
   const word = test.signedGap >= 0 ? up : down;
   // Precip is compared on a different summary, so the block says which.

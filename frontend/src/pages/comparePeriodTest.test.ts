@@ -8,6 +8,7 @@
 // Each assertion throws on failure; a clean exit (code 0) means all passed.
 
 import { extractSamples, periodShuffleTest, statisticFor } from './comparePeriodTest.ts';
+import { periodTestWindows, seriesPeriodRanges } from './compareTypes.ts';
 import type { WeatherDataPoint } from '../types/index.ts';
 
 let passed = 0;
@@ -158,6 +159,58 @@ const run = (rows: WeatherDataPoint[], nPerm = 400) =>
   assert(
     statisticFor('precipitation_sum') === 'p90',
     "precip uses its wet tail — its median is 0 and would report 'no change'"
+  );
+}
+
+// --- Case 8: three eras, one question ---------------------------------------
+{
+  console.log('Case 8: the windows a three-era split hands the test');
+  // A range straddling BOTH cuts, which is the ordinary case for an ERA5-Land
+  // cell: 1950 to now carries all three eras.
+  const ranges = seriesPeriodRanges({ startYear: 1950, endYear: 2026, split: true });
+  assert(
+    ranges.map((p) => p.label).join(' | ') === '1950–1978 | 1979–1999 | 2000–2026',
+    'the split is the main page’s three eras'
+  );
+
+  const windows = periodTestWindows(ranges);
+  if (!windows) throw new Error('FAIL: expected two windows');
+  assert(windows.late.label === '2000–2026', 'the LATEST era is one pile');
+  assert(
+    windows.early.startYear === 1950 && windows.early.endYear === 1999,
+    'and everything before it, pooled into one contiguous window, is the other'
+  );
+  assert(windows.early.label === '1950–1999', 'which is what the sentence names it');
+  assert(windows.early.era === -1, 'a pooled span is no single era, so it has no era colour');
+
+  // The pooled split still recovers a shift applied from 2000 on.
+  const rows = makeRows(1950, 2026, (_doy, year) => (year >= 2000 ? 2 : 0));
+  const res = periodShuffleTest(
+    samples(rows, 1950, 2026),
+    windows.early,
+    windows.late,
+    'median',
+    { nPerm: 400, seed: 11 }
+  );
+  if (!res) throw new Error('FAIL: expected a result');
+  assert(res.nEarlyYears === 50 && res.nLateYears === 27, 'the piles are 50 and 27 years');
+  assert(Math.abs(res.signedGap - 2) < 0.6, 'and the signed gap recovers the +2C shift');
+  assert(res.pSigned <= 1 / 401 + 1e-12, 'which a random deal of these years does not reach');
+
+  // Two eras when the range reaches only one cut, and nothing to test inside one.
+  const narrow = periodTestWindows(
+    seriesPeriodRanges({ startYear: 1990, endYear: 2020, split: true })
+  );
+  if (!narrow) throw new Error('FAIL: expected two windows');
+  assert(
+    narrow.early.label === '1990–1999' && narrow.late.label === '2000–2020',
+    'with two eras the older pile is just the older era, clamped to the range'
+  );
+  assert(narrow.early.era === 1, 'and it keeps that era’s identity, since it is only the one');
+  assert(
+    periodTestWindows(seriesPeriodRanges({ startYear: 1985, endYear: 1995, split: true })) ===
+      null,
+    'a range inside a single era has nothing to compare, so there is no test'
   );
 }
 

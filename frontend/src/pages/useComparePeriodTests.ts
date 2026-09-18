@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { convert } from '../utils/units';
 import type { UnitSystem } from '../utils/units';
 import type { Series, SeriesData } from './compareTypes';
-import { seriesPeriods } from './compareTypes';
+import { periodTestWindows, seriesPeriodRanges } from './compareTypes';
 import { extractSamples, statisticFor, type PeriodTest } from './comparePeriodTest';
 import type { PeriodWorkerRequest, PeriodWorkerResponse } from './comparePeriodTest.worker';
 
@@ -25,13 +25,17 @@ const N_PERM = 2000;
 
 /**
  * The cache key for a chart's test, or null when there is nothing to test:
- * not split, no archive loaded yet, or a range too short to halve.
+ * not split, no archive loaded yet, or a range that lies inside one era.
+ *
+ * The key names the two windows the test actually runs on — the latest era and
+ * the pooled older ones — not the periods the dial draws, so a change that does
+ * not move those windows reuses the cached answer.
  */
 function signature(s: Series, data: SeriesData | undefined, system: UnitSystem): string | null {
   if (!s.split || !data || data.loading || data.rows.length === 0) return null;
-  const periods = seriesPeriods(s);
-  if (periods.length !== 2) return null;
-  const [early, late] = periods;
+  const windows = periodTestWindows(seriesPeriodRanges(s));
+  if (!windows) return null;
+  const { early, late } = windows;
   return [
     s.lat, s.lon, s.metric, system,
     early.startYear, early.endYear, late.startYear, late.endYear,
@@ -80,7 +84,9 @@ export function useComparePeriodTests(
       if (!key || key in cache || inFlight.current.has(key)) continue;
       const data = dataMap[s.id];
       if (!data) continue;
-      const [early, late] = seriesPeriods(s);
+      const windows = periodTestWindows(seriesPeriodRanges(s));
+      if (!windows) continue;
+      const { early, late } = windows;
       const samples = extractSamples(
         data.rows,
         s.metric,

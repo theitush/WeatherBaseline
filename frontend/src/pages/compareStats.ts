@@ -7,7 +7,8 @@
 import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint } from '../types';
-import type { BandKey, Period, Series } from './compareTypes.ts';
+import type { ThemeMode } from '../utils/eras.ts';
+import type { BandKey, Series } from './compareTypes.ts';
 import { BAND_SPECS, seriesPeriods } from './compareTypes.ts';
 
 /** Day-of-year buckets. Leap day collapses onto ~Mar 1, so 365 of them. */
@@ -39,13 +40,16 @@ export interface BandPath {
 }
 
 /**
- * One drawable line of a dial: a whole series, or one half of a split one.
+ * One drawable line of a dial: a whole series, or one era of a split one.
  * Everything the chart draws hangs off a track, so a split series behaves
- * exactly like two series that happen to share a cell and a metric.
+ * exactly like N series that happen to share a cell and a metric.
  */
 export interface DialTrack {
   seriesId: string;
-  half: Period['half'];
+  /** Which era this track is (0 = oldest), or -1 for an unsplit whole series.
+   *  A series' tracks are pushed in era order, which is what lets the gap
+   *  shading walk them in adjacent pairs. */
+  era: number;
   color: string;
   label: string;
   /** Every day in the period. Always drawn as the cloud. */
@@ -106,16 +110,18 @@ const MIN_DOYS = 8;
 
 /**
  * Build one track per period across every series on a dial. `toDisplay` applies
- * the unit conversion (the caller owns the unit system).
+ * the unit conversion (the caller owns the unit system) and `theme` resolves the
+ * era colors, which have a separate ramp per theme.
  */
 export function buildDialTracks(
   inputs: TrackInput[],
   toDisplay: (raw: number, metric: MetricKey) => number,
-  bands: BandKey[]
+  bands: BandKey[],
+  theme: ThemeMode
 ): DialTrack[] {
   const tracks: DialTrack[] = [];
   for (const { series: s, rows } of inputs) {
-    for (const period of seriesPeriods(s)) {
+    for (const period of seriesPeriods(s, theme)) {
       const pts: Pt[] = [];
       for (const d of rows) {
         const raw = d[s.metric as MetricKey];
@@ -132,7 +138,7 @@ export function buildDialTracks(
 
       const track: DialTrack = {
         seriesId: s.id,
-        half: period.half,
+        era: period.era,
         color: period.color,
         label: period.label,
         pts,
