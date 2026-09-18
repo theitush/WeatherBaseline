@@ -16,6 +16,11 @@ export const ERA_FILL_ALPHA = 0.45;
  *   shade   — three shades of the metric hue, each era's fill AND outline.
  *   contour — one fill (the metric hue, same alpha for all) and only the
  *             outline colour changes per era.
+ *
+ * In contour style the histogram's bars carry NO stroke: `stroke` inks a single
+ * step path along the tops of that era's bars — the silhouette of the shape —
+ * rather than a box around every bin. It still inks the legend swatch, the
+ * tooltip swatch and MainChart's era band, so it is always a real colour.
  */
 export type EraStyle = 'shade' | 'contour';
 

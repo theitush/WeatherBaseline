@@ -259,6 +259,13 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // axis leaves thin white separators between bins, matching the period hists.
     // One overlaid set per era, oldest first so the most recent sits on top;
     // every set shares ERA_FILL_ALPHA and carries its own shade as fill + outline.
+    //
+    // CONTOUR style strokes no rect at all. Outlining every bar drew a vertical
+    // rule between each pair of adjacent bins plus a line along the baseline, so
+    // the "contour" read as a row of boxes rather than a distribution. Instead
+    // the era gets ONE step path along the tops of its bars — the literal
+    // silhouette of the shape — appended after the bars below.
+    const isContour = eraStyle === 'contour';
     eraBins.forEach((eb, i) => {
       const ink = eraInk(currentMetric, i, eraStyle);
       const barSel = g.selectAll(`.bar.era-${i}`)
@@ -268,8 +275,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .attr('class', `bar era-${i}`)
         .attr('fill', ink.fill)
         .attr('fill-opacity', ink.fillOpacity)
-        .attr('stroke', ink.stroke)
-        .attr('stroke-width', ink.strokeWidth)
+        .attr('stroke', isContour ? 'none' : ink.stroke)
+        .attr('stroke-width', isContour ? 0 : ink.strokeWidth)
         .attr('stroke-opacity', 0.9);
 
       if (isVertical) {
@@ -294,6 +301,62 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           .attr('width', (d) => countLen(d.length));
       }
     });
+
+    // The era silhouettes (contour style only). One path per era, drawn after
+    // every rect so all three outlines sit on top of all three fills.
+    //
+    // The step runs along the TRUE bin edges — tempScale(x0)→tempScale(x1), not
+    // the inset rect edges — so it reads as one continuous shape and the bars'
+    // 1px separator gap stays underneath it. Empty bins inside the era's span
+    // drop the step to the baseline, which is what makes it an outline of the
+    // distribution rather than a line joining bar tops.
+    if (isContour) {
+      // Polyline in (temp, count) space: baseline at the first populated bin's
+      // left edge, a flat top across every bin between, baseline again at the
+      // last populated bin's right edge. `flat` pins every count to 0 — the
+      // starting path of the enter animation, identical in shape and point
+      // count to the final one so d3 interpolates it number-for-number and the
+      // outline rises in step with the bars.
+      const silhouettePoints = (
+        eb: d3.Bin<number, number>[],
+        flat = false
+      ): [number, number][] => {
+        const first = eb.findIndex((d) => d.length > 0);
+        if (first < 0) return [];
+        let last = eb.length - 1;
+        while (last > first && eb[last].length === 0) last--;
+        const pts: [number, number][] = [[eb[first].x0 as number, 0]];
+        for (let k = first; k <= last; k++) {
+          const c = flat ? 0 : eb[k].length;
+          pts.push([eb[k].x0 as number, c], [eb[k].x1 as number, c]);
+        }
+        pts.push([eb[last].x1 as number, 0]);
+        return pts;
+      };
+      // Same orientation rules as the bars: vertical grows up from y=height,
+      // horizontal grows right from x=0.
+      const silhouetteLine = d3
+        .line<[number, number]>()
+        .x((p) => (isVertical ? tempScale(p[0]) : countLen(p[1])))
+        .y((p) => (isVertical ? height - countLen(p[1]) : tempScale(p[0])));
+
+      eraBins.forEach((eb, i) => {
+        const pts = silhouettePoints(eb);
+        if (pts.length < 2) return;
+        const ink = eraInk(currentMetric, i, eraStyle);
+        g.append('path')
+          .attr('class', `era-outline era-${i}`)
+          .attr('fill', 'none')
+          .attr('stroke', ink.stroke)
+          .attr('stroke-width', ink.strokeWidth)
+          .attr('stroke-opacity', 0.9)
+          .attr('pointer-events', 'none')
+          .attr('d', silhouetteLine(silhouettePoints(eb, true)) as string)
+          .transition()
+          .duration(500)
+          .attr('d', silhouetteLine(pts) as string);
+      });
+    }
 
     // Transparent full-extent hit areas, one per non-empty bin, so the tooltip
     // triggers anywhere in the bin's row/column — a 1-day bar is only a sliver
