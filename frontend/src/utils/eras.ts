@@ -81,9 +81,20 @@ export function erasForPool(
   metric: MetricKey,
   currentDate: string
 ): Era[] | undefined {
-  const years = comparablePool(data, currentDate)
-    .filter((d) => d[metric] !== undefined)
-    .map((d) => d.year);
+  return erasForYears(
+    comparablePool(data, currentDate)
+      .filter((d) => d[metric] !== undefined)
+      .map((d) => d.year)
+  );
+}
+
+/**
+ * The eras spanning a set of years, for callers that have already filtered
+ * their own rows — the period histogram and its permutation tests, which work
+ * off every observed row rather than the comparable pool. Same cuts either way:
+ * the years only set the two OUTER bounds, which is all the end labels read.
+ */
+export function erasForYears(years: number[]): Era[] | undefined {
   if (years.length === 0) return undefined;
   return eraSplit(Math.min(...years), Math.max(...years));
 }

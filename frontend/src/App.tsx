@@ -94,8 +94,9 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Oldest-vs-newest permutation test, computed once and shared by the period
-  // histogram's significance bracket and the verdict panel below it.
+  // The three era permutation tests, computed once and shared: two of them are
+  // the period histogram's significance brackets, and the third — the two
+  // satellite eras — is what the headline and the verdict panel below it say.
   const significance = usePermutationTest(filteredData, currentMetric);
 
   // "June 13th" — the target date as prose. Parse at local noon so the day never
@@ -423,19 +424,18 @@ const AppContent: React.FC = () => {
               <div className="chart-subtitle">
                 {`± ${CONFIG.chart.seasonalWindowDays} days around ${formatTargetDate(currentDate)}`}
               </div>
-              <PeriodLegend metric={currentMetric} />
+              <PeriodLegend metric={currentMetric} filteredData={filteredData} />
               <div className={`period-histogram-row ${isMobile ? 'mobile' : ''}`}>
                 <PeriodHistogramChart
                   filteredData={filteredData}
                   currentMetric={currentMetric}
-                  /* Only pass the p-value once the result is for the *current*
-                     metric, so switching metrics shows a starless bracket until
-                     the new test lands — never the previous metric's stars. */
-                  pValue={
-                    significance.resultMetric === currentMetric
-                      ? significance.result?.pValue ?? null
-                      : null
-                  }
+                  /* The two BRACKETED comparisons. The hook clears every result
+                     the moment a new round is dispatched, so a non-null one is
+                     always for the current metric — a metric switch shows a
+                     starless bracket until the new test lands, never the
+                     previous metric's stars. */
+                  pValueNewestVsPooled={significance.results.newestVsPooled?.pValue ?? null}
+                  pValuePresatVsFirstsat={significance.results.presatVsFirstsat?.pValue ?? null}
                   /* Desktop: span the main chart (760) plus the per-date
                      histogram's bar area, stopping where the % brackets begin
                      (~890), and left-align (see .period-histogram-row) so the
@@ -451,6 +451,7 @@ const AppContent: React.FC = () => {
                 result={significance.resultMetric === currentMetric ? significance.result : null}
                 loading={significance.pending}
                 currentMetric={currentMetric}
+                periods={significance.periods}
               />
             </section>
 

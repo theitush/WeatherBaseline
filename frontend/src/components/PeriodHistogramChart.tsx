@@ -6,21 +6,27 @@ import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, binWidth, axisPad, tickCount } from '../utils/units';
+import { erasForYears, eraColor } from '../utils/eras';
+import { useThemeMode } from '../hooks/useTheme';
 import './PeriodHistogramChart.css';
 
 interface PeriodHistogramChartProps {
   // Same windowed (±CONFIG.chart.seasonalWindowDays, all years) subset the main
-  // chart uses. We further restrict to historical archive rows and split into
-  // 15-year periods.
+  // chart uses. We further restrict to observed rows and split into the eras.
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
-  // Two-sided p-value of the oldest-vs-newest permutation test (same one the
-  // SignificancePanel reports). Drives the significance bracket + stars drawn
-  // between the bottom (oldest) and top (newest) panel medians. null while the
-  // test is still running or when there isn't enough data.
-  pValue?: number | null;
+  // Two-sided p-values of the two permutation tests the chart BRACKETS. Each
+  // drives one bracket's stars; null while that test is running, or when there
+  // isn't enough data for it. The third test — the post-satellite pair — is the
+  // one the prose reports and is deliberately not drawn here.
+  //   newestVsPooled   — the newest era against both previous ones pooled.
+  //                      Bracket spans the top panel's median to the bottom's.
+  //   presatVsFirstsat — pre-satellite against the first satellite era.
+  //                      Bracket spans the bottom two panels' medians.
+  pValueNewestVsPooled?: number | null;
+  pValuePresatVsFirstsat?: number | null;
   width?: number;
-  // Height of a single panel (each of the 3 periods gets one). Total SVG height
+  // Height of a single panel (each of the 3 eras gets one). Total SVG height
   // is derived from this plus the shared x-axis strip.
   panelHeight?: number;
 }
@@ -29,32 +35,46 @@ export interface Period {
   start: number;
   end: number;
   label: string;
-  // 0 = lightest (oldest), higher = darker (most recent)
-  shade: number;
+  /** Index into the era ramp: 0 = oldest (pre-satellite), 2 = newest. */
+  era: number;
 }
 
-// Three rolling 15-year periods ending the *previous* full year. Computed from
-// "now" so the windows advance automatically each year.
-export function buildPeriods(): Period[] {
-  const prevYear = new Date().getFullYear() - 1;
-  const p1Start = prevYear - 14;        // most recent 15 years (e.g. 2011–2025)
-  const p2Start = p1Start - 15;         // (e.g. 1995–2010)
-  const p3Start = p2Start - 15;         // (e.g. 1980–1994)
-  return [
-    { start: p3Start, end: p2Start - 1, label: `${p3Start}–${p2Start - 1}`, shade: 0 },
-    { start: p2Start, end: p1Start - 1, label: `${p2Start}–${p1Start - 1}`, shade: 1 },
-    { start: p1Start, end: prevYear, label: `${p1Start}–${prevYear}`, shade: 2 },
-  ];
+/**
+ * The three periods this section compares: THE ERAS (utils/eras) — pre-satellite,
+ * the first satellite stretch, and everything since MIDPOINT_YEAR — replacing the
+ * rolling 15-year windows this used to build from "now". One definition, read by
+ * the chart, by the three permutation tests and by the panel's sentence, so a
+ * bracket, a bar colour and a number can never be talking about different years.
+ *
+ * `rows` sets only the two OUTER bounds — the first and last year on record,
+ * which the outer labels read. Both cuts are fixed years, so the eras mean the
+ * same thing on every cell and in every year; a rolling window did not, and the
+ * bars silently re-cut themselves each January.
+ */
+export function buildPeriods(rows: WeatherDataPoint[], metric: MetricKey): Period[] {
+  const eras = erasForYears(
+    rows
+      .filter((d) => d.data_type !== 'forecast' && d[metric] != null)
+      .map((d) => d.year)
+  );
+  if (!eras) return [];
+  return eras.map((e, i) => ({ start: e.from, end: e.to, label: e.label, era: i }));
 }
 
-// Three shades of the metric's base color, light → dark, for the three periods.
-export function shadeFor(base: string, shade: number): string {
-  const c = d3.color(base);
-  if (!c) return base;
-  // All periods are lightened toward white; oldest lightest, most recent least.
-  const factors = [0.7, 0.5, 0.3]; // amount lightened
-  const t = factors[shade] ?? 0;
-  return (d3.interpolateRgb(base, '#ffffff')(t) as string);
+/**
+ * A period's bar colour: its step on the metric's ordinal era ramp, the same
+ * one the main histogram paints that era with, so a bar here and a bar there
+ * read as the same years.
+ *
+ * Deliberately eraColor and not eraInk(...).fill: in CONTOUR style every era's
+ * `fill` is the one shared metric base, which works there because the eras are
+ * overlaid and told apart by their outlines. These three panels are separate and
+ * have no outlines, so a shared fill would make them — and their three legend
+ * swatches — identical. The ramp step is what eraInk hands the shade style as
+ * `fill` and the contour style as `stroke`; it is the era's colour either way.
+ */
+export function periodColor(metric: MetricKey, era: number, theme: 'light' | 'dark'): string {
+  return eraColor(metric, era, theme);
 }
 
 // Darkened trend-line color used for the dashed summary-stat line (shared by the
@@ -74,10 +94,13 @@ export function statLabelFor(_metric: MetricKey): string {
 // HTML legend rendered above the period histogram — matches the data chart's
 // `.chart-legend` convention. Shows the dashed summary-stat line plus a color
 // swatch for each of the three periods.
-export const PeriodLegend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
-  const base = CONFIG.metricColors[metric].base;
+export const PeriodLegend: React.FC<{
+  metric: MetricKey;
+  filteredData: WeatherDataPoint[];
+}> = ({ metric, filteredData }) => {
+  const theme = useThemeMode();
   const medianColor = medianColorFor(metric);
-  const periods = buildPeriods();
+  const periods = buildPeriods(filteredData, metric);
   return (
     <div className="chart-legend">
       <div className="chart-legend-item">
@@ -89,7 +112,7 @@ export const PeriodLegend: React.FC<{ metric: MetricKey }> = ({ metric }) => {
       {periods.map((p) => (
         <div key={p.label} className="chart-legend-item">
           <svg width={14} height={14} style={{ flex: '0 0 auto' }}>
-            <rect x={1} y={1} width={12} height={12} fill={shadeFor(base, p.shade)} />
+            <rect x={1} y={1} width={12} height={12} fill={periodColor(metric, p.era, theme)} />
           </svg>
           <span>{p.label}</span>
         </div>
@@ -155,20 +178,26 @@ export function changeVerdict(pValue: number, observedDiff: number, metric: Metr
   return `${TIER_CONFIDENCE[tier]} gotten ${direction} over the decades`;
 }
 
+/** Which comparison a bracket draws; also its class suffix and geometry key. */
+type BracketKey = 'pooled' | 'presat';
+interface BracketGeom { x0: number; x1: number; barY: number }
+
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   filteredData,
   currentMetric,
-  pValue,
+  pValueNewestVsPooled,
+  pValuePresatVsFirstsat,
   width: propWidth,
   panelHeight: propPanelHeight,
 }) => {
   const { system } = useUnits();
+  const theme = useThemeMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  // Bracket geometry stashed by the main render so the separate pValue-keyed
-  // effect can place the stars without recomputing it (and without touching the
-  // bracket lines, which the main render already drew).
-  const bracketGeomRef = useRef<{ x0: number; x1: number; barY: number } | null>(null);
+  // Bracket geometry stashed by the main render so the separate p-value-keyed
+  // effect can place each bracket's stars without recomputing it (and without
+  // touching the bracket lines, which the main render already drew).
+  const bracketGeomRef = useRef<Partial<Record<BracketKey, BracketGeom>>>({});
 
   const TOTAL_WIDTH = propWidth ?? 720;
   const panelHeight = propPanelHeight ?? 70;
@@ -185,8 +214,8 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const periods = buildPeriods();
-    const baseColor = CONFIG.metricColors[currentMetric].base;
+    const periods = buildPeriods(filteredData, currentMetric);
+    if (periods.length === 0) return;
     // Same color as the rolling-median (trend) line on the main chart, darkened
     // a touch for contrast against the filled bars (see medianColorFor).
     const medianLineColor = medianColorFor(currentMetric);
@@ -290,17 +319,14 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Render panels top → bottom in display order: most recent first (top).
     const displayOrder = [...perPeriod].reverse();
 
-    // Capture the geometry of the top (newest) and bottom (oldest) panel
-    // medians so we can connect them with a significance bracket afterwards.
-    let topMedianX: number | null = null;
-    let bottomMedianX: number | null = null;
-    let bottomPanelBaselineY = 0;
+    // Each panel's median x, in display order (0 = newest on top, 2 = oldest at
+    // the bottom). The significance brackets join pairs of these afterwards;
+    // panels share one x range, so the values are directly comparable.
+    const medianX: (number | null)[] = displayOrder.map(() => null);
 
     displayOrder.forEach((pp, idx) => {
       const panelTop = idx * (panelHeight + PANEL_GAP);
-      const isTopPanel = idx === 0;
-      const isBottomPanel = idx === displayOrder.length - 1;
-      const color = shadeFor(baseColor, pp.period.shade);
+      const color = periodColor(currentMetric, pp.period.era, theme);
 
       const panel = g
         .append('g')
@@ -391,14 +417,10 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       // bars. Median for most metrics; 90th percentile for precipitation.
       if (pp.stat !== null) {
         const mx = tempScale(pp.stat);
-        // Record geometry for the significance bracket. mx is panel-local x
+        // Record geometry for the significance brackets. mx is panel-local x
         // (panels share the same x range), so it's directly comparable; panel y
-        // offsets are added when the bracket is drawn on `g`.
-        if (isTopPanel) topMedianX = mx;
-        if (isBottomPanel) {
-          bottomMedianX = mx;
-          bottomPanelBaselineY = panelTop + panelHeight;
-        }
+        // offsets are added when the brackets are drawn on `g`.
+        medianX[idx] = mx;
         panel
           .append('line')
           .attr('class', 'period-median')
@@ -440,28 +462,39 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       }
     });
 
-    // Significance bracket — the scientific-paper style "⊓" over the top panel,
-    // connecting the newest (top) and oldest (bottom) period medians along the
-    // shared x-axis. The bracket *lines* are drawn here, with the bars, since
-    // their geometry doesn't depend on the p-value — only the stars do, and
-    // those are added by a separate pValue-keyed effect so the bracket itself
-    // never flashes when the permutation worker result lands.
-    void bottomPanelBaselineY;
-    if (topMedianX != null && bottomMedianX != null) {
-      const barY = -10;       // horizontal bar, in the top margin (negative y on g)
-      const legBottomY = -4;  // legs drop to just above the top panel
-      const x0 = Math.min(topMedianX, bottomMedianX);
-      const x1 = Math.max(topMedianX, bottomMedianX);
-      bracketGeomRef.current = { x0, x1, barY };
-
-      const bracket = g.append('g').attr('class', 'sig-bracket');
-      bracket
+    // Significance brackets — the scientific-paper "⊓" joining the medians of
+    // the panels being compared, along the shared x-axis. The bracket LINES are
+    // drawn here, with the bars, since their geometry doesn't depend on any
+    // p-value; only the stars do, and those are added by a separate effect keyed
+    // on the p-values, so a bracket never flashes when a worker result lands.
+    //
+    // TWO of the three tests are drawn. Each sits in the margin above the LOWER
+    // of the panels it joins, the same 10px/4px offsets the single bracket used:
+    //   pooled — the newest era against both older ones POOLED, so it spans the
+    //            whole stack, top median to bottom.
+    //   presat — pre-satellite against the first satellite era, in the gap above
+    //            the bottom panel, spanning just those two.
+    // The third test, the two post-satellite eras, is the one the prose reports
+    // (SignificancePanel). It is deliberately not drawn: it would be a second
+    // bracket across the same two panels as `pooled`'s upper half, and the
+    // section already says it in words.
+    const panelTopOf = (idx: number) => idx * (panelHeight + PANEL_GAP);
+    bracketGeomRef.current = {};
+    const drawBracket = (key: BracketKey, xA: number | null, xB: number | null, topY: number) => {
+      if (xA == null || xB == null) return;
+      const barY = topY - 10;
+      const legBottomY = topY - 4;
+      const x0 = Math.min(xA, xB);
+      const x1 = Math.max(xA, xB);
+      bracketGeomRef.current[key] = { x0, x1, barY };
+      g.append('g')
+        .attr('class', `sig-bracket sig-bracket-${key}`)
         .append('path')
         .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
         .attr('fill', 'none');
-    } else {
-      bracketGeomRef.current = null;
-    }
+    };
+    drawBracket('pooled', medianX[0], medianX[medianX.length - 1], panelTopOf(0));
+    drawBracket('presat', medianX[1], medianX[2], panelTopOf(2));
 
     // Shared x-axis under the bottom panel. tickCount() computed from the same
     // domain the main chart uses (default count for temp/wind, precip capped at
@@ -496,7 +529,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('fill', 'var(--chart-label)')
       .text('Count');
 
-  }, [filteredData, currentMetric, width, panelHeight, plotHeight, system]);
+  }, [filteredData, currentMetric, width, panelHeight, plotHeight, system, theme]);
 
   // Significance stars — placed (and updated) on their own, keyed on pValue, so
   // the permutation worker result landing only adds/fades in the stars text. The
@@ -505,26 +538,40 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   // isn't known until the worker returns.
   useEffect(() => {
     if (!svgRef.current) return;
-    const bracket = d3.select(svgRef.current).select<SVGGElement>('.sig-bracket');
-    if (bracket.empty()) return;
-
-    // Clear any prior stars so pValue flips don't stack.
-    bracket.selectAll('.sig-stars').remove();
-
-    const geom = bracketGeomRef.current;
-    if (pValue == null || !geom) return;
-
-    const stars = starsFor(pValue);
-    bracket
-      .append('text')
-      .attr('class', `sig-stars ${stars === 'ns' ? 'sig-ns' : ''}`)
-      .attr('x', (geom.x0 + geom.x1) / 2)
-      .attr('y', geom.barY - 3)
-      .style('text-anchor', 'middle')
-      .text(stars);
+    const svg = d3.select(svgRef.current);
+    const pairs: Array<[BracketKey, number | null | undefined]> = [
+      ['pooled', pValueNewestVsPooled],
+      ['presat', pValuePresatVsFirstsat],
+    ];
+    for (const [key, p] of pairs) {
+      const bracket = svg.select<SVGGElement>(`.sig-bracket-${key}`);
+      if (bracket.empty()) continue;
+      // Clear any prior stars so a p-value flip doesn't stack them.
+      bracket.selectAll('.sig-stars').remove();
+      const geom = bracketGeomRef.current[key];
+      if (p == null || !geom) continue;
+      const stars = starsFor(p);
+      bracket
+        .append('text')
+        .attr('class', `sig-stars ${stars === 'ns' ? 'sig-ns' : ''}`)
+        .attr('x', (geom.x0 + geom.x1) / 2)
+        .attr('y', geom.barY - 3)
+        .style('text-anchor', 'middle')
+        .text(stars);
+    }
     // Also re-runs after the main render (filteredData/metric rebuild the SVG and
-    // the bracket lines, then this re-adds the stars onto the fresh bracket).
-  }, [pValue, filteredData, currentMetric, width, panelHeight, plotHeight, system]);
+    // the bracket lines, then this re-adds the stars onto the fresh brackets).
+  }, [
+    pValueNewestVsPooled,
+    pValuePresatVsFirstsat,
+    filteredData,
+    currentMetric,
+    width,
+    panelHeight,
+    plotHeight,
+    system,
+    theme,
+  ]);
 
   return (
     <div className="period-histogram-wrapper">
