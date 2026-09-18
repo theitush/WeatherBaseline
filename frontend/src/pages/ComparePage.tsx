@@ -8,9 +8,9 @@ import { convert, unitLabel } from '../utils/units';
 import type { MetricKey } from '../utils/config';
 import type { BandKey, LayoutMode, Series } from './compareTypes';
 import {
-  BANDS_FOR_MODE,
   BAND_LABEL,
   BAND_SPECS,
+  BAND_TOGGLES,
   DEFAULT_BANDS,
   SERIES_PALETTE,
   seriesPeriods,
@@ -76,9 +76,8 @@ const ComparePage: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [series, setSeries] = useState<Series[]>(() => [makeSeries(0)]);
   const [layout, setLayout] = useState<LayoutMode>('overlay');
-  const [pointMode, setPointMode] = useState<'all' | 'percentile'>('all');
-  // Which percentile layers the dials draw. Page-level, like the point mode:
-  // every dial shows the same layers so they stay comparable.
+  // Which layers the dials draw over the always-on day cloud. Page-level: every
+  // dial shows the same layers so they stay comparable.
   const [bands, setBands] = useState<BandKey[]>(DEFAULT_BANDS);
 
   const toggleBand = (k: BandKey) =>
@@ -103,10 +102,8 @@ const ComparePage: React.FC = () => {
   // [min,max] — directly comparable — and units never mix on one axis. Min and
   // max temp pool together since they share a unit.
   //
-  // The extent covers the layers actually DRAWN rather than every raw day, so
-  // switching layers off zooms the dial onto what is left: with the cloud and
-  // the wide bands gone, half a degree between two periods fills a real slice
-  // of the radius instead of disappearing inside a fifty-degree spread.
+  // The extent covers every day of the cloud, which is always drawn, so ticking
+  // a band on or off never rescales the dial and nothing can be clipped.
   const domainByFamily = useMemo(() => {
     const out = new Map<UnitFamily, [number, number]>();
     const byFamily = new Map<UnitFamily, TrackInput[]>();
@@ -120,16 +117,15 @@ const ComparePage: React.FC = () => {
       const tracks = buildDialTracks(
         inputs,
         (raw, metric) => convert(raw, metric, system),
-        pointMode,
         bands
       );
-      const ext = drawnExtent(tracks, pointMode);
+      const ext = drawnExtent(tracks);
       if (!ext) continue;
       const pad = (ext[1] - ext[0]) * 0.1 || 1;
       out.set(fam, [ext[0] - pad, ext[1] + pad]);
     }
     return out;
-  }, [resolved, system, pointMode, bands]);
+  }, [resolved, system, bands]);
 
   const addSeries = () => setSeries((prev) => [...prev, makeSeries(prev.length)]);
 
@@ -205,27 +201,10 @@ const ComparePage: React.FC = () => {
               </button>
             </div>
 
-            <div className="cmp-layout-toggle">
-              <button
-                type="button"
-                className={pointMode === 'all' ? 'active' : ''}
-                onClick={() => setPointMode('all')}
-              >
-                All data
-              </button>
-              <button
-                type="button"
-                className={pointMode === 'percentile' ? 'active' : ''}
-                onClick={() => setPointMode('percentile')}
-              >
-                Percentiles
-              </button>
-            </div>
-
-            {/* Each percentile layer on its own switch. */}
+            {/* Every day is always drawn; each layer over it is its own switch. */}
             <div className="cmp-band-toggles">
               <div className="cmp-band-head">Layers</div>
-              {BANDS_FOR_MODE[pointMode].map((k) => (
+              {BAND_TOGGLES.map((k) => (
                 <label key={k} className="cmp-check">
                   <input
                     type="checkbox"
@@ -242,8 +221,9 @@ const ComparePage: React.FC = () => {
             </button>
 
             <p className="cmp-drag-hint">
-              Overlay groups charts by metric — different units get their own
-              dial. Switching layers off also zooms the dial in on what is left.
+              Every archive day is drawn as the cloud; the layers above sit over
+              it. Overlay groups charts by metric — different units get their
+              own dial.
             </p>
           </div>
 
@@ -270,7 +250,6 @@ const ComparePage: React.FC = () => {
                     series={grp.items}
                     axisMetric={grp.items[0].series.metric}
                     domain={domainByFamily.get(grp.family)}
-                    pointMode={pointMode}
                     bands={bands}
                     width={overlayGroups.length > 1 ? 420 : 520}
                     height={overlayGroups.length > 1 ? 420 : 520}
@@ -281,7 +260,6 @@ const ComparePage: React.FC = () => {
                       rs.series.markers.map((m) => ({ series: rs.series, marker: m }))
                     )}
                     system={system}
-                    pointMode={pointMode}
                     bands={bands}
                   />
                   {grp.items.map(({ series: s }) =>
@@ -313,7 +291,6 @@ const ComparePage: React.FC = () => {
                     series={[rs]}
                     axisMetric={rs.series.metric}
                     domain={domainByFamily.get(unitFamily(rs.series.metric))}
-                    pointMode={pointMode}
                     bands={bands}
                     width={400}
                     height={400}
@@ -322,7 +299,6 @@ const ComparePage: React.FC = () => {
                     entries={[rs]}
                     markers={rs.series.markers.map((m) => ({ series: rs.series, marker: m }))}
                     system={system}
-                    pointMode={pointMode}
                     bands={bands}
                   />
                   {rs.series.split && (
@@ -349,11 +325,10 @@ interface LegendProps {
   entries: ResolvedSeries[];
   markers: { series: Series; marker: { id: string; date: string; color: string } }[];
   system: ReturnType<typeof useUnits>['system'];
-  pointMode: 'all' | 'percentile';
   bands: BandKey[];
 }
 
-const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode, bands }) => {
+const Legend: React.FC<LegendProps> = ({ entries, markers, system, bands }) => {
   // Resolve each marker's value so the legend can show what its dashed ring sits at.
   const markerValue = (
     date: string,
@@ -388,22 +363,15 @@ const Legend: React.FC<LegendProps> = ({ entries, markers, system, pointMode, ba
                     {bands.includes('median') ? ' · median' : ''}
                   </span>
                 </div>
-                {pointMode === 'percentile' &&
-                  BAND_SPECS.filter((spec) => bands.includes(spec.key)).map((spec) => (
-                    <div className="cmp-legend-item cmp-legend-sub" key={spec.key}>
-                      <span
-                        className="cmp-legend-swatch"
-                        style={{ background: p.color, opacity: spec.opacity }}
-                      />
-                      <span className="cmp-legend-text">{spec.label}</span>
-                    </div>
-                  ))}
-                {pointMode === 'percentile' && bands.includes('outliers') && (
-                  <div className="cmp-legend-item cmp-legend-sub">
-                    <span className="cmp-legend-dot" style={{ background: p.color, opacity: 0.1 }} />
-                    <span className="cmp-legend-text">{BAND_LABEL.outliers}</span>
+                {BAND_SPECS.filter((spec) => bands.includes(spec.key)).map((spec) => (
+                  <div className="cmp-legend-item cmp-legend-sub" key={spec.key}>
+                    <span
+                      className="cmp-legend-swatch"
+                      style={{ background: p.color, opacity: spec.opacity }}
+                    />
+                    <span className="cmp-legend-text">{spec.label}</span>
                   </div>
-                )}
+                ))}
               </React.Fragment>
             ))}
             {s.split && s.diffShade && periods.length === 2 && (
