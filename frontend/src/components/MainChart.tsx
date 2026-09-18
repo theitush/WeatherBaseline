@@ -7,7 +7,7 @@ import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor'
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
-import { erasForPool, eraIndex, eraInk, hasOutline, type EraInk } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, type EraInk } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './MainChart.css';
@@ -222,11 +222,10 @@ const MainChart: React.FC<MainChartProps> = ({
       const eraG = g.append('g').attr('class', 'era-marks');
       eras.forEach((era, i) => {
         const ink = eraInk(currentMetric, i, eraStyle, theme);
-        // Boundary at the era's first year (skip the record's own start, and any
-        // era with no ink to draw it in). The 1979 cut is drawn by the satellite
-        // block below with its label; here it just gets the era's ink over the
-        // neutral dash.
-        if (i > 0 && hasOutline(ink)) {
+        // Boundary at the era's first year (skip the record's own start). The
+        // 1979 cut is drawn by the satellite block below with its label; here
+        // it just gets the era's ink over the neutral dash.
+        if (i > 0) {
           const pos = timeScale(new Date(era.from, 0, 1));
           const line = eraG.append('line')
             .attr('class', `era-boundary era-${i}`)
@@ -258,8 +257,7 @@ const MainChart: React.FC<MainChartProps> = ({
       const boundaryPos = timeScale(satelliteDate);
       // In the era-split view the 1979 cut is the second era's start, so its
       // dash takes that era's ink (#62); the neutral axis colour otherwise.
-      const satEraInk = eras ? eraInk(currentMetric, 1, eraStyle, theme) : null;
-      const satInk = satEraInk && hasOutline(satEraInk) ? satEraInk : null;
+      const satInk = eras ? eraInk(currentMetric, 1, eraStyle, theme) : null;
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
         g.append('line')
@@ -364,19 +362,16 @@ const MainChart: React.FC<MainChartProps> = ({
       const segments = eras ? eraSegments(validAggs) : null;
 
       /**
-       * The colour an era's stretch of the band is FILLED with — one rule that
-       * happens to be right in both styles, which is the point: the band is
-       * drawn identically either way and only the ink differs.
-       *
-       *   shade   — stroke and fill are both that era's ramp step, so this is
-       *             the shade, as before.
-       *   contour — stroke is the era's contour ink (the colour its silhouette
-       *             wears on the histogram) and that is what fills the band, so
-       *             the 10–90 shading reads back to the histogram directly. The
-       *             oldest era has no contour ink and `fill` is the shared
-       *             metric base, so its stretch keeps the plain colour.
+       * The colour an era's stretch of the band is FILLED with: `stroke`, in
+       * both styles — which is the point, the band is drawn identically either
+       * way and only the ink differs. In shade style `stroke` is that era's
+       * ramp step (its shade); in contour style it is the era's contour ink,
+       * i.e. the colour its silhouette wears on the histogram, so the 10–90
+       * shading reads back to the histogram directly. `ink.fill` is deliberately
+       * NOT used here: in contour style it is the one shared metric base, which
+       * is what the band looked like before it carried the eras at all.
        */
-      const bandFill = (ink: EraInk) => (hasOutline(ink) ? ink.stroke : ink.fill);
+      const bandFill = (ink: EraInk) => ink.stroke;
 
       // One band path per era segment, each at the band's own alpha, so the
       // shading itself changes colour across the eras. No eras (a pool too thin

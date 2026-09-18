@@ -14,7 +14,7 @@ import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
-import { erasForPool, eraIndex, eraInk, hasOutline } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './HistogramChart.css';
@@ -346,9 +346,6 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
       eraBins.forEach((eb, i) => {
         const ink = eraInk(currentMetric, i, eraStyle, theme);
-        // The oldest era carries no contour ink (its old one read as black), so
-        // it is fill only — no silhouette for it.
-        if (!hasOutline(ink)) return;
         const pts = silhouettePoints(eb);
         if (pts.length < 2) return;
         g.append('path')
@@ -377,10 +374,8 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
           const n = eraBins[i][binIdx]?.length ?? 0;
           const ink = eraInk(currentMetric, i, eraStyle, theme);
           // A 9px chip can't carry the chart's own 2px stroke, so the border
-          // width is fixed here and only its colour changes — transparent for
-          // an outline-less era, which keeps the three rows aligned.
-          const border = `1.5px solid ${hasOutline(ink) ? ink.stroke : 'transparent'}`;
-          const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:${border};vertical-align:-1px`;
+          // width is fixed here and only its colour follows the era's ink.
+          const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:1.5px solid ${ink.stroke};vertical-align:-1px`;
           return `<span style="${sw}"></span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
         })
         .join('<br/>');

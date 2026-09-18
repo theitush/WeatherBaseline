@@ -20,10 +20,10 @@ export const ERA_FILL_ALPHA = 0.45;
  *
  * In contour style the histogram's bars carry NO stroke: `stroke` inks a single
  * step path along the tops of that era's bars — the silhouette of the shape —
- * rather than a box around every bin, and on the main chart it rings that era's
- * daily dots and dashes its boundary line. The OLDEST era has no contour ink at
- * all (see eraInk), so in this style `stroke` can be `'none'`: test it with
- * hasOutline() before drawing anything with it.
+ * rather than a box around every bin. On the main chart it is also what tints
+ * that era's stretch of the percentile band and dashes its boundary line.
+ *
+ * `stroke` is always a real colour, in both styles and for every era.
  */
 export type EraStyle = 'shade' | 'contour';
 
@@ -142,16 +142,7 @@ export interface EraInk {
   strokeWidth: number;
 }
 
-/**
- * Does this ink draw an outline at all? Contour style leaves the oldest era
- * fill-only, so every reader of `stroke` has to cope with there being none —
- * this is the one place that test is spelled out.
- */
-export function hasOutline(ink: EraInk): boolean {
-  return ink.strokeWidth > 0 && ink.stroke !== 'none';
-}
-
-/** What to draw an era's marks (bars, silhouette, dots, boundary) in, per style. */
+/** What to draw an era's marks (bars, silhouette, band, boundary) in, per style. */
 export function eraInk(
   metric: MetricKey,
   era: number,
@@ -159,22 +150,23 @@ export function eraInk(
   theme: ThemeMode
 ): EraInk {
   if (style === 'contour') {
-    // The outlines are steps 1 and 2 of the SAME ordinal ramp the shades use —
-    // one hue, 0.13 L apart, so the pair reads as ordered rather than as two
-    // unrelated colours. That is also why they are not tellable apart by colour
-    // alone, and the legend labels each era by its years.
+    // Every era outlines, in its own step of the SAME ordinal ramp the shades
+    // fill with — one hue, 0.13 L apart, so the three read as ordered rather
+    // than as three unrelated colours. That is also why they are not tellable
+    // apart by colour alone, and the legend labels each era by its years.
     //
-    // The oldest era has no outline at all: it is the fill the other two sit
-    // over, which keeps the contour pair an ordered PAIR and settles the "the
-    // old one reads as black" complaint at the source.
+    // What contour style changes is only WHICH MARK wears the ramp: the outline
+    // rather than the fill, which stays one shared metric-base wash under all
+    // three. The oldest era is outlined too — it cannot just be the background
+    // (Ita, 2026-09-18).
     return {
       fill: CONFIG.metricColors[metric]?.base ?? '#888888',
       fillOpacity: ERA_FILL_ALPHA,
-      stroke: era > 0 ? eraColor(metric, era, theme) : 'none',
+      stroke: eraColor(metric, era, theme),
       // 2px is the mark spec for a line carrying identity. Callers drawing on
-      // something too small for it say so themselves — MainChart's 2.8px dots
-      // ring at 1 — rather than this returning a second width.
-      strokeWidth: era > 0 ? 2 : 0,
+      // something too small for it say so themselves rather than this returning
+      // a second width.
+      strokeWidth: 2,
     };
   }
   const shade = eraColor(metric, era, theme);
