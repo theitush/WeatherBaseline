@@ -138,7 +138,9 @@ gh api -X PATCH repos/theitush/WeatherBaseline/issues/$n -F body=@/tmp/task-$n.m
 
 Don't use Review to hedge. Work you are simply unsure about is Done with the doubt written into the result, or Blocked if you actually cannot proceed. Review means *this is finished and a person has to look at it before it counts*.
 
-New tasks that come out of the work become issues here and go on the project: the REST POST above, then `tools/board add WeatherBaseline <n>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `tools/board set` above if that is wrong. Never track work in a file in this repo, and never touch another repo's issues from here — anything cross-project goes through the `coo` repo.
+New tasks that come out of the work become issues here and go on the project: the REST POST above, then `tools/board add WeatherBaseline <n>`. An item with no Status shows on the board as Queued and with no Worker as opus; use `tools/board set` above if that is wrong. Never track work in a file in this repo.
+
+**Work that belongs to another repo is handed off, not taken.** File the issue *in that repo* — REST works from any directory, the same POST as above with that repo's name in the path — then `/home/ita/coo/tools/board add <repo> <n>` and `/home/ita/coo/tools/board set <repo> <n> Status backlog`, tell Ita in one line that you did, and go back to your own task. Reading another repo to answer a question is free; writing into its tree, or filing there and starting the work as if it were yours, is the line — a planets session crossed it six times in one evening (coo#93 §1b). If the work cannot wait, the COO is who dispatches it, and **The org** below is why (Ita, 2026-09-19, coo#98).
 
 ### What you could not do becomes a task
 
@@ -184,6 +186,23 @@ caused it, in that agent's own terminal, while the fix is still one edit away.
 `git commit --no-verify` skips it when you mean to. If you think this repo is the exception,
 say so and ask — don't push a workflow and find out.
 
+### The org: six repos, and the COO
+
+You work one repo. The other five are Ita's too — all owned by `theitush`, all on this one machine, all on the same board — so a task that mentions the cockpit, or a histogram, or the poster editor is naming somebody else's tree rather than something missing from yours.
+
+| Repo | Local dir | What it is |
+|---|---|---|
+| `WeatherBaseline` | `~/HowHotWasIt` (the directory keeps the old name) | ERA5 climate baselines: the pipeline, the debias models, and the public site at weather-baseline.pages.dev |
+| `inbar` | `~/Inbar` | Quantitative trading research — backtest engine, fill model, desk reproductions. One machine, no production |
+| `lead-machine` | `~/leadgen` | The outreach pipeline: companies and contacts, enrichment and scoring, and the cockpit that picks who gets messaged next |
+| `planets` | `~/planets` (v3; v2 is `~/planets-v2`, local only and not mirrored) | An editor for astronomical posters — where the planets stood over a run of dates, drawn and printed at poster size |
+| `yajna` | `~/yajna` | A local-first journal and notes app, published as a GitHub Pages site |
+| `coo` | `~/coo` | The COO — below |
+
+What each of them is *doing* right now — in flight, blocked, hands-off, just landed — is deliberately not copied here. It lives in `coo/STATUS.md` and on the board, which are the two places kept current.
+
+`coo` is the COO: Ita's cross-project brain, and the owner of what is shared. The board is its Project #2 (https://coo-board.pages.dev), this Tasks section is generated from its `templates/CLAUDE-tasks.md`, and it keeps a read-only mirror of every repo's trunk under `coo/mirror/<name>/` — which is where another repo's code gets read without anyone going near its working tree. It is also the one session that puts workers into other repos: `coo/.claude/agents/<repo>.md` is a brief per repo, so a COO session spawns an agent that works in `~/leadgen` or `~/planets` as routinely as one working in its own tree. That is why cross-repo work is handed to it — not because spawning across directories is impossible, but because the COO is where it is set up. Don't conclude otherwise from in here: a planets session told Ita it could not be done, days after the COO had started doing it routinely (coo#93 §4, coo#98).
+
 ### Staying focused
 
 Work the task you were given, and only it. When something unrelated turns up mid-task — a bug somewhere else, a perf stall, a dead file, a good idea for later — **pin it**: one REST POST in the repo it belongs to, `tools/board add` it, set it to `backlog`, and go straight back to what you were doing. A pin is a title plus three to five lines: where you saw it, the symptom, a one-line hunch, a one-line "done when". Don't chase it, don't name every code path, don't design the fix — that is the job of whoever picks the issue up. The issue is what makes dropping it safe; nothing is lost, so there is never a reason to chase it now.
@@ -192,6 +211,6 @@ Related is not a detour. If the thing you found is part of the task, blocks it, 
 
 Same rule for scope: the task is what the issue says. Improvements you notice along the way are pins, not extras.
 
-Same rule for the filesystem: **stay inside this repo's directory**. Everything you write — code, scratch files, test output, downloads — lands in this working tree (or your session scratchpad for throwaways), never in `~`, another project's directory, or anywhere else on the machine.
+Same rule for the filesystem: **stay inside this repo's directory**. Everything you write — code, scratch files, test output, downloads — lands in this working tree (or your session scratchpad for throwaways), never in `~`, another project's directory, or anywhere else on the machine. That is about *files*, and it is the same line the handoff rule draws: another repo you may read, here or in `coo/mirror/<name>/`, and file an issue in over REST; its working tree you never write.
 
 And the tree itself is shared: **you hold what you dirty, and you touch nothing dirty that is not yours.** A file `git status` reports changed that you did not change is someone's work in progress — another session's agent, the COO's, Ita's own — whatever it looks like, and it is not yours to edit, stage, commit or revert. Check the file, not the tree, and check when you first reach for it, not at the start of the task: a check made at the top was accurate when it ran and wrong twenty minutes later (coo#39, 2026-09-01). `git status --short -- <path>` is the whole check — empty means yours, and it stays yours until you commit it. Held? Put your change in a new file; that costs nothing, never goes stale, and ends in a merge rather than a lost edit. Has to be that file? Ask, never guess: `ListAgents` shows the sessions on this machine and `SendMessage` reaches them, and the one working in this tree can say whether the file is its agent's. Nobody alive claims it? It is still not yours — it is Ita's to keep or drop, so tell him.
