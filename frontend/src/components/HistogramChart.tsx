@@ -778,14 +778,16 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
             // never text colour. The hatch used to be var(--text-h) at 0.5,
             // which is white on the dark theme: the loudest thing on the chart,
             // and reading as chrome rather than as this metric's forecast.
-            // Light takes the ramp's darkest step, dark its mid step — bright
-            // enough on #16171d to read without glowing — so the texture is
+            // Both take the step that reads strongest against their own
+            // surface: light the ramp's DARKEST (index 0, now that light runs
+            // dark → light like dark mode does), dark its mid step — bright
+            // enough on #16171d to read without glowing. So the texture is
             // equally loud in both themes. One ink for the whole mark: the
             // wash, the lines and the % label all take it.
             const hatchInk =
               theme === 'dark'
                 ? eraColor(currentMetric, 1, 'dark')
-                : eraColor(currentMetric, 2, 'light');
+                : eraColor(currentMetric, 0, 'light');
 
             // Clip the full-support fill to the region — a rect in g-local coords,
             // so the fill edge lands exactly on the reference line's pixel.
