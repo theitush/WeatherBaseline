@@ -1,39 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
-import { buildPeriods, type Period } from '../components/PeriodHistogramChart';
+import { buildPeriods, type Period, type BracketKey } from '../components/PeriodHistogramChart';
 import type { PermRecord, PermutationResult } from '../utils/permutationTest';
 import type { PermWorkerRequest, PermWorkerResponse } from '../utils/permutationTest.worker';
 
 /**
- * The three comparisons this section runs over the eras:
- *   newestVsPooled   — the newest era against both older ones POOLED. Drawn as
- *                      the bracket spanning the whole panel stack.
- *   presatVsFirstsat — pre-satellite against the first satellite era. Drawn as
- *                      the bracket over the bottom two panels.
- *   postsatPair      — the two satellite eras against each other. NOT drawn:
- *                      this is the one the prose reports, and it is what
- *                      `result` holds.
+ * The three comparisons this section runs: every PAIR of the three eras, no
+ * pooling. Each is drawn as its own bracket over the top panel — including the
+ * one the prose reports, since a reader comparing three pairs should see all
+ * three marked. Keys are the chart's BracketKey, so a p-value cannot be handed
+ * to the wrong bracket.
  */
-export const PERM_COMPARISONS = ['newestVsPooled', 'presatVsFirstsat', 'postsatPair'] as const;
-export type PermComparison = (typeof PERM_COMPARISONS)[number];
+export const PERM_COMPARISONS = ['latestVsPrev', 'latestVsPresat', 'prevVsPresat'] as const;
+export type PermComparison = BracketKey;
 
-/** The comparison the headline and the SignificancePanel speak for. */
-const TEXT_COMPARISON: PermComparison = 'postsatPair';
+/** The comparison the headline and the SignificancePanel speak for: the two
+ *  satellite eras, the most recent change the record can show. */
+const TEXT_COMPARISON: PermComparison = 'latestVsPrev';
 
 export type PermResults = Record<PermComparison, PermutationResult | null>;
 const NO_RESULTS: PermResults = {
-  newestVsPooled: null,
-  presatVsFirstsat: null,
-  postsatPair: null,
+  latestVsPrev: null,
+  latestVsPresat: null,
+  prevVsPresat: null,
 };
 
 export interface PermutationTestState {
   /**
-   * The post-satellite pair's result — THE comparison the text reports. Kept
-   * under this name because every text consumer (the headline's changeVerdict,
-   * the SignificancePanel's sentence) reads exactly one result and should not
-   * have to choose which.
+   * The latest-vs-previous result — THE comparison the text reports. Kept under
+   * this name because every text consumer (the headline's changeVerdict, the
+   * SignificancePanel's sentence) reads exactly one result and should not have
+   * to choose which.
    */
   result: PermutationResult | null;
   // The metric `result` was computed for. Lets consumers tell a fresh result
@@ -45,28 +43,27 @@ export interface PermutationTestState {
   // render *after* the switch, so it isn't exposed: keying off it alone flashes
   // an "empty" state in that gap.
   pending: boolean;
-  /** All three, for the chart's brackets. Cleared the moment a new round is
-   *  dispatched, so a non-null entry is always for the current metric. */
+  /** All three, one per bracket. Cleared the moment a new round is dispatched,
+   *  so a non-null entry is always for the current metric. */
   results: PermResults;
   /** The eras being compared, so the panel can name them without re-deriving. */
   periods: Period[];
 }
 
 /**
- * Runs the year-block permutation test over the three eras — three comparisons,
- * one worker each. Re-dispatches whenever the data/metric change. Shared by
- * SignificancePanel and the headline (which read `result`, the post-satellite
- * pair) and by PeriodHistogramChart (which brackets the other two), so the
- * words and the marks are always the same numbers.
+ * Runs the year-block permutation test over every PAIR of the three eras —
+ * three comparisons, one worker each. Re-dispatches whenever the data/metric
+ * change. Shared by SignificancePanel and the headline (which read `result`,
+ * the latest-vs-previous pair) and by PeriodHistogramChart (which brackets all
+ * three), so the words and the marks are always the same numbers.
  *
  * WHY THREE WORKERS AND NOT ONE. The eras are much larger pools than the
  * 15-year windows this replaced, and a single 10k-permutation run over them
- * takes ~0.8–1.5s (measured 2026-09-18, 1950–2026 at a ±3-day window: 890ms for
- * the pre/first-sat pair, 842ms for the post-sat pair, 1539ms for the newest
- * against 50 pooled year-blocks). Queued on one worker that is ~3.3s, past the
- * point where the headline gives up and says "Yet to be tested…" on every
- * metric switch. One worker per comparison runs them at once, so the wait is
- * the slowest test (~1.5s), not the sum.
+ * takes ~0.9s (measured 2026-09-18, 1950–2026 at a ±3-day window: 890ms for the
+ * prev/pre-sat pair, 842ms for the latest/prev pair). Queued on one worker that
+ * is ~2.6s, past the point where the headline gives up and says "Yet to be
+ * tested…" on every metric switch. One worker per comparison runs them at once,
+ * so the wait is the slowest test (~1s), not the sum.
  */
 export function usePermutationTest(
   filteredData: WeatherDataPoint[],
@@ -91,11 +88,13 @@ export function usePermutationTest(
   // One PermRecord[] per comparison. Memoized on data+metric+periods so we don't
   // rebuild (or re-dispatch) on unrelated re-renders.
   const recordSets = useMemo<Record<PermComparison, PermRecord[]> | null>(() => {
-    const [pre, firstSat, latest] = periods;
-    if (!pre || !firstSat || !latest) return null;
-    const within = (year: number, ps: Period[]) =>
-      ps.some((p) => year >= p.start && year <= p.end);
-    const build = (oldSide: Period[], newSide: Period[]): PermRecord[] => {
+    const [presat, prev, latest] = periods;
+    if (!presat || !prev || !latest) return null;
+    const within = (year: number, p: Period) => year >= p.start && year <= p.end;
+    // `old` is always the EARLIER era of the pair, so observedDiff is signed
+    // later-minus-earlier in every comparison and a positive number always means
+    // "the more recent era is higher".
+    const build = (older: Period, newer: Period): PermRecord[] => {
       const out: PermRecord[] = [];
       for (const d of filteredData) {
         // Exclude only forecast; 'recent' is real settled-enough data (unchanged
@@ -103,15 +102,15 @@ export function usePermutationTest(
         if (d.data_type === 'forecast') continue;
         const v = d[currentMetric];
         if (v === null || v === undefined || !Number.isFinite(v)) continue;
-        if (within(d.year, oldSide)) out.push({ year: d.year, group: 'old', value: v });
-        else if (within(d.year, newSide)) out.push({ year: d.year, group: 'new', value: v });
+        if (within(d.year, older)) out.push({ year: d.year, group: 'old', value: v });
+        else if (within(d.year, newer)) out.push({ year: d.year, group: 'new', value: v });
       }
       return out;
     };
     return {
-      newestVsPooled: build([pre, firstSat], [latest]),
-      presatVsFirstsat: build([pre], [firstSat]),
-      postsatPair: build([firstSat], [latest]),
+      latestVsPrev: build(prev, latest),
+      latestVsPresat: build(presat, latest),
+      prevVsPresat: build(presat, prev),
     };
   }, [filteredData, currentMetric, periods]);
 

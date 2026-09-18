@@ -7,11 +7,11 @@ import { convertDelta, unitLabel, valueDecimals } from '../utils/units';
 import './SignificancePanel.css';
 
 interface SignificancePanelProps {
-  // Result of the POST-SATELLITE PAIR's permutation test — the first satellite
-  // era against the newest — computed in App by usePermutationTest. The other
-  // two comparisons that hook runs are drawn as brackets on the histogram and
-  // deliberately have no sentence here: the section states one change, the
-  // recent one, and the chart shows the rest.
+  // Result of the LATEST-vs-PREVIOUS permutation test — the first satellite era
+  // against the newest — computed in App by usePermutationTest. All three of
+  // that hook's pairs are bracketed on the histogram; only this one gets a
+  // sentence, because the section states one change, the recent one, and the
+  // chart marks the rest.
   result: PermutationResult | null;
   loading: boolean;
   currentMetric: MetricKey;

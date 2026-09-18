@@ -16,16 +16,12 @@ interface PeriodHistogramChartProps {
   // chart uses. We further restrict to observed rows and split into the eras.
   filteredData: WeatherDataPoint[];
   currentMetric: MetricKey;
-  // Two-sided p-values of the two permutation tests the chart BRACKETS. Each
-  // drives one bracket's stars; null while that test is running, or when there
-  // isn't enough data for it. The third test — the post-satellite pair — is the
-  // one the prose reports and is deliberately not drawn here.
-  //   newestVsPooled   — the newest era against both previous ones pooled.
-  //                      Bracket spans the top panel's median to the bottom's.
-  //   presatVsFirstsat — pre-satellite against the first satellite era.
-  //                      Bracket spans the bottom two panels' medians.
-  pValueNewestVsPooled?: number | null;
-  pValuePresatVsFirstsat?: number | null;
+  // Two-sided p-value per bracket — every PAIR of eras, all three drawn. Null
+  // while that test is still running, or when there isn't enough data for it.
+  // `latestVsPrev` is also the one the prose reports (SignificancePanel); it is
+  // bracketed here like the others, because a reader comparing three pairs
+  // should see all three marked, not two.
+  pValues?: Partial<Record<BracketKey, number | null>>;
   width?: number;
   // Height of a single panel (each of the 3 eras gets one). Total SVG height
   // is derived from this plus the shared x-axis strip.
@@ -39,6 +35,17 @@ export interface Period {
   /** Index into the era ramp: 0 = oldest (pre-satellite), 2 = newest. */
   era: number;
 }
+
+/**
+ * The three comparisons: every PAIR of the three eras, each drawn as its own
+ * bracket over the top panel. Named here rather than in usePermutationTest
+ * because that hook already imports this module (for buildPeriods), so the
+ * dependency can only run one way.
+ *   latestVsPrev   — 2000–now vs 1979–1999. Also the pair the prose reports.
+ *   latestVsPresat — 2000–now vs 1950–1978.
+ *   prevVsPresat   — 1979–1999 vs 1950–1978.
+ */
+export type BracketKey = 'latestVsPrev' | 'latestVsPresat' | 'prevVsPresat';
 
 /**
  * The three periods this section compares: THE ERAS (utils/eras) — pre-satellite,
@@ -126,10 +133,16 @@ export const PeriodLegend: React.FC<{
 // MainChart.tsx: left 55, right 20) so that on mobile, where this chart's
 // x-axis sits directly under the main chart's, the two temp axes share the
 // exact same pixel range and their ticks line up.
-// top leaves room for both the significance bracket (a band above the top
-// panel) and that panel's right-aligned year label which sits just below it.
-const MARGIN = { top: 44, right: 20, bottom: 36, left: 55 };
+// top leaves room for the THREE stacked significance brackets (all of them sit
+// above the top panel — see the bracket block below) plus that panel's
+// right-aligned year label, which sits just below the innermost one.
+const MARGIN = { top: 80, right: 20, bottom: 36, left: 55 };
 const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
+// One bracket level: 6px of legs, a 1.2px bar, and the ~13px the 14px stars
+// occupy above it (see .sig-stars). 24 leaves the next level's legs ~5px clear
+// of the level below's stars, and three levels put the topmost ink at y=-71 —
+// so MARGIN.top must stay comfortably above that, hence 80.
+const BRACKET_STEP = 24;
 
 // Significance tier of a p-value: 0 = not significant, 1 = p<0.05, 2 = p<0.01,
 // 3 = p<0.001. The single source for both the in-chart stars and the section's
@@ -179,15 +192,12 @@ export function changeVerdict(pValue: number, observedDiff: number, metric: Metr
   return `${TIER_CONFIDENCE[tier]} gotten ${direction} over the decades`;
 }
 
-/** Which comparison a bracket draws; also its class suffix and geometry key. */
-type BracketKey = 'pooled' | 'presat';
 interface BracketGeom { x0: number; x1: number; barY: number }
 
 const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   filteredData,
   currentMetric,
-  pValueNewestVsPooled,
-  pValuePresatVsFirstsat,
+  pValues,
   width: propWidth,
   panelHeight: propPanelHeight,
 }) => {
@@ -467,38 +477,46 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     });
 
     // Significance brackets — the scientific-paper "⊓" joining the medians of
-    // the panels being compared, along the shared x-axis. The bracket LINES are
-    // drawn here, with the bars, since their geometry doesn't depend on any
-    // p-value; only the stars do, and those are added by a separate effect keyed
-    // on the p-values, so a bracket never flashes when a worker result lands.
+    // the two panels being compared, one per PAIR of eras, so all three pairs
+    // are marked. The panels share one x axis, so a bracket's legs land on the x
+    // of each compared median however far apart the panels are vertically.
     //
-    // TWO of the three tests are drawn. Each sits in the margin above the LOWER
-    // of the panels it joins, the same 10px/4px offsets the single bracket used:
-    //   pooled — the newest era against both older ones POOLED, so it spans the
-    //            whole stack, top median to bottom.
-    //   presat — pre-satellite against the first satellite era, in the gap above
-    //            the bottom panel, spanning just those two.
-    // The third test, the two post-satellite eras, is the one the prose reports
-    // (SignificancePanel). It is deliberately not drawn: it would be a second
-    // bracket across the same two panels as `pooled`'s upper half, and the
-    // section already says it in words.
-    const panelTopOf = (idx: number) => idx * (panelHeight + PANEL_GAP);
+    // ALL THREE sit above the TOP panel, stacked, never in the gaps between
+    // panels: a bracket is the section's headline result, and results belong in
+    // one band at the top where they can be read against each other — not
+    // scattered down the stack where the reader has to hunt for them. Widest
+    // span outermost, so no bracket is drawn inside another's footprint.
+    //
+    // The bracket LINES are drawn here, with the bars, since their geometry
+    // doesn't depend on any p-value; only the stars do, and those are added by a
+    // separate effect keyed on the p-values, so a bracket never flashes when a
+    // worker result lands.
     bracketGeomRef.current = {};
-    const drawBracket = (key: BracketKey, xA: number | null, xB: number | null, topY: number) => {
-      if (xA == null || xB == null) return;
-      const barY = topY - 10;
-      const legBottomY = topY - 4;
-      const x0 = Math.min(xA, xB);
-      const x1 = Math.max(xA, xB);
-      bracketGeomRef.current[key] = { x0, x1, barY };
-      g.append('g')
-        .attr('class', `sig-bracket sig-bracket-${key}`)
-        .append('path')
-        .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
-        .attr('fill', 'none');
-    };
-    drawBracket('pooled', medianX[0], medianX[medianX.length - 1], panelTopOf(0));
-    drawBracket('presat', medianX[1], medianX[2], panelTopOf(2));
+    const pairXs: Array<{ key: BracketKey; a: number | null; b: number | null }> = [
+      // medianX is in DISPLAY order: 0 = latest (top), 1 = prev, 2 = pre-satellite.
+      { key: 'latestVsPrev', a: medianX[0], b: medianX[1] },
+      { key: 'latestVsPresat', a: medianX[0], b: medianX[2] },
+      { key: 'prevVsPresat', a: medianX[1], b: medianX[2] },
+    ];
+    pairXs
+      .filter((p) => p.a != null && p.b != null)
+      .map((p) => ({
+        key: p.key,
+        x0: Math.min(p.a as number, p.b as number),
+        x1: Math.max(p.a as number, p.b as number),
+      }))
+      // Narrowest first → level 0, closest to the panel; widest last → outermost.
+      .sort((m, n) => m.x1 - m.x0 - (n.x1 - n.x0))
+      .forEach(({ key, x0, x1 }, level) => {
+        const barY = -10 - level * BRACKET_STEP;
+        const legBottomY = -4 - level * BRACKET_STEP;
+        bracketGeomRef.current[key] = { x0, x1, barY };
+        g.append('g')
+          .attr('class', `sig-bracket sig-bracket-${key}`)
+          .append('path')
+          .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
+          .attr('fill', 'none');
+      });
 
     // Shared x-axis under the bottom panel. tickCount() computed from the same
     // domain the main chart uses (default count for temp/wind, precip capped at
@@ -540,14 +558,22 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
   // bracket lines themselves are drawn by the main render with the bars, so they
   // never flash. The stars fade in late, which is fine — the p-value genuinely
   // isn't known until the worker returns.
+  // Read out as scalars: `pValues` is built inline by the caller, so a fresh
+  // object every render — keying the effect on it would re-place the stars on
+  // any unrelated App re-render.
+  const pLatestVsPrev = pValues?.latestVsPrev ?? null;
+  const pLatestVsPresat = pValues?.latestVsPresat ?? null;
+  const pPrevVsPresat = pValues?.prevVsPresat ?? null;
+
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    const pairs: Array<[BracketKey, number | null | undefined]> = [
-      ['pooled', pValueNewestVsPooled],
-      ['presat', pValuePresatVsFirstsat],
+    const entries: Array<[BracketKey, number | null]> = [
+      ['latestVsPrev', pLatestVsPrev],
+      ['latestVsPresat', pLatestVsPresat],
+      ['prevVsPresat', pPrevVsPresat],
     ];
-    for (const [key, p] of pairs) {
+    for (const [key, p] of entries) {
       const bracket = svg.select<SVGGElement>(`.sig-bracket-${key}`);
       if (bracket.empty()) continue;
       // Clear any prior stars so a p-value flip doesn't stack them.
@@ -566,8 +592,9 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // Also re-runs after the main render (filteredData/metric rebuild the SVG and
     // the bracket lines, then this re-adds the stars onto the fresh brackets).
   }, [
-    pValueNewestVsPooled,
-    pValuePresatVsFirstsat,
+    pLatestVsPrev,
+    pLatestVsPresat,
+    pPrevVsPresat,
     filteredData,
     currentMetric,
     width,
