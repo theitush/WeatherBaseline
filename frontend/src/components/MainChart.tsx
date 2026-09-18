@@ -7,7 +7,7 @@ import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor'
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
-import { erasForPool, eraIndex, eraInk, hasOutline } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, hasOutline, type EraInk } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './MainChart.css';
@@ -214,11 +214,10 @@ const MainChart: React.FC<MainChartProps> = ({
     // NOTHING paints the plot background any more. Washing the whole background
     // in each era's ink was what Ita objected to (2026-09-18) — the eras belong
     // on the data, not behind it — so what carries them here is the PERCENTILE
-    // BAND (see the band block below: shade tints the fill per era segment,
-    // contour strokes the 10–90 band's own edges per era), plus the dashed
-    // boundary line at each era's first year, which is all this group draws now.
+    // BAND, whose fill is tinted per era segment in BOTH styles (see bandFill in
+    // the band block below), plus the dashed boundary line at each era's first
+    // year, which is all this group draws now.
     const eras = erasForPool(filteredData, currentMetric, currentDate);
-    const isContour = eraStyle === 'contour';
     if (eras) {
       const eraG = g.append('g').attr('class', 'era-marks');
       eras.forEach((era, i) => {
@@ -364,10 +363,24 @@ const MainChart: React.FC<MainChartProps> = ({
       };
       const segments = eras ? eraSegments(validAggs) : null;
 
-      // One band path per era segment in SHADE style, each in that era's shade
-      // at the band's own alpha, so the shading itself changes colour across the
-      // eras. Contour style keeps the single metric-coloured band and says it
-      // with the outline instead (below).
+      /**
+       * The colour an era's stretch of the band is FILLED with — one rule that
+       * happens to be right in both styles, which is the point: the band is
+       * drawn identically either way and only the ink differs.
+       *
+       *   shade   — stroke and fill are both that era's ramp step, so this is
+       *             the shade, as before.
+       *   contour — stroke is the era's contour ink (the colour its silhouette
+       *             wears on the histogram) and that is what fills the band, so
+       *             the 10–90 shading reads back to the histogram directly. The
+       *             oldest era has no contour ink and `fill` is the shared
+       *             metric base, so its stretch keeps the plain colour.
+       */
+      const bandFill = (ink: EraInk) => (hasOutline(ink) ? ink.stroke : ink.fill);
+
+      // One band path per era segment, each at the band's own alpha, so the
+      // shading itself changes colour across the eras. No eras (a pool too thin
+      // to split) falls back to the single whole-band path.
       const drawBand = (
         cls: 'percentile-band-90' | 'percentile-band-75',
         area: d3.Area<YearlyAggregate>,
@@ -378,7 +391,7 @@ const MainChart: React.FC<MainChartProps> = ({
         // the same type to d3's typings.
         const paint = <T,>(sel: d3.Selection<SVGPathElement, T, null, undefined>) =>
           sel.style('opacity', 0).transition().duration(500).style('opacity', 1);
-        if (segments && !isContour) {
+        if (segments) {
           segments.forEach((seg, i) => {
             if (seg.length < 2) return;
             const ink = eraInk(currentMetric, i, eraStyle, theme);
@@ -386,7 +399,7 @@ const MainChart: React.FC<MainChartProps> = ({
               g.append('path')
                 .datum(seg)
                 .attr('class', `${cls} era-${i}`)
-                .attr('fill', ink.fill)
+                .attr('fill', bandFill(ink))
                 .attr('fill-opacity', CONFIG.opacityLevels[level])
                 .attr('d', area)
             );
@@ -404,50 +417,6 @@ const MainChart: React.FC<MainChartProps> = ({
 
       drawBand('percentile-band-90', area90, 'percentileBand90');
       drawBand('percentile-band-75', area75, 'percentileBand75');
-
-      // CONTOUR style: the 10–90 band's own contour — its p90 edge and its p10
-      // edge — stroked per era segment in that era's ink, over the unchanged
-      // single-colour fills. Only the outer band is outlined; outlining 25–75 as
-      // well would put four lines through the same few pixels. The oldest era
-      // has no ink, so its stretch of the band is simply un-outlined.
-      if (segments && isContour) {
-        const edgeLine = (acc: (d: YearlyAggregate) => number) =>
-          isVertical
-            ? d3
-                .line<YearlyAggregate>()
-                .y((d) => timeScale(d.date))
-                .x((d) => tsv(acc(d)))
-                .curve(d3.curveMonotoneY)
-            : d3
-                .line<YearlyAggregate>()
-                .x((d) => timeScale(d.date))
-                .y((d) => tsv(acc(d)))
-                .curve(d3.curveMonotoneX);
-        const edges: Array<[string, (d: YearlyAggregate) => number]> = [
-          ['hi', (d) => (d.p90 ?? d.moving90) as number],
-          ['lo', (d) => (d.p10 ?? d.moving10) as number],
-        ];
-        segments.forEach((seg, i) => {
-          if (seg.length < 2) return;
-          const ink = eraInk(currentMetric, i, eraStyle, theme);
-          if (!hasOutline(ink)) return;
-          edges.forEach(([side, acc]) => {
-            g.append('path')
-              .datum(seg)
-              .attr('class', `percentile-band-90-edge edge-${side} era-${i}`)
-              .attr('fill', 'none')
-              .attr('stroke', ink.stroke)
-              .attr('stroke-width', ink.strokeWidth)
-              .attr('stroke-linejoin', 'round')
-              .attr('pointer-events', 'none')
-              .attr('d', edgeLine(acc))
-              .style('opacity', 0)
-              .transition()
-              .duration(500)
-              .style('opacity', 1);
-          });
-        });
-      }
 
       const trendData = validAggs.filter((d) => d.movingMedian !== null);
       if (trendData.length > 0) {
