@@ -128,6 +128,10 @@ export function usePermutationTest(
         setResults((prev) => ({ ...prev, [key]: e.data.result }));
         // Only the text's comparison ends the pending state: the brackets have
         // no loading copy to hold, their stars just fade in when they land.
+        //
+        // One setState per answer, NOT one batched across the three: the three
+        // tests are different sizes and land hundreds of ms apart, so a
+        // per-frame batch coalesced nothing when measured (#64).
         if (key === TEXT_COMPARISON) {
           setResultMetric(pendingMetricRef.current);
           setLoading(false);

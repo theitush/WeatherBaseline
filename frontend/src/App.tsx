@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import CONFIG from './utils/config';
 import { AppProvider, useApp } from './context/AppContext';
 import LocationSelector from './components/LocationSelector';
@@ -152,28 +152,31 @@ const AppContent: React.FC = () => {
     return { lead, verdict: 'Too little data to say' };
   };
 
-  // Get current date data for temperature context.
-  // Parse as LOCAL midnight (T00:00:00) to match the data rows; a bare
-  // new Date("YYYY-MM-DD") is UTC, which selects the wrong day's row west of UTC
-  // (e.g. Mexico), desyncing the card's temp/verdict from the chart's marker.
-  const getCurrentTemp = () => {
-    const currentDateData = filteredData.filter(
-      (d) => d.date.toDateString() === new Date(currentDate + 'T00:00:00').toDateString()
-    );
-    if (currentDateData.length > 0) {
-      return currentDateData[0][currentMetric] ?? null;
-    }
-    return null;
-  };
+  // The headline day's row. Parse the target as LOCAL midnight (T00:00:00) to
+  // match the data rows; a bare new Date("YYYY-MM-DD") is UTC, which selects the
+  // wrong day's row west of UTC (e.g. Mexico), desyncing the card's
+  // temp/verdict from the chart's marker.
+  //
+  // MEMOIZED, and the target string is built ONCE rather than inside the
+  // predicate: this scan used to run nine times per render (temp and band are
+  // each read from several places) and every render, so a permutation result
+  // landing re-dated every row in the window for nothing (#64).
+  const currentDateRow = useMemo(() => {
+    const target = new Date(currentDate + 'T00:00:00').toDateString();
+    return filteredData.find((d) => d.date.toDateString() === target) ?? null;
+  }, [filteredData, currentDate]);
+
+  const currentTemp = useMemo(
+    () => currentDateRow?.[currentMetric] ?? null,
+    [currentDateRow, currentMetric]
+  );
 
   // The forecast-uncertainty band for the headline day/metric, if the local CI
-  // server provided one (forecast rows only). Same row lookup as getCurrentTemp.
-  const getCurrentBand = () => {
-    const row = filteredData.find(
-      (d) => d.date.toDateString() === new Date(currentDate + 'T00:00:00').toDateString()
-    );
-    return row?.band?.[currentMetric] ?? null;
-  };
+  // server provided one (forecast rows only). Same row as currentTemp.
+  const currentBand = useMemo(
+    () => currentDateRow?.band?.[currentMetric] ?? null,
+    [currentDateRow, currentMetric]
+  );
 
   // Section 3.5's heading answers the DIAL's question — "is this unusual for
   // this place, full stop?" — where the card at the top of the page answers "is
@@ -194,13 +197,21 @@ const AppContent: React.FC = () => {
   // The era boundaries the side histogram splits its bars on, computed off the
   // SAME pool it bins (comparable rows carrying the metric) so the legend's
   // year ranges match the bars exactly.
-  const histogramEras = erasForPool(filteredData, currentMetric, currentDate);
+  const histogramEras = useMemo(
+    () => erasForPool(filteredData, currentMetric, currentDate),
+    [filteredData, currentMetric, currentDate]
+  );
 
   // days a year are top-5% days, so "WTF." would fire every summer here.
-  const yearVerdict = (() => {
-    const value = getCurrentTemp();
+  // MEMOIZED for the same reason as the row lookup above: this walks the whole
+  // record (observedPool over yearTimeline) and runs the prose ladder's
+  // order-statistics over it, which is the single most expensive thing in this
+  // component — and none of it depends on the permutation results, so it must
+  // not re-run when one lands (#64).
+  const yearVerdict = useMemo(() => {
+    const value = currentTemp;
     if (value === null) return null;
-    const band = getCurrentBand();
+    const band = currentBand;
     const observed = observedPool(yearTimeline, currentMetric).filter((d) => {
       const v = d[currentMetric];
       return typeof v === 'number' && Number.isFinite(v);
@@ -233,7 +244,7 @@ const AppContent: React.FC = () => {
       `For any day of the year, ${formatTargetDate(currentDate)}, ${year} ` +
       `${metricQuestionLabel[currentMetric]}${where} is`;
     return { lead, verdict: prose.verdict, rarityLine: prose.rarityLine };
-  })();
+  }, [currentTemp, currentBand, yearTimeline, currentMetric, system, location.name, currentDate]);
 
   return (
     <div className="app">
@@ -268,7 +279,7 @@ const AppContent: React.FC = () => {
             <SettingsMenu />
             <ShareButton
               placeName={location.name || ''}
-              temp={getCurrentTemp()}
+              temp={currentTemp}
               currentMetric={currentMetric}
               date={currentDate}
             />
@@ -327,13 +338,13 @@ const AppContent: React.FC = () => {
           <div className="data-panel">
             {/* Section 1 — the answer at a glance. When the target date has no
                 data row (e.g. a future day the forecast doesn't reach yet, or a
-                cell whose forecast tier is briefly stale), getCurrentTemp() is
+                cell whose forecast tier is briefly stale), currentTemp is
                 null: there's no value to headline and no marker to place. Say so
                 plainly instead of silently dropping the card, which reads as a
                 broken page. The charts below still render — they describe the
                 ±-day window across all years, which exists regardless. */}
             <section className="page-section">
-              {getCurrentTemp() === null ? (
+              {currentTemp === null ? (
                 <div className="no-target-data">
                   <strong>
                     Whoops — sorry, we couldn't fetch the data for that date for
@@ -348,8 +359,8 @@ const AppContent: React.FC = () => {
               ) : (
                 <TemperatureContextDisplay
                   context={temperatureContext}
-                  currentTemp={getCurrentTemp()}
-                  band={getCurrentBand()}
+                  currentTemp={currentTemp}
+                  band={currentBand}
                   filteredData={filteredData}
                   yearTimeline={yearTimeline}
                   currentMetric={currentMetric}
@@ -364,7 +375,7 @@ const AppContent: React.FC = () => {
               <header className="section-header" />
               <div className="charts-section">
                 <div className="chart-title">{formatChartTitle(currentDate)}</div>
-                <Legend metric={currentMetric} currentDate={currentDate} isForecast={getCurrentBand() != null} eras={histogramEras} />
+                <Legend metric={currentMetric} currentDate={currentDate} isForecast={currentBand != null} eras={histogramEras} />
                 <div className={`charts-container ${isMobile ? 'mobile' : ''}`}>
                   {isMobile ? (
                     <>
@@ -480,7 +491,7 @@ const AppContent: React.FC = () => {
                   {` (1950–${new Date().getFullYear()})`}
                 </div>
               )}
-              <RadialLegend metric={currentMetric} currentDate={currentDate} isForecast={getCurrentBand() != null} />
+              <RadialLegend metric={currentMetric} currentDate={currentDate} isForecast={currentBand != null} />
               <div className="radial-chart-row">
                 <YearRadialChart
                   fullData={yearTimeline}
