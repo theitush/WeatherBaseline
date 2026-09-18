@@ -73,7 +73,7 @@ WeatherBaseline#76 | BUG: sign drops the surname           | skip |  | Blocked o
 EOF
 ```
 
-The columns are id, title, lane, your estimate in whole minutes, and a note; `skip` in the lane column is a task you saw and passed over, and the note is why. That file *is* the pass — it is what the panel renders and what §4's footer is printed from, so it is also what a reader compares the finished pass against. Re-run `plan` whenever the shape of the pass changes (a task added, a lane re-cut, an estimate you now know better): it re-orders and re-estimates, and it never un-runs anything that has already started or landed.
+The columns are id, title, lane, your estimate in whole minutes, and a note; `skip` in the lane column is a task you saw and passed over, and the note is why — those render under **Skipped**, last, so that `Planned` holds only what is going to run next (§4). That file *is* the pass — it is what the panel renders and what §6's footer is printed from, so it is also what a reader compares the finished pass against. Re-run `plan` whenever the shape of the pass changes (a task added, a lane re-cut, an estimate you now know better): it re-orders and re-estimates, and it never un-runs anything that has already started or landed.
 
 ## 3. Spawn, watch, land
 
@@ -103,15 +103,15 @@ When a worker reports, before starting anything else in its lane:
    Exactly the three ways a task is allowed to finish. `--at HH:MM` is for when you notice a few minutes late; without it the clock is now.
 3. Commit **by path** the paths its report names, and nothing else. Never `-A`: the tree is shared.
 4. Start the next task in that lane.
-5. Send a message: it ends with the footer, and the footer now carries this task's actual timing.
+5. Send a message saying what landed and what you started behind it — a line or two, no footer. The panel at the bottom of the terminal is already carrying the lists, live and recomputed; the block goes on the final report and nowhere else (§4, §6).
 
-## 4. The panel, and the footer on every message
+## 4. The panel, and the footer on the final report
 
-The three lists — what ran, what is running, what is planned — are one file now, written by the commands in §2 and §3 and rendered in two places.
+The lists — what is running, what is planned, what ran, and what the pass passed over — are one file now, written by the commands in §2 and §3 and rendered in two places.
 
-**The panel** is the status line: Claude Code re-runs it on every assistant message and pins each line of its output to the bottom of the terminal. So the three headings sit in one place and stop scrolling away, which is what Ita asked for (coo#87): *"i just want to have the running, ran, planned in a fixed format that doesnt go anywhere instead of the text written at the end of every msg."* There is nothing to set up per pass — `plan` brings the panel up, §5's `clear` takes it down, and a session with no pass shows no headings at all.
+**The panel** is the status line: Claude Code re-runs it on every assistant message and pins each line of its output to the bottom of the terminal. So the headings sit in one place and stop scrolling away, which is what Ita asked for (coo#87): *"i just want to have the running, ran, planned in a fixed format that doesnt go anywhere instead of the text written at the end of every msg."* There is nothing to set up per pass — `plan` brings the panel up, §5's `clear` takes it down, and a session with no pass shows no headings at all.
 
-**The footer stays, and stays whole.** Every message you send during a pass still ends with the block, whether it is the plan, a one-line update, a question, or the final report. The panel lives only in this terminal; Ita follows a pass from his phone, where there is no status line, and a single notification has to be readable on its own — so a footer trimmed to "what changed since last time" is unreadable to exactly the reader it exists for. What has changed is that you no longer *retype* it. Print it and paste it:
+**The footer goes on the final report, whole — and on nothing else.** During the pass the panel *is* the footer: it re-renders on every message and on a timer, it sits in one place, and it is already right, so a block pasted under each message only says the same thing twice. Ita, mid-pass on 2026-09-19: *"you dont need to write the suffix coz the under table thing seems ot be working!"* (coo#97). What the panel cannot do is leave this terminal, and Ita follows a pass from his phone, where there is no status line and a single notification has to be readable on its own — so the final report still ends with the block, in full, never trimmed to "what changed since last time". You never retype it either. Print it and paste it:
 
 ```bash
 /home/ita/coo/tools/orchestrate-status show
@@ -121,12 +121,13 @@ The three lists — what ran, what is running, what is planned — are one file 
 STAGE    TASK                                                     ETA
 Running  WeatherBaseline#74 CLEANUP: retire queue.json                        ~14:40  ~20m left, since 14:20
 Planned  WeatherBaseline#75 RUN: re-measure board cost                        ~15:00  ~20m, lane 2 after #74
-Planned  WeatherBaseline#76 BUG: sign drops the surname                       skipped — Blocked on inbar#40
 Ran      WeatherBaseline#71 BUG: board loses the middle page                  14:02→14:19 (17m)  Done
 Ran      WeatherBaseline#73 FEATURE: lane carries its own backlog             14:02→14:25 (23m)  Review — ita
+Skipped  WeatherBaseline#76 BUG: sign drops the surname                       Blocked on inbar#40
+Skipped  WeatherBaseline#77 DECIDE: who owns the colour keys                  Worker: ita
 ```
 
-It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then Ran, the stage written on every row — with the ETA column a fixed width and TASK taking the rest of the terminal, so nothing jumps between renders (Ita, 2026-09-17, coo#90: *"running then planned then ran … stage, task, eta in fixed length columns"*). Claude Code runs the status line with `COLUMNS` and `LINES` set to the terminal's size, so the panel sizes itself to the window; `/home/ita/coo/tools/orchestrate-status width <cols>` is only the fallback for a status line run some other way, and unset it lays out for 120. Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
+It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then Ran, then Skipped, the stage written on every row — with the ETA column a fixed width and TASK taking the rest of the terminal, so nothing jumps between renders (Ita, 2026-09-17, coo#90: *"running then planned then ran … stage, task, eta in fixed length columns"*). Claude Code runs the status line with `COLUMNS` and `LINES` set to the terminal's size, so the panel sizes itself to the window; `/home/ita/coo/tools/orchestrate-status width <cols>` is only the fallback for a status line run some other way, and unset it lays out for 120. Both views render the same file, so the panel and the footer cannot disagree, and what the renderer guarantees you no longer have to:
 
 - **Every line names the task by id *and* title.** A title longer than the column is cut with an ellipsis; the id never is.
 - **The ETA column leads with the clock** — the finish time for running and planned work, the measured `start→end (Nm)` for finished work — so it reads straight down.
@@ -134,9 +135,9 @@ It is a table — a `STAGE  TASK  ETA` header, Running first, then Planned, then
 - **Running** counts itself down. `~20m left` is `start + eta − now`, recomputed every time the panel re-renders, so it is true between your messages as well as in them — and a worker past its estimate reads `~12m past ~14:40` instead of sitting at "20m left" forever.
 - **Planned** clocks are chained down each lane from whatever is running in it, so a worker landing early or late moves every line behind it. That is the whole-chain recalibration this section used to ask you to do by hand, and it is the part that was always wrong when you did.
 - **Every `Running` and `Planned` line carries a wall-clock finish time, not only a duration** — `~15:00  ~20m`. A duration alone makes the reader do the arithmetic and guess what time the dispatcher thinks it is; the clock time is what they actually want, which is when to come back.
-- Skipped tasks stay on **Planned** with the reason, so the reader knows they were seen.
-- Nothing running still prints the header and all three stages, with `Running  —`.
-- **The panel is capped** at half the terminal, and Ran collapses from the oldest into a `+N earlier` count; a status line cannot scroll. `/home/ita/coo/tools/orchestrate-status expand` lifts the cap for this session and `collapse` restores it — Ita runs them from the prompt as `! …/orchestrate-status expand`, and so can you when he asks. The status line also re-runs on a timer (`refreshInterval` in `~/.claude/settings.json`), so the toggle and the countdowns take effect between messages (coo#91).
+- **Planned holds only what is going to run next.** A task you saw and passed over — `Worker: ita`, `Blocked`, `Review`, `backlog` — leaves it, and lands under **Skipped**, rendered last, after Ran, with the reason on its row, so the reader still knows it was seen. Ita, reading the panel mid-pass (2026-09-19, coo#97): *"planned is ONLY things that are planned to go next in line."* A pass that skipped nothing shows no `Skipped` stage at all.
+- Nothing running still prints the header and the three standing stages, with `Running  —`.
+- **The panel is capped** at half the terminal, and the history collapses to fit: Skipped first, from the far end into `+N more`, then Ran from the oldest into a `+N earlier` count that keeps the outcomes. Running is never collapsed, and Planned only once both of those have given all they can; a status line cannot scroll. `/home/ita/coo/tools/orchestrate-status expand` lifts the cap for this session and `collapse` restores it — Ita runs them from the prompt as `! …/orchestrate-status expand`, and so can you when he asks. The status line also re-runs on a timer (`refreshInterval` in `~/.claude/settings.json`), so the toggle and the countdowns take effect between messages (coo#91).
 - Times are measured, never guessed: `start` and `land` stamp the clock themselves. Estimates are the `--eta` you gave and say so with `~`; once the first worker lands, re-run `plan` to re-estimate the rest against what it actually took.
 
 **The file is per session, not per repo**, because the panel has to be true of the terminal it is pinned to — two sessions open in the same repo (Ita's and yours) would otherwise overwrite each other's pass. It is keyed by `CLAUDE_CODE_SESSION_ID`, which is in the environment of every shell the skill runs, and which a subagent inherits from the session that spawned it — so a worker that stamps itself writes into its dispatcher's file, which is the right one. The renderer takes the session id off the status line's own input instead. You never name it: `/home/ita/coo/tools/orchestrate-status where` prints the path if you want to look. The id can change under a running pass — a resume, or Ita switching to the agents view and back — and then `start`/`land` report no pass: run `/home/ita/coo/tools/orchestrate-status adopt` and the previous session's file moves under the new id (coo#92).
@@ -155,7 +156,7 @@ Before the final report, and every time:
 
 ## 6. Report
 
-Per item: what it was, what its worker did, how it was verified, where it landed (Done / Review-and-who / Blocked-and-why), and what it left behind. Then the queue's new state, anything you skipped with the reason, the priorities you changed — and the footer one last time, with every line now carrying its actual timing.
+Per item: what it was, what its worker did, how it was verified, where it landed (Done / Review-and-who / Blocked-and-why), and what it left behind. Then the queue's new state, anything you skipped with the reason, the priorities you changed — and the footer, `/home/ita/coo/tools/orchestrate-status show` pasted whole, every line now carrying its actual timing. This is the one message of the pass that carries it.
 
 Then, and only after that footer is written:
 
