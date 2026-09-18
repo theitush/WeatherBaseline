@@ -6,6 +6,14 @@ import { comparablePool } from './dataProcessor';
  *  the same boundary MainChart draws its "Satellites!" line at. */
 export const SATELLITE_YEAR = 1979;
 
+/** Where the satellite era is cut in two: the turn of the century, chosen
+ *  because it is a date a reader already holds, not because it happens to halve
+ *  today's record. A computed midpoint drifts — it was 2003 for a 1950–2026
+ *  pool and would move again next year — so the same chart would silently
+ *  re-cut itself over time and two screenshots a year apart would not be
+ *  comparable (Ita, 2026-09-18). */
+export const MIDPOINT_YEAR = 2000;
+
 /** Fill alpha every era's histogram shares; the eras are told apart by shade
  *  or outline, never by transparency. */
 export const ERA_FILL_ALPHA = 0.45;
@@ -32,19 +40,27 @@ export interface Era {
   from: number;
   /** Last year, inclusive. */
   to: number;
-  /** "1950–1978", "1979–2002" … the legend / tooltip label. */
+  /** "1950–1978", "1979–1999" … the legend / tooltip label. */
   label: string;
 }
 
 /**
  * The three eras the histogram is split into: everything before the satellites,
- * then the satellite era cut evenly-ish in two. `firstYear`/`lastYear` bound the
- * pool actually on screen so the labels read the real record, and the midpoint
- * moves with the record: 1979–2026 → 1979–2002 | 2003–2026.
+ * then the satellite era cut at MIDPOINT_YEAR. `firstYear`/`lastYear` bound the
+ * pool actually on screen so the labels read the real record — a 1950–2026 cell
+ * gives 1950–1978 | 1979–1999 | 2000–2026.
+ *
+ * Both cuts are FIXED years, so the eras mean the same thing on every cell and
+ * in every year. The last era therefore grows as the record does, which is the
+ * point: "since 2000" stays "since 2000".
+ *
+ * (A record ending before MIDPOINT_YEAR would leave the last era empty and its
+ * label reversed. Nothing reaches that — ERA5-Land runs 1950 to now for every
+ * cell — and it is the same shape as the empty first era a post-1979 record
+ * already gives, so it is left alone rather than special-cased.)
  */
 export function eraSplit(firstYear: number, lastYear: number): Era[] {
-  const satSpan = lastYear - SATELLITE_YEAR + 1;
-  const mid = SATELLITE_YEAR + Math.ceil(satSpan / 2);
+  const mid = MIDPOINT_YEAR;
   const fmt = (a: number, b: number) => `${a}–${b}`;
   return [
     { from: firstYear, to: SATELLITE_YEAR - 1, label: fmt(firstYear, SATELLITE_YEAR - 1) },

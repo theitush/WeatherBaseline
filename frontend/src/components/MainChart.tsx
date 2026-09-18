@@ -217,36 +217,39 @@ const MainChart: React.FC<MainChartProps> = ({
     // BAND, whose fill is tinted per era segment in BOTH styles (see bandFill in
     // the band block below), plus the dashed boundary line at each era's first
     // year, which is all this group draws now.
+    //
+    // The boundary dashes are CHROME, not an era mark: neutral grey in both
+    // styles, exactly the axis dash the 1979 line has always been (Ita,
+    // 2026-09-18). The era inks stay on the things that carry data — the band
+    // fills here, the bars and silhouettes on the histogram.
     const eras = erasForPool(filteredData, currentMetric, currentDate);
     if (eras) {
       const eraG = g.append('g').attr('class', 'era-marks');
       eras.forEach((era, i) => {
-        const ink = eraInk(currentMetric, i, eraStyle, theme);
-        // Boundary at the era's first year (skip the record's own start). The
-        // 1979 cut is drawn by the satellite block below with its label; here
-        // it just gets the era's ink over the neutral dash.
-        if (i > 0) {
+        // Only the SECOND cut is ours: era 1 starts at SATELLITE_YEAR by
+        // construction, and that cut is drawn with its own "Satellites!" label
+        // by the block below. Era 0 starts at the record's own start, which is
+        // the axis, not a boundary.
+        if (i > 1) {
           const pos = timeScale(new Date(era.from, 0, 1));
           const line = eraG.append('line')
             .attr('class', `era-boundary era-${i}`)
-            .attr('stroke', ink.stroke)
-            .attr('stroke-width', ink.strokeWidth)
-            .attr('stroke-dasharray', '3,4')
-            .attr('stroke-opacity', 0.8);
+            .attr('stroke', 'var(--chart-axis)')
+            .attr('stroke-width', 0.75)
+            .attr('stroke-dasharray', '3,4');
           if (isVertical) line.attr('x1', 0).attr('x2', width).attr('y1', pos).attr('y2', pos);
           else line.attr('x1', pos).attr('x2', pos).attr('y1', 0).attr('y2', height);
-          // Label the midpoint cut with its year, the way 1979 gets "Satellites!".
-          if (i === eras.length - 1) {
-            eraG.append('text')
-              .attr('class', 'era-boundary-label')
-              .attr('x', isVertical ? width - 5 : pos)
-              .attr('y', isVertical ? pos - 5 : -5)
-              .style('text-anchor', isVertical ? 'end' : 'middle')
-              .style('font-size', '11px')
-              .style('font-style', 'italic')
-              .style('fill', ink.stroke)
-              .text(String(era.from));
-          }
+          // Label the cut with its year, the way 1979 gets "Satellites!" — and
+          // in the same ink that label uses, for the same reason.
+          eraG.append('text')
+            .attr('class', 'era-boundary-label')
+            .attr('x', isVertical ? width - 5 : pos)
+            .attr('y', isVertical ? pos - 5 : -5)
+            .style('text-anchor', isVertical ? 'end' : 'middle')
+            .style('font-size', '11px')
+            .style('font-style', 'italic')
+            .style('fill', 'var(--text-tertiary)')
+            .text(String(era.from));
         }
       });
     }
@@ -255,17 +258,14 @@ const MainChart: React.FC<MainChartProps> = ({
     const satelliteDate = new Date(1979, 0, 1);
     if (satelliteDate > dateExtent[0]) {
       const boundaryPos = timeScale(satelliteDate);
-      // In the era-split view the 1979 cut is the second era's start, so its
-      // dash takes that era's ink (#62); the neutral axis colour otherwise.
-      const satInk = eras ? eraInk(currentMetric, 1, eraStyle, theme) : null;
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', 0).attr('x2', width)
           .attr('y1', boundaryPos).attr('y2', boundaryPos)
-          .attr('stroke', satInk ? satInk.stroke : 'var(--chart-axis)')
-          .attr('stroke-width', satInk ? satInk.strokeWidth : 0.75)
+          .attr('stroke', 'var(--chart-axis)')
+          .attr('stroke-width', 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
           .attr('class', 'satellite-era-label')
@@ -282,8 +282,8 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('class', 'satellite-era-line')
           .attr('x1', boundaryPos).attr('x2', boundaryPos)
           .attr('y1', 0).attr('y2', height)
-          .attr('stroke', satInk ? satInk.stroke : 'var(--chart-axis)')
-          .attr('stroke-width', satInk ? satInk.strokeWidth : 0.75)
+          .attr('stroke', 'var(--chart-axis)')
+          .attr('stroke-width', 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
           .attr('class', 'satellite-era-label')
