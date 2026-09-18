@@ -38,9 +38,9 @@ export interface Period {
 
 /**
  * The three comparisons: every PAIR of the three eras, each drawn as its own
- * bracket over the top panel. Named here rather than in usePermutationTest
- * because that hook already imports this module (for buildPeriods), so the
- * dependency can only run one way.
+ * bracket above the topmost of the two panels it compares. Named here rather
+ * than in usePermutationTest because that hook already imports this module (for
+ * buildPeriods), so the dependency can only run one way.
  *   latestVsPrev   — 2000–now vs 1979–1999. Also the pair the prose reports.
  *   latestVsPresat — 2000–now vs 1950–1978.
  *   prevVsPresat   — 1979–1999 vs 1950–1978.
@@ -133,16 +133,31 @@ export const PeriodLegend: React.FC<{
 // MainChart.tsx: left 55, right 20) so that on mobile, where this chart's
 // x-axis sits directly under the main chart's, the two temp axes share the
 // exact same pixel range and their ticks line up.
-// top leaves room for the THREE stacked significance brackets (all of them sit
-// above the top panel — see the bracket block below) plus that panel's
-// right-aligned year label, which sits just below the innermost one.
-const MARGIN = { top: 80, right: 20, bottom: 36, left: 55 };
-const PANEL_GAP = 18;   // vertical gap between stacked panels (room for the centered year title)
+// top leaves room for the TWO latest-vs-* brackets stacked above the top panel
+// — the third, prev-vs-pre-satellite, now sits above the MIDDLE panel (see the
+// bracket block below) — plus the top panel's right-aligned year label, which
+// sits just below the innermost bracket.
+const MARGIN = { top: 56, right: 20, bottom: 36, left: 55 };
+// Vertical gap between stacked panels. Every gap carries the panel below's
+// right-aligned year label (13px of ink, ending 2px above the panel), and the
+// FIRST gap also carries the prev-vs-pre-satellite bracket (MID_BRACKET_LIFT).
+// 56 puts that bracket's ink 20px under the baseline of the panel above and its
+// legs 18px over the panel below, so it reads as belonging to the panel it is
+// captioning rather than to the bars above it. Both gaps stay the same so the
+// three panels keep one rhythm.
+const PANEL_GAP = 56;
 // One bracket level: 6px of legs, a 1.2px bar, and the ~13px the 14px stars
 // occupy above it (see .sig-stars). 24 leaves the next level's legs ~5px clear
-// of the level below's stars, and three levels put the topmost ink at y=-71 —
-// so MARGIN.top must stay comfortably above that, hence 80.
+// of the level below's stars, and the two levels now stacked above the top
+// panel put the topmost ink at about y=-47 — so MARGIN.top must stay above
+// that, hence 56.
 const BRACKET_STEP = 24;
+// How far the prev-vs-pre-satellite bracket is lifted off the MIDDLE panel: its
+// legs stop at panelTop-18, 3px clear of the top of that panel's year label, and
+// its stars reach panelTop-36. Deliberately less than a full BRACKET_STEP —
+// nothing is stacked under it, and every pixel of lift pulls it towards the
+// panel above, which is the one panel it is NOT about.
+const MID_BRACKET_LIFT = 14;
 
 // Significance tier of a p-value: 0 = not significant, 1 = p<0.05, 2 = p<0.01,
 // 3 = p<0.001. The single source for both the in-chart stars and the section's
@@ -338,8 +353,12 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // panels share one x range, so the values are directly comparable.
     const medianX: (number | null)[] = displayOrder.map(() => null);
 
+    // Top of a panel, in `g` coordinates, by display index (0 = newest on top).
+    // The brackets are drawn on `g` too, so they position off the same helper.
+    const panelTopOf = (idx: number) => idx * (panelHeight + PANEL_GAP);
+
     displayOrder.forEach((pp, idx) => {
-      const panelTop = idx * (panelHeight + PANEL_GAP);
+      const panelTop = panelTopOf(idx);
       const color = periodColor(currentMetric, pp.period.era, theme);
 
       const panel = g
@@ -481,42 +500,75 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
     // are marked. The panels share one x axis, so a bracket's legs land on the x
     // of each compared median however far apart the panels are vertically.
     //
-    // ALL THREE sit above the TOP panel, stacked, never in the gaps between
-    // panels: a bracket is the section's headline result, and results belong in
-    // one band at the top where they can be read against each other — not
-    // scattered down the stack where the reader has to hunt for them. Widest
-    // span outermost, so no bracket is drawn inside another's footprint.
+    // A bracket sits above the TOPMOST panel of the pair it compares (Ita,
+    // 2026-09-18, overruling the earlier "one band of results at the top"):
+    // the two latest-vs-* pairs stack above the top panel, while
+    // prev-vs-pre-satellite sits in the gap above the MIDDLE panel — the first
+    // panel it actually compares — so a reader meets each bracket where its own
+    // eras are instead of decoding a three-high band that spans everything. In
+    // the stack above the top panel the widest span stays outermost, so no
+    // bracket is drawn inside another's footprint.
     //
     // The bracket LINES are drawn here, with the bars, since their geometry
     // doesn't depend on any p-value; only the stars do, and those are added by a
     // separate effect keyed on the p-values, so a bracket never flashes when a
-    // worker result lands.
+    // worker result lands. That effect reads barY back out of bracketGeomRef and
+    // puts the stars 3px above it, so it follows a bracket wherever it is drawn.
     bracketGeomRef.current = {};
-    const pairXs: Array<{ key: BracketKey; a: number | null; b: number | null }> = [
-      // medianX is in DISPLAY order: 0 = latest (top), 1 = prev, 2 = pre-satellite.
-      { key: 'latestVsPrev', a: medianX[0], b: medianX[1] },
-      { key: 'latestVsPresat', a: medianX[0], b: medianX[2] },
-      { key: 'prevVsPresat', a: medianX[1], b: medianX[2] },
-    ];
-    pairXs
-      .filter((p) => p.a != null && p.b != null)
-      .map((p) => ({
-        key: p.key,
-        x0: Math.min(p.a as number, p.b as number),
-        x1: Math.max(p.a as number, p.b as number),
-      }))
+    // `lift` is how many px the bracket is raised off `panelTop`: 0 hugs the
+    // panel, and a stack raises each level by BRACKET_STEP.
+    const drawBracket = (
+      key: BracketKey,
+      x0: number,
+      x1: number,
+      panelTop: number,
+      lift: number
+    ) => {
+      const barY = panelTop - 10 - lift;
+      const legBottomY = panelTop - 4 - lift;
+      bracketGeomRef.current[key] = { x0, x1, barY };
+      g.append('g')
+        .attr('class', `sig-bracket sig-bracket-${key}`)
+        .append('path')
+        .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
+        .attr('fill', 'none');
+    };
+    // A pair's horizontal span, or null when either median is missing (too
+    // little data in that era). medianX is in DISPLAY order: 0 = latest (top),
+    // 1 = previous, 2 = pre-satellite.
+    const span = (a: number | null, b: number | null) =>
+      a == null || b == null ? null : { x0: Math.min(a, b), x1: Math.max(a, b) };
+
+    // The two pairs the top panel is in, stacked above it, narrowest first.
+    const topPairs: Array<{ key: BracketKey; x0: number; x1: number }> = (
+      [
+        { key: 'latestVsPrev' as BracketKey, s: span(medianX[0], medianX[1]) },
+        { key: 'latestVsPresat' as BracketKey, s: span(medianX[0], medianX[2]) },
+      ].filter((p) => p.s != null) as Array<{
+        key: BracketKey;
+        s: { x0: number; x1: number };
+      }>
+    )
+      .map((p) => ({ key: p.key, x0: p.s.x0, x1: p.s.x1 }))
       // Narrowest first → level 0, closest to the panel; widest last → outermost.
-      .sort((m, n) => m.x1 - m.x0 - (n.x1 - n.x0))
-      .forEach(({ key, x0, x1 }, level) => {
-        const barY = -10 - level * BRACKET_STEP;
-        const legBottomY = -4 - level * BRACKET_STEP;
-        bracketGeomRef.current[key] = { x0, x1, barY };
-        g.append('g')
-          .attr('class', `sig-bracket sig-bracket-${key}`)
-          .append('path')
-          .attr('d', `M${x0},${legBottomY} L${x0},${barY} L${x1},${barY} L${x1},${legBottomY}`)
-          .attr('fill', 'none');
-      });
+      .sort((m, n) => m.x1 - m.x0 - (n.x1 - n.x0));
+    topPairs.forEach(({ key, x0, x1 }, level) =>
+      drawBracket(key, x0, x1, panelTopOf(0), level * BRACKET_STEP)
+    );
+
+    // Previous vs pre-satellite: in the gap above the MIDDLE panel, lifted just
+    // far enough to clear that panel's right-aligned year label (PANEL_GAP is
+    // sized for exactly this).
+    const prevPresat = span(medianX[1], medianX[2]);
+    if (prevPresat) {
+      drawBracket(
+        'prevVsPresat',
+        prevPresat.x0,
+        prevPresat.x1,
+        panelTopOf(1),
+        MID_BRACKET_LIFT
+      );
+    }
 
     // Shared x-axis under the bottom panel. tickCount() computed from the same
     // domain the main chart uses (default count for temp/wind, precip capped at
