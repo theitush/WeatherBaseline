@@ -93,6 +93,14 @@ Where there is no `/home/ita/coo/tools/sign` — a cloud or remote run — write
 **Agent:** Pike Vance · <hostname> · in `<pwd>` · no resumable session (cloud or remote run)
 ```
 
+### Which model you are on
+
+`Worker: opus` is what the card asked for. What you are actually running on is a fact you check, never one you infer — not from a setting, not from a default, not from what you meant to pass. On 2026-09-18 an orchestrator asked which model its worker was on said *Fable* ("it inherits mine"), then *Opus* (it had found the default in `~/.claude/settings.json`), and had looked at the worker neither time; the worker's transcript said `claude-opus-5` on every turn while the terminal labelled it fable (coo#94). Three answers, one true. When asked, look here and quote what you find:
+
+- **Your own model** is in your system prompt: the line *You are powered by the model named …*, with the exact model ID after it. That line, not a guess.
+- **A subagent's model** is in its transcript: `~/.claude/projects/<session dir>/<session id>/subagents/agent-<id>.jsonl`, the `"model"` on its `assistant` lines — what it ran on and was billed as. The `agent-<id>.meta.json` beside it carries the `description` you gave the spawn, which is how you find the right one, and a `model` key only when the spawn passed one. When nothing was passed there is no key, and the terminal's label then has nothing true to read.
+- **Pass `model:` on every spawn** — the card's `Worker`, which is `opus` unless the card says otherwise. Then meta, label and transcript all agree and there is nothing to wonder about. The machine default (`CLAUDE_CODE_SUBAGENT_MODEL=opus` in `~/.claude/settings.json`, coo#83) is the net under a spawn that forgot, not the answer to the question.
+
 ### When the work needs a human eye: Review, not Done
 
 Some work is finished but cannot be *signed off* by the thing that did it. Anything visual is the usual case — a new screen or component, a layout, spacing, colour, an animation, copy a person will read, a chart, a print or export layout — because "the tests pass" says nothing about whether it looks right. It is not only frontend: a judgement call between two defensible designs, an irreversible or outward-facing change, a heuristic or threshold whose output only a person can call good, a migration you cannot dry-run.

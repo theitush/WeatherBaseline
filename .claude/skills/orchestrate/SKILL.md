@@ -45,7 +45,7 @@ Two workers in one checkout are safe only when the files they will reach for are
 - Group the survivors by the paths their work will touch. Tasks whose paths are disjoint run **at the same time**, each in its own subagent. Tasks that share a path run **one after the other**, in project order, in one lane.
 - Name the split in every brief: the paths that worker owns, and the paths it must not touch because another worker holds them.
 - Where two tasks cannot be split by path and you still want both running, one of them gets `isolation: "worktree"`; its branch is merged when it reports — a merge, never a clobber.
-- Run as many lanes as the split allows and no more than you can watch. Model per worker is the card's `Worker` column.
+- Run as many lanes as the split allows and no more than you can watch. Model per worker is the card's `Worker` column, and it goes on the spawn as `model:` **every time** — `opus` unless the card says otherwise. A spawn with no `model` runs at whatever default this machine happens to carry, and on 2026-09-18 an orchestrator asked which that was answered Fable, then Opus, and had checked neither (coo#94). Passing it is what makes the answer yours.
 
 ### The box
 
@@ -85,7 +85,7 @@ n=<n>
 /home/ita/coo/tools/orchestrate-status start WeatherBaseline#$n --eta 20     # stamps the real start; the panel counts down from it
 ```
 
-Then spawn its worker into this repo at the card's model with the issue body as context and this brief:
+Then spawn its worker into this repo with `model:` set to the card's `Worker` — passed explicitly, never left to inherit — with the issue body as context and this brief:
 
 > You hold `WeatherBaseline#n` and nothing else. Sign it (`/home/ita/coo/tools/sign WeatherBaseline n <YourName>`) before the work. You own these paths: `…`; do not touch `…`, another worker holds them. Your memory budget is **`<N>` GB**: run anything heavy under `systemd-run --user --scope -q -p MemoryMax=<N>G -p MemorySwapMax=0 -- …`, never uncapped and never into swap, and report its peak (`/usr/bin/time -v`, `Maximum resident set size`) — if you hit the cap, report the number rather than raising it. Do the work, verify it (tests, build, a read of the diff — the result is a claim you are signing), file whatever the work did not reach as its own issue at `Status backlog` before this one closes, and finish it exactly one of three ways per `CLAUDE.md`: **Done** (result block below a `---` rule, close the issue, `Status Done`), **Review** (issue stays open, one-line `**Review:** <who> — <what> — <where>` as the body's first line, `Status Review`, commit says `Refs #n`), or **Blocked** (blocker in the body, issue open, `Status Blocked`). Report back: what you did, how you verified, where it landed, which issues you filed, and the exact paths you left uncommitted.
 
