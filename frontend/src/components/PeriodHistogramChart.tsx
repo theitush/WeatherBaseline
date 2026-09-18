@@ -4,6 +4,7 @@ import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
 import { placeTooltip } from '../utils/tooltip';
+import { binPercentileLabel } from '../utils/dataProcessor';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, binWidth, axisPad, tickCount } from '../utils/units';
 import { erasForYears, eraColor } from '../utils/eras';
@@ -298,6 +299,9 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         period: p,
         bins: binGen(values),
         n: values.length,
+        // Ascending copy, sorted once, for the bins' percentile tooltips. A copy
+        // because `values` is what the bins and the median were computed from.
+        sorted: values.slice().sort(d3.ascending),
         stat: values.length ? statOf(values) : null,
       };
     });
@@ -374,7 +378,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
         tooltip
           .style('opacity', 1)
           .html(
-            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(dp)}–${(b.x1 as number).toFixed(dp)}${unit}<br/>${b.length} day${b.length === 1 ? '' : 's'}`
+            `<strong>${pp.period.label}</strong><br/>${(b.x0 as number).toFixed(dp)}–${(b.x1 as number).toFixed(dp)}${unit}<br/>${binPercentileLabel(b.x0 as number, b.x1 as number, pp.sorted)}`
           );
         placeTooltip(tooltipRef.current, event);
       };

@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import type { WeatherDataPoint } from '../types';
 import type { MetricKey } from '../utils/config';
 import CONFIG from '../utils/config';
-import { comparablePool, observedPool } from '../utils/dataProcessor';
+import { comparablePool, observedPool, binPercentileLabel } from '../utils/dataProcessor';
 import {
   bandQuantilePoints,
   valueAtTailFraction,
@@ -236,6 +236,15 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       binner(valueRows.filter((r) => eraIndex(r.year, eras) === i).map((r) => r.v))
     );
     const maxEraCount = d3.max(eraBins, (eb) => d3.max(eb, (d) => d.length) as number) as number;
+    // Each era's values, ascending — sorted ONCE here and reused by every bin's
+    // tooltip, which reports where the bin sits in that era rather than how many
+    // days fell in it.
+    const eraSorted = eras.map((_, i) =>
+      valueRows
+        .filter((r) => eraIndex(r.year, eras) === i)
+        .map((r) => r.v)
+        .sort(d3.ascending)
+    );
 
     // Count scale: horizontal mode → X (0→width); vertical mode → Y (0 at top → max at bottom, bars hang down)
     const countScale = d3
@@ -368,15 +377,17 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // and near-impossible to point at directly. Appended after the bars so they
     // capture the mouse (same approach as PeriodHistogramChart).
     const showTip = (event: MouseEvent, d: d3.Bin<number, number>) => {
-      const binIdx = bins.indexOf(d);
+      // One row per era, each saying where THIS bin sits in THAT era — not how
+      // many days landed in it, which is the bar's height and already on screen.
+      // The eras share one set of bin edges, so a bin reading 38th–45th in one
+      // era and 20th–28th in another states the shift between them directly.
       const perEra = eras
         .map((era, i) => {
-          const n = eraBins[i][binIdx]?.length ?? 0;
           const ink = eraInk(currentMetric, i, eraStyle, theme);
           // A 9px chip can't carry the chart's own 2px stroke, so the border
           // width is fixed here and only its colour follows the era's ink.
           const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:1.5px solid ${ink.stroke};vertical-align:-1px`;
-          return `<span style="${sw}"></span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
+          return `<span style="${sw}"></span> ${era.label}: ${binPercentileLabel(d.x0 as number, d.x1 as number, eraSorted[i])}`;
         })
         .join('<br/>');
       tooltip

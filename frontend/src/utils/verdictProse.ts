@@ -30,7 +30,11 @@
 import type { MetricBand, MetricKey } from '../types';
 import type { UnitSystem } from './units.ts';
 import { convert } from './units.ts';
-import { rankValue } from './dataProcessor.ts';
+// ordinalSuffix moved to dataProcessor (the histogram tooltips need it too, and
+// they cannot import this module without a cycle); re-exported so the card's
+// date labels keep their existing import.
+import { rankValue, ordinalSuffix } from './dataProcessor.ts';
+export { ordinalSuffix };
 import { resolveForecastMarker, type ForecastTier } from './forecastReference.ts';
 import {
   bandQuantilePoints,
@@ -40,12 +44,6 @@ import {
   valueAtTailFraction,
 } from './confidence.ts';
 
-// "st"/"nd"/"rd"/"th" for an ordinal — the historical top-5 rank line and the
-// card's date labels all share it.
-export const ordinalSuffix = (n: number): string =>
-  n % 10 === 1 && n !== 11 ? 'st' :
-  n % 10 === 2 && n !== 12 ? 'nd' :
-  n % 10 === 3 && n !== 13 ? 'rd' : 'th';
 
 // Direction words for the single-tailed "this hot/hotter" line, per metric.
 // [adjective, comparative, superlative] for the high side and the low side.

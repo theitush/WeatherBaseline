@@ -130,6 +130,48 @@ export function rankValue(
   };
 }
 
+/** "st"/"nd"/"rd"/"th" for an ordinal. Lives here, next to rankValue, because
+ *  both the prose ladder (verdictProse) and the histogram tooltips need it and
+ *  verdictProse already reads this module — the other way round would cycle. */
+export const ordinalSuffix = (n: number): string =>
+  n % 10 === 1 && n !== 11 ? 'st' :
+  n % 10 === 2 && n !== 12 ? 'nd' :
+  n % 10 === 3 && n !== 13 ? 'rd' : 'th';
+
+/**
+ * Where a value sits in a pool, as a percentage: the share of the pool STRICTLY
+ * BELOW it. `poolSorted` must be ascending — callers sort once per render and
+ * reuse it across every bin. NaN on an empty pool, which has no percentiles.
+ */
+export function percentileOf(value: number, poolSorted: number[]): number {
+  const n = poolSorted.length;
+  if (n === 0) return NaN;
+  return (d3.bisectLeft(poolSorted, value) / n) * 100;
+}
+
+/**
+ * A histogram bin's place in a pool, as its tooltip states it: the percentile
+ * band the bin's two edges span — "38th–45th pct" — in the same register the
+ * legend uses for "10th–90th pct".
+ *
+ * This is what a bin tooltip says INSTEAD of a day count. A count answers "how
+ * many days landed here", which is the bar's height and is already on screen;
+ * the percentile answers "how ordinary was this range FOR THIS POOL", and since
+ * every era shares one set of bin edges, the same bin reading 38th–45th in one
+ * era and 20th–28th in another is the shift itself, stated.
+ *
+ * Collapses to a single number when the two edges round together, and says so
+ * plainly on an empty pool — an era with no days on this date has no percentile,
+ * not a 0th.
+ */
+export function binPercentileLabel(x0: number, x1: number, poolSorted: number[]): string {
+  if (poolSorted.length === 0) return 'no days';
+  const lo = Math.round(percentileOf(x0, poolSorted));
+  const hi = Math.round(percentileOf(x1, poolSorted));
+  const ord = (n: number) => `${n}${ordinalSuffix(n)}`;
+  return lo === hi ? `${ord(lo)} pct` : `${ord(lo)}–${ord(hi)} pct`;
+}
+
 /**
  * Calculate yearly aggregates with percentiles and rolling medians
  */
