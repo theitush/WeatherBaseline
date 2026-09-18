@@ -4,6 +4,7 @@
 import CONFIG, { type MetricKey } from './config.ts';
 import type { WeatherDataPoint } from '../types';
 import { comparablePool } from './dataProcessor.ts';
+import { eraColorOverride, eraColorOverrides } from './eraColorOverrides.ts';
 
 /** The year continuous global satellite coverage begins in the reanalysis —
  *  the same boundary MainChart draws its "Satellites!" line at. */
@@ -145,7 +146,10 @@ export type ThemeMode = 'light' | 'dark';
  *            at 0.635 and climbs, 0.065 L a step.
  *
  * DO NOT hand-edit a value here, and do not add a metric by eye: regenerate and
- * re-run the validator, or the guarantees above quietly stop being true.
+ * re-run the validator, or the guarantees above quietly stop being true. The
+ * one sanctioned way in is the settings menu's era-colour picker (#73), which
+ * overrides these live and hands back this same literal to paste in — the
+ * picked palette still has to clear the validator before it lands.
  */
 const ERA_RAMPS: Record<
   MetricKey,
@@ -176,10 +180,54 @@ const ERA_RAMPS: Record<
  * era array longer than the ramp keeps the newest step rather than running off
  * the end; an unknown metric falls back to wind's neutral grey ramp rather than
  * a colour it has no claim to.
+ *
+ * A swatch Ita has picked in the settings menu's era-colour picker (#73) wins
+ * over the built-in step. That lookup is here, in the ONE function every
+ * consumer already goes through, so the picker reaches the main chart, both
+ * histograms, the legend and the compare dials' defaults without any of them
+ * knowing it exists.
  */
 export function eraColor(metric: MetricKey, era: number, theme: ThemeMode): string {
-  const ramp = (ERA_RAMPS[metric] ?? ERA_RAMPS.wind_speed_10m_max)[theme];
-  return ramp[Math.min(Math.max(era, 0), ramp.length - 1)];
+  const key: MetricKey = metric in ERA_RAMPS ? metric : 'wind_speed_10m_max';
+  const ramp = ERA_RAMPS[key][theme];
+  const step = Math.min(Math.max(era, 0), ramp.length - 1);
+  return eraColorOverride(key, theme, step) ?? ramp[step];
+}
+
+/** Every metric the ramps cover, in the order `eras.ts` writes them — the order
+ *  the picker lists them in and the order `eraRampsSource` emits. */
+export const ERA_RAMP_METRICS = Object.keys(ERA_RAMPS) as MetricKey[];
+
+/** The committed ramps, for the picker's "back to this" swatches. Frozen at the
+ *  type level only — nothing is to write through it. */
+export const DEFAULT_ERA_RAMPS: Readonly<
+  Record<MetricKey, { light: readonly string[]; dark: readonly string[] }>
+> = ERA_RAMPS;
+
+/**
+ * The `ERA_RAMPS` literal above, overrides merged over the defaults, spelled
+ * exactly as this file spells it — the whole point of the picker: Ita tunes 24
+ * swatches by eye, copies this, and pasting it over the block above makes the
+ * palette the default in one edit. Shape, key order and quoting all match, so
+ * the paste is a drop-in rather than a diff to reconcile.
+ */
+export function eraRampsSource(): string {
+  const overrides = eraColorOverrides();
+  const body = ERA_RAMP_METRICS.map((metric) => {
+    const rows = (['light', 'dark'] as ThemeMode[]).map((theme) => {
+      const steps = ERA_RAMPS[metric][theme]
+        .map((hex, i) => `'${overrides[`${metric}:${theme}:${i}`] ?? hex}'`)
+        .join(', ');
+      return `    ${theme}: [${steps}],`;
+    });
+    return `  ${metric}: {\n${rows.join('\n')}\n  },`;
+  }).join('\n');
+  return (
+    'const ERA_RAMPS: Record<\n' +
+    '  MetricKey,\n' +
+    '  { light: [string, string, string]; dark: [string, string, string] }\n' +
+    `> = {\n${body}\n};\n`
+  );
 }
 
 export interface EraInk {

@@ -276,7 +276,7 @@ const AppContent: React.FC = () => {
               </svg>
               WeatherBaseline.com
             </h1>
-            <SettingsMenu />
+            <SettingsMenu eras={histogramEras} />
             <ShareButton
               placeName={location.name || ''}
               temp={currentTemp}

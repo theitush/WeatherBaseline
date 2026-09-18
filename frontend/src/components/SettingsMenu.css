@@ -89,3 +89,11 @@
     height: 16px;
   }
 }
+
+/* The era-colour button while its panel is open — the only toggle here that
+   opens something rather than flipping a setting, so it holds a pressed look. */
+.settings-toggle.is-on {
+  color: var(--text-strong);
+  border-color: var(--text-faint);
+  background-color: var(--surface-muted);
+}

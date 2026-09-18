@@ -15,6 +15,7 @@ import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
 import { erasForPool, eraIndex, eraInk, eraColor } from '../utils/eras';
+import { useEraColorOverrides } from '../hooks/useEraColors';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './HistogramChart.css';
@@ -141,8 +142,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   const { system } = useUnits();
   const { eraStyle } = useEraStyle();
   // The era ramps are picked in JS, not off CSS variables, so a theme flip
-  // has to redraw the chart — hence `theme` in the effect deps below.
+  // has to redraw the chart — hence `theme` in the effect deps below. Same for
+  // a swatch picked in the settings menu's era-colour picker (#73).
   const theme = useThemeMode();
+  const eraColors = useEraColorOverrides();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -1062,7 +1065,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // Legend is rendered as an HTML element above the charts for both
     // mobile and desktop (see App.tsx).
 
-  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system, eraStyle, theme]);
+  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system, eraStyle, theme, eraColors]);
 
   return (
     <div className="histogram-chart-wrapper">

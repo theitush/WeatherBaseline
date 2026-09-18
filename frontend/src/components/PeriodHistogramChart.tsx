@@ -8,6 +8,7 @@ import { binPercentileLabel } from '../utils/dataProcessor';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, binWidth, axisPad, tickCount } from '../utils/units';
 import { erasForYears, eraColor } from '../utils/eras';
+import { useEraColorOverrides } from '../hooks/useEraColors';
 import { useThemeMode } from '../hooks/useTheme';
 import './PeriodHistogramChart.css';
 
@@ -107,6 +108,8 @@ export const PeriodLegend: React.FC<{
   filteredData: WeatherDataPoint[];
 }> = ({ metric, filteredData }) => {
   const theme = useThemeMode();
+  // Swatches are inked at render time, so subscribing is all this needs (#73).
+  useEraColorOverrides();
   const medianColor = medianColorFor(metric);
   const periods = buildPeriods(filteredData, metric);
   return (
@@ -218,6 +221,9 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
 }) => {
   const { system } = useUnits();
   const theme = useThemeMode();
+  // The three panels are inked from the era ramp, so a swatch picked in the
+  // settings menu's era-colour picker (#73) has to re-run the draw.
+  const eraColors = useEraColorOverrides();
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Bracket geometry stashed by the main render so the separate p-value-keyed
@@ -603,7 +609,7 @@ const PeriodHistogramChart: React.FC<PeriodHistogramChartProps> = ({
       .style('fill', 'var(--chart-label)')
       .text('Count');
 
-  }, [filteredData, currentMetric, width, panelHeight, plotHeight, system, theme]);
+  }, [filteredData, currentMetric, width, panelHeight, plotHeight, system, theme, eraColors]);
 
   // Significance stars — placed (and updated) on their own, keyed on pValue, so
   // the permutation worker result landing only adds/fades in the stars text. The

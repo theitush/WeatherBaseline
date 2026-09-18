@@ -2,6 +2,7 @@ import React from 'react';
 import type { Selection } from 'd3';
 import CONFIG, { type MetricKey } from '../utils/config';
 import { eraInk, type Era, type EraStyle, type ThemeMode } from '../utils/eras';
+import { useEraColorOverrides } from '../hooks/useEraColors';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 
@@ -209,8 +210,10 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
 export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForecast?: boolean; eras?: Era[] }> = ({ metric, currentDate, isForecast, eras }) => {
   const { eraStyle } = useEraStyle();
   // The era swatches come off the same theme-specific ramp the charts paint
-  // with, so the legend has to re-render on a theme flip too.
+  // with, so the legend has to re-render on a theme flip too — and on a swatch
+  // picked in the era-colour picker (#73), which is what the subscribe is for.
   const theme = useThemeMode();
+  useEraColorOverrides();
   const items = getLegendData(metric, currentDate, isForecast, eras, eraStyle, theme);
   // The binned-data swatch(es) + the target-day marker form the first row on
   // mobile; the break sits after the marker (or after the last swatch when no

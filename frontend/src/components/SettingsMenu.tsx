@@ -2,16 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { useUnits } from '../hooks/useUnits';
 import { useEraStyle } from '../hooks/useEraStyle';
+import EraColorPicker from './EraColorPicker';
+import type { Era } from '../utils/eras';
 import './SettingsMenu.css';
 
-// Gear button in the header that opens a small popover with two single toggle
-// buttons stacked vertically: one flips the theme (sun ⇄ moon), one flips the
-// units (°C ⇄ °F). Each button shows the current state and toggles on click.
-const SettingsMenu: React.FC = () => {
+// Gear button in the header that opens a small popover with single toggle
+// buttons stacked vertically: one flips the theme (sun ⇄ moon), one the units
+// (°C ⇄ °F), one the era style. Each shows its current state and toggles on
+// click. The last button opens the era-colour picker (#73) instead of toggling.
+const SettingsMenu: React.FC<{ eras?: Era[] }> = ({ eras }) => {
   const { theme, toggleTheme } = useTheme();
   const { system, toggleUnits } = useUnits();
   const { eraStyle, toggleEraStyle } = useEraStyle();
   const [open, setOpen] = useState(false);
+  const [colorsOpen, setColorsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Close on outside-click or Escape.
@@ -20,10 +24,14 @@ const SettingsMenu: React.FC = () => {
     const onPointer = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setColorsOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      // Escape backs out one layer: the colour panel first, then the menu.
+      if (colorsOpen) setColorsOpen(false);
+      else setOpen(false);
     };
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
@@ -31,7 +39,7 @@ const SettingsMenu: React.FC = () => {
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, colorsOpen]);
 
   const isDark = theme === 'dark';
   const isImperial = system === 'imperial';
@@ -135,7 +143,42 @@ const SettingsMenu: React.FC = () => {
               </svg>
             )}
           </button>
+
+          {/* Era-colour picker (#73) — opens the 24-swatch tuning panel rather
+              than toggling anything. Local tool: Ita picks the ramps by eye and
+              copies the literal back into eras.ts. */}
+          <button
+            type="button"
+            className={`settings-toggle${colorsOpen ? ' is-on' : ''}`}
+            onClick={() => setColorsOpen((c) => !c)}
+            aria-label="Era colours"
+            aria-expanded={colorsOpen}
+            title="Era colours — pick the three shades per metric and theme"
+          >
+            {/* Palette */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3a9 9 0 1 0 0 18 2 2 0 0 0 1.6-3.2 2 2 0 0 1 1.6-3.2H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3z" />
+              <circle cx="7.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+              <circle cx="9.5" cy="8" r="1.1" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
+              <circle cx="17" cy="10.5" r="1.1" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
         </div>
+      )}
+
+      {open && colorsOpen && (
+        <EraColorPicker eras={eras} theme={theme} onClose={() => setColorsOpen(false)} />
       )}
     </div>
   );

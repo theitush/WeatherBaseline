@@ -1,0 +1,206 @@
+/* Era-colour tuning panel (#73) — a local tool hung off the settings popover,
+   deliberately plain: native colour inputs, no custom swatch chrome. It is how
+   a palette gets chosen, not something the site ships. */
+.era-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 54px;
+  z-index: 1001;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  max-height: min(78vh, 620px);
+  overflow-y: auto;
+  padding: 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.era-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.era-picker-title {
+  font-weight: 600;
+  color: var(--text-strong);
+  font-size: 13px;
+  margin-right: auto;
+}
+
+.era-picker-tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.era-picker-tab {
+  padding: 3px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.era-picker-tab.is-on {
+  background-color: var(--surface-muted);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.era-picker-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.era-picker-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.era-picker-row {
+  display: grid;
+  grid-template-columns: 74px repeat(3, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.era-picker-header .era-picker-era {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.era-picker-metric {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.era-picker-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.era-picker-cell input[type='color'] {
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.era-picker-cell code {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+}
+
+.era-picker-cell code.is-override {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.era-picker-revert {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background-color: var(--surface);
+  color: var(--text-secondary);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.era-picker-note {
+  margin: 10px 0 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.era-picker-note code {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.era-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.era-picker-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.era-picker-btn:hover:not(:disabled) {
+  color: var(--text-strong);
+  border-color: var(--text-faint);
+  background-color: var(--surface-muted);
+}
+
+.era-picker-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.era-picker-btn.is-primary {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.era-picker-snippet {
+  width: 100%;
+  height: 132px;
+  margin-top: 10px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+}
+
+@media (max-width: 767px) {
+  .era-picker {
+    left: 0;
+    width: calc(100vw - 24px);
+  }
+}

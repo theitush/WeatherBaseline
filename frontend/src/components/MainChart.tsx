@@ -8,6 +8,7 @@ import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
 import { erasForPool, eraIndex, eraInk, type EraInk } from '../utils/eras';
+import { useEraColorOverrides } from '../hooks/useEraColors';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './MainChart.css';
@@ -63,6 +64,9 @@ const MainChart: React.FC<MainChartProps> = ({
   const { eraStyle } = useEraStyle();
   // Era colours are chosen in JS per theme, so the chart redraws on a flip.
   const theme = useThemeMode();
+  // …and on a swatch picked in the settings menu's era-colour picker (#73):
+  // `eraColor` reads the override store, which this subscribes the draw to.
+  const eraColors = useEraColorOverrides();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -91,6 +95,9 @@ const MainChart: React.FC<MainChartProps> = ({
     const drawKey = [
       currentMetric, currentDate, system, eraStyle, theme, isVertical,
       totalWidth, totalHeight,
+      // A picked era colour is a switch the reader asked for, not the chart
+      // arriving — in the key, so the marks re-ink without replaying the fade.
+      JSON.stringify(eraColors),
     ].join('|');
     const isRedraw = lastDrawKeyRef.current !== null && lastDrawKeyRef.current !== drawKey;
 
@@ -736,7 +743,7 @@ const MainChart: React.FC<MainChartProps> = ({
     }
 
     lastDrawKeyRef.current = drawKey;
-  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle, theme]);
+  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle, theme, eraColors]);
 
   return (
     <div className="main-chart-wrapper">
