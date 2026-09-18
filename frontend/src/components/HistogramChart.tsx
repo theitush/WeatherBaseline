@@ -259,16 +259,17 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // 0.05-in edges apart (0.05 and 0.10 both round to "0.1").
     const dp = BIN < 0.1 ? 2 : 1;
 
-    // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
-    // axis leaves thin white separators between bins, matching the period hists.
-    // One overlaid set per era, oldest first so the most recent sits on top;
-    // every set shares ERA_FILL_ALPHA and carries its own shade as fill + outline.
+    // Bars (animate count dimension from 0 on enter). One overlaid set per era,
+    // oldest first so the most recent sits on top; every set shares
+    // ERA_FILL_ALPHA and carries its era's shade as the fill.
     //
-    // CONTOUR style strokes no rect at all. Outlining every bar drew a vertical
-    // rule between each pair of adjacent bins plus a line along the baseline, so
-    // the "contour" read as a row of boxes rather than a distribution. Instead
-    // the era gets ONE step path along the tops of its bars — the literal
-    // silhouette of the shape — appended after the bars below.
+    // NO LINES BETWEEN BINS, in either style. The bars used to be inset half a
+    // pixel each side so the surface showed through as a separator, which on the
+    // dark theme reads as a black rule between every pair of bins; shade style
+    // then stroked each rect on top of that. Both are gone: a bar spans its true
+    // bin edges, tempScale(x0) to tempScale(x1), and carries no stroke at all.
+    // The eras are told apart by the fill shade (shade) or by the one silhouette
+    // path along the tops of the bars (contour), never by per-bin lines.
     const isContour = eraStyle === 'contour';
     eraBins.forEach((eb, i) => {
       const ink = eraInk(currentMetric, i, eraStyle, theme);
@@ -279,16 +280,15 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .attr('class', `bar era-${i}`)
         .attr('fill', ink.fill)
         .attr('fill-opacity', ink.fillOpacity)
-        .attr('stroke', isContour ? 'none' : ink.stroke)
-        .attr('stroke-width', isContour ? 0 : ink.strokeWidth)
-        .attr('stroke-opacity', 0.9);
+        .attr('stroke', 'none')
+        .attr('stroke-width', 0);
 
       if (isVertical) {
         // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
         barSel
-          .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
+          .attr('x', (d) => tempScale(d.x0 as number))
           .attr('y', height)
-          .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
+          .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number)))
           .attr('height', 0)
           .transition()
           .duration(500)
@@ -297,9 +297,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       } else {
         barSel
           .attr('x', 0)
-          .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
+          .attr('y', (d) => tempScale(d.x1 as number))
           .attr('width', 0)
-          .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1))
+          .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number)))
           .transition()
           .duration(500)
           .attr('width', (d) => countLen(d.length));
@@ -309,9 +309,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // The era silhouettes (contour style only). One path per era, drawn after
     // every rect so all three outlines sit on top of all three fills.
     //
-    // The step runs along the TRUE bin edges — tempScale(x0)→tempScale(x1), not
-    // the inset rect edges — so it reads as one continuous shape and the bars'
-    // 1px separator gap stays underneath it. Empty bins inside the era's span
+    // The step runs along the TRUE bin edges — tempScale(x0)→tempScale(x1) —
+    // which is now exactly where the bars end too, so the outline sits flush on
+    // the shape rather than a pixel inside it. Empty bins inside the era's span
     // drop the step to the baseline, which is what makes it an outline of the
     // distribution rather than a line joining bar tops.
     if (isContour) {
@@ -401,16 +401,16 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     if (isVertical) {
       hitSel
-        .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
-        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
+        .attr('x', (d) => tempScale(d.x0 as number))
+        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number)))
         .attr('y', 0)
         .attr('height', height);
     } else {
       hitSel
         .attr('x', 0)
         .attr('width', width)
-        .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
-        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1));
+        .attr('y', (d) => tempScale(d.x1 as number))
+        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number)));
     }
 
     // Count axis

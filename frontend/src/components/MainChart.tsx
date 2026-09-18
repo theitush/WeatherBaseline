@@ -7,7 +7,7 @@ import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor'
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
-import { erasForPool, eraIndex, eraInk, hasOutline, type EraInk } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, hasOutline } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import { useThemeMode } from '../hooks/useTheme';
 import './MainChart.css';
@@ -208,39 +208,21 @@ const MainChart: React.FC<MainChartProps> = ({
         .text(tempAxisLabel);
     }
 
-    // The histogram's three eras, carried onto the time axis (#62), each style
-    // in its own register. Same cuts as the histogram and legend (erasForPool);
-    // the 1979 line keeps its label below.
-    //   shade   — a faint wash of the era's shade across the plot, which is the
-    //             whole point of "shade", plus a dashed boundary at its start.
-    //   contour — NO wash. Washing the entire background in the era's ink was
-    //             the thing Ita objected to (2026-09-18); this style inks the
-    //             CONTOURS instead, exactly as the histogram does: the boundary
-    //             dash, and a ring in the era's ink on each of its daily dots
-    //             (see eraDotInk, applied where the dots are drawn).
+    // The histogram's three eras, carried onto the time axis (#62). Same cuts as
+    // the histogram and legend (erasForPool); the 1979 line keeps its label below.
+    //
+    // NOTHING paints the plot background any more. Washing the whole background
+    // in each era's ink was what Ita objected to (2026-09-18) — the eras belong
+    // on the data, not behind it — so what carries them here is the PERCENTILE
+    // BAND (see the band block below: shade tints the fill per era segment,
+    // contour strokes the 10–90 band's own edges per era), plus the dashed
+    // boundary line at each era's first year, which is all this group draws now.
     const eras = erasForPool(filteredData, currentMetric, currentDate);
     const isContour = eraStyle === 'contour';
     if (eras) {
-      const eraG = g.append('g').attr('class', 'era-bands');
+      const eraG = g.append('g').attr('class', 'era-marks');
       eras.forEach((era, i) => {
         const ink = eraInk(currentMetric, i, eraStyle, theme);
-        if (!isContour) {
-          // Band spans [start-of-first-year, end-of-last-year], clamped to the axis.
-          const [t0, t1] = timeScale.domain();
-          const a = timeScale(d3.max([new Date(era.from, 0, 1), t0]) as Date);
-          const b = timeScale(d3.min([new Date(era.to + 1, 0, 1), t1]) as Date);
-          const lo = Math.min(a, b);
-          const hi = Math.max(a, b);
-          eraG.append('rect')
-            .attr('class', `era-band era-${i}`)
-            .attr('x', isVertical ? 0 : lo)
-            .attr('y', isVertical ? lo : 0)
-            .attr('width', isVertical ? width : Math.max(0, hi - lo))
-            .attr('height', isVertical ? Math.max(0, hi - lo) : height)
-            .attr('fill', ink.fill)
-            .attr('fill-opacity', 0.07)
-            .attr('pointer-events', 'none');
-        }
         // Boundary at the era's first year (skip the record's own start, and any
         // era with no ink to draw it in). The 1979 cut is drawn by the satellite
         // block below with its label; here it just gets the era's ink over the
@@ -356,25 +338,116 @@ const MainChart: React.FC<MainChartProps> = ({
         (d) => (d.p75 ?? d.moving75) as number
       );
 
-      g.append('path')
-        .datum(validAggs)
-        .attr('class', 'percentile-band-90')
-        .attr('fill', CONFIG.getColorForElement(currentMetric, 'percentileBand90'))
-        .attr('d', area90)
-        .style('opacity', 0)
-        .transition()
-        .duration(500)
-        .style('opacity', 1);
+      // THE ERAS LIVE ON THE BAND (#62). The band is the chart's actual subject
+      // — the climatology envelope — so that is what carries the era, rather
+      // than a wash behind everything or a ring on every dot.
+      //
+      // validAggs split at the era cuts, in time order. The row at a cut goes
+      // into BOTH neighbouring segments, so consecutive segments share an exact
+      // endpoint and no gap can open between them. (curveMonotone reads its
+      // tangents from each segment's own neighbours, so the two curves can meet
+      // at a very slight kink there — they touch at the same pixel, there is no
+      // seam, and at a 0.2/0.4-alpha wash it is invisible.) A segment of one row
+      // draws nothing, which only an era one year long could hit.
+      const eraSegments = (rows: YearlyAggregate[]): YearlyAggregate[][] => {
+        if (!eras) return [rows];
+        const segs: YearlyAggregate[][] = eras.map(() => []);
+        rows.forEach((d, k) => {
+          const i = eraIndex(d.year, eras);
+          if (k > 0) {
+            const prev = eraIndex(rows[k - 1].year, eras);
+            if (prev !== i) segs[prev].push(d);
+          }
+          segs[i].push(d);
+        });
+        return segs;
+      };
+      const segments = eras ? eraSegments(validAggs) : null;
 
-      g.append('path')
-        .datum(validAggs)
-        .attr('class', 'percentile-band-75')
-        .attr('fill', CONFIG.getColorForElement(currentMetric, 'percentileBand75'))
-        .attr('d', area75)
-        .style('opacity', 0)
-        .transition()
-        .duration(500)
-        .style('opacity', 1);
+      // One band path per era segment in SHADE style, each in that era's shade
+      // at the band's own alpha, so the shading itself changes colour across the
+      // eras. Contour style keeps the single metric-coloured band and says it
+      // with the outline instead (below).
+      const drawBand = (
+        cls: 'percentile-band-90' | 'percentile-band-75',
+        area: d3.Area<YearlyAggregate>,
+        level: 'percentileBand90' | 'percentileBand75'
+      ) => {
+        // Generic over the datum: a segment path is bound to YearlyAggregate[]
+        // and the whole-band path to the same, but the two selections are not
+        // the same type to d3's typings.
+        const paint = <T,>(sel: d3.Selection<SVGPathElement, T, null, undefined>) =>
+          sel.style('opacity', 0).transition().duration(500).style('opacity', 1);
+        if (segments && !isContour) {
+          segments.forEach((seg, i) => {
+            if (seg.length < 2) return;
+            const ink = eraInk(currentMetric, i, eraStyle, theme);
+            paint(
+              g.append('path')
+                .datum(seg)
+                .attr('class', `${cls} era-${i}`)
+                .attr('fill', ink.fill)
+                .attr('fill-opacity', CONFIG.opacityLevels[level])
+                .attr('d', area)
+            );
+          });
+          return;
+        }
+        paint(
+          g.append('path')
+            .datum(validAggs)
+            .attr('class', cls)
+            .attr('fill', CONFIG.getColorForElement(currentMetric, level))
+            .attr('d', area)
+        );
+      };
+
+      drawBand('percentile-band-90', area90, 'percentileBand90');
+      drawBand('percentile-band-75', area75, 'percentileBand75');
+
+      // CONTOUR style: the 10–90 band's own contour — its p90 edge and its p10
+      // edge — stroked per era segment in that era's ink, over the unchanged
+      // single-colour fills. Only the outer band is outlined; outlining 25–75 as
+      // well would put four lines through the same few pixels. The oldest era
+      // has no ink, so its stretch of the band is simply un-outlined.
+      if (segments && isContour) {
+        const edgeLine = (acc: (d: YearlyAggregate) => number) =>
+          isVertical
+            ? d3
+                .line<YearlyAggregate>()
+                .y((d) => timeScale(d.date))
+                .x((d) => tsv(acc(d)))
+                .curve(d3.curveMonotoneY)
+            : d3
+                .line<YearlyAggregate>()
+                .x((d) => timeScale(d.date))
+                .y((d) => tsv(acc(d)))
+                .curve(d3.curveMonotoneX);
+        const edges: Array<[string, (d: YearlyAggregate) => number]> = [
+          ['hi', (d) => (d.p90 ?? d.moving90) as number],
+          ['lo', (d) => (d.p10 ?? d.moving10) as number],
+        ];
+        segments.forEach((seg, i) => {
+          if (seg.length < 2) return;
+          const ink = eraInk(currentMetric, i, eraStyle, theme);
+          if (!hasOutline(ink)) return;
+          edges.forEach(([side, acc]) => {
+            g.append('path')
+              .datum(seg)
+              .attr('class', `percentile-band-90-edge edge-${side} era-${i}`)
+              .attr('fill', 'none')
+              .attr('stroke', ink.stroke)
+              .attr('stroke-width', ink.strokeWidth)
+              .attr('stroke-linejoin', 'round')
+              .attr('pointer-events', 'none')
+              .attr('d', edgeLine(acc))
+              .style('opacity', 0)
+              .transition()
+              .duration(500)
+              .style('opacity', 1);
+          });
+        });
+      }
 
       const trendData = validAggs.filter((d) => d.movingMedian !== null);
       if (trendData.length > 0) {
@@ -441,16 +514,6 @@ const MainChart: React.FC<MainChartProps> = ({
         !(d.data_type === 'forecast' && d.date > targetDay)
     );
     const dotColor = CONFIG.getColorForElement(currentMetric, 'dataPoints');
-    // Contour style's era mark on this chart: ring each day's dot in the ink of
-    // the era it falls in — the main chart's own contours, the same idea as the
-    // histogram's silhouettes. Returns null when there is nothing to ink with
-    // (shade style, or the oldest era, which has no contour ink), and the dot
-    // then keeps exactly the styling it always had.
-    const eraDotInk = (d: WeatherDataPoint): EraInk | null => {
-      if (!eras || !isContour) return null;
-      const ink = eraInk(currentMetric, eraIndex(d.year, eras), eraStyle, theme);
-      return hasOutline(ink) ? ink : null;
-    };
     const dotSelection = g.selectAll('.data-point')
       .data(dotData)
       .enter()
@@ -460,10 +523,8 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
       .attr('r', (d) => (isForecastLike(d) ? 3.2 : 2.8))
       .attr('fill', (d) => (isForecastLike(d) ? 'var(--surface)' : dotColor))
-      // A hollow dot still means "forecast" — that reads off the fill and the
-      // radius, not the ring's colour — so the era ink can take the ring over.
-      .attr('stroke', (d) => eraDotInk(d)?.stroke ?? (isForecastLike(d) ? dotColor : 'none'))
-      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : eraDotInk(d) ? 1 : 0))
+      .attr('stroke', (d) => (isForecastLike(d) ? dotColor : 'none'))
+      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : 0))
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
