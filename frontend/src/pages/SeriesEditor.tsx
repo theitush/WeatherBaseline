@@ -1,6 +1,8 @@
 import React from 'react';
 import LocationSelector from '../components/LocationSelector';
 import type { MetricKey } from '../utils/config';
+import type { ThemeMode } from '../utils/eras';
+import { MIDPOINT_YEAR, SATELLITE_YEAR } from '../utils/eras';
 import type { Series, SeriesData, DateMarker } from './compareTypes';
 import {
   MARKER_PALETTE,
@@ -32,6 +34,9 @@ interface SeriesEditorProps {
   canRemove: boolean;
   onChange: (s: Series) => void;
   onRemove: () => void;
+  /** The theme being painted — the era ramps have a row per theme, so a swatch
+   *  can only show the color the dial will actually draw if it knows which. */
+  theme: ThemeMode;
 }
 
 /** Color input + palette swatches, used for the series color and each half. */
@@ -70,6 +75,7 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
   canRemove,
   onChange,
   onRemove,
+  theme,
 }) => {
   const set = (patch: Partial<Series>) => onChange({ ...series, ...patch });
 
@@ -90,16 +96,25 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
     set({ markers: series.markers.filter((m) => m.id !== id) });
 
   const splittable = canSplit(series);
-  const periods = seriesPeriods(series);
+  const periods = seriesPeriods(series, theme);
   const splitOn = series.split && splittable;
 
-  // Turning the split on brings smoothing with it: the two halves' medians
-  // bound the difference shading, and raw daily medians make it flicker.
+  // Turning the split on brings smoothing with it: the periods' medians bound
+  // the difference shading, and raw daily medians make it flicker.
   const toggleSplit = (on: boolean) =>
     set({
       split: on,
       smoothDays: on && series.smoothDays === 0 ? SPLIT_DEFAULT_SMOOTH : series.smoothDays,
     });
+
+  /** An era's swatch writes an override; "era color" clears it again, so the
+   *  period goes back to following the main page (and the theme with it). */
+  const setEraColor = (era: number, color: string | null) => {
+    const next = { ...series.eraColors };
+    if (color === null) delete next[era];
+    else next[era] = color;
+    set({ eraColors: next });
+  };
 
   return (
     <div className="cmp-series-card" style={{ borderLeftColor: series.color }}>
@@ -107,7 +122,7 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
         <span className="cmp-series-index">Chart {index + 1}</span>
         <ColorPicker
           value={series.color}
-          label={splitOn ? 'Early period color' : 'Series color'}
+          label="Series color"
           onChange={(color) => set({ color })}
         />
         {canRemove && (
@@ -184,7 +199,7 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
         </label>
       </div>
 
-      {/* ---- split the range in half and lay the two periods on top ------- */}
+      {/* ---- split the range into eras and lay the periods on top --------- */}
       <div className="cmp-field cmp-split">
         <label className="cmp-check">
           <input
@@ -193,25 +208,39 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
             disabled={!splittable}
             onChange={(e) => toggleSplit(e.target.checked)}
           />
-          <span>Split at the halfway year</span>
+          <span>Split into eras</span>
         </label>
+        <span className="cmp-hint">
+          The main page's cuts: before {SATELLITE_YEAR}, {SATELLITE_YEAR}–
+          {MIDPOINT_YEAR - 1}, and {MIDPOINT_YEAR} on — clipped to this range,
+          so a range inside one era has nothing to split.
+        </span>
         {!splittable && (
-          <span className="cmp-hint">Needs a range of at least two years.</span>
+          <span className="cmp-hint">
+            This range sits inside a single era. Widen it past {SATELLITE_YEAR}{' '}
+            or {MIDPOINT_YEAR}.
+          </span>
         )}
 
         {splitOn && (
           <>
             {periods.map((p) => (
-              <div className="cmp-split-row" key={p.half}>
-                <span className="cmp-split-label">
-                  {p.half === 'early' ? 'Early' : 'Late'} · {p.label}
-                </span>
+              <div className="cmp-split-row" key={p.era}>
+                <span className="cmp-split-label">{p.label}</span>
+                {series.eraColors[p.era] !== undefined && (
+                  <button
+                    type="button"
+                    className="cmp-era-reset"
+                    title="Back to the main page's color for this era"
+                    onClick={() => setEraColor(p.era, null)}
+                  >
+                    era color
+                  </button>
+                )}
                 <ColorPicker
                   value={p.color}
-                  label={`${p.half === 'early' ? 'Early' : 'Late'} period color`}
-                  onChange={(color) =>
-                    p.half === 'early' ? set({ color }) : set({ lateColor: color })
-                  }
+                  label={`${p.label} color`}
+                  onChange={(color) => setEraColor(p.era, color)}
                 />
               </div>
             ))}
@@ -221,7 +250,7 @@ const SeriesEditor: React.FC<SeriesEditorProps> = ({
                 checked={series.diffShade}
                 onChange={(e) => set({ diffShade: e.target.checked })}
               />
-              <span>Shade the gap in the higher half's color</span>
+              <span>Shade each gap in the higher period's color</span>
             </label>
           </>
         )}

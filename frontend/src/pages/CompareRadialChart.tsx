@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
+import type { ThemeMode } from '../utils/eras';
 import type { BandKey, Series, SeriesData } from './compareTypes';
 import { DOY_COUNT, buildDialTracks, dayFraction } from './compareStats';
 import type { BandPath } from './compareStats';
@@ -33,6 +34,12 @@ interface CompareRadialChartProps {
    * always there.
    */
   bands: BandKey[];
+  /**
+   * The theme being painted. Passed in rather than read here so the dial, the
+   * legend and the editor's swatches all resolve the era ramps against the same
+   * answer as the page header's own toggle.
+   */
+  theme: ThemeMode;
   width?: number;
   height?: number;
 }
@@ -45,6 +52,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
   axisMetric,
   domain,
   bands,
+  theme,
   width: propWidth,
   height: propHeight,
 }) => {
@@ -81,7 +89,8 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
     const tracks = buildDialTracks(
       series.map(({ series: s, data }) => ({ series: s, rows: data.rows })),
       (raw, metric) => convert(raw, metric, system),
-      bands
+      bands,
+      theme
     );
     const allPts = tracks.flatMap((t) => t.pts);
 
@@ -211,50 +220,65 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
       .duration(400)
       .style('opacity', 1);
 
-    // ---- difference shading: which half runs higher, day by day ------------
-    // Drawn between the two median rings of one split series and BELOW them.
-    // Two full-circle areas rather than clipped arcs: the "late higher" area
-    // spans early→max(early,late) and so collapses to nothing wherever the
-    // early half is on top, and the "early higher" area is the mirror. That
-    // makes the crossings seamless — no gap at the day the two rings swap.
-    type Diff = { frac: number; early: number; late: number };
+    // ---- difference shading: which period runs higher, day by day ----------
+    // One ribbon per ADJACENT pair of a split series' median rings — two pairs
+    // when the range carries all three eras — drawn between them and BELOW
+    // them. Each pair is two full-circle areas rather than clipped arcs: the
+    // "newer higher" area spans older→max(older,newer) and so collapses to
+    // nothing wherever the older ring is on top, and the "older higher" area is
+    // its mirror. That makes the crossings seamless — no gap at the day two
+    // rings swap.
+    //
+    // Everything a series shades goes in ONE group that carries the opacity,
+    // rather than a fade per path. With three rings the pairs' annuli genuinely
+    // overlap wherever the middle ring is the highest or the lowest of the
+    // three, and per-path alpha would stack there into a patch darker or
+    // muddier than either color it is made of. Inside a group the paths
+    // composite opaquely against one another first — the later simply wins —
+    // and the group is faded once. A series with a single pair is unaffected:
+    // its two areas never overlap.
+    type Diff = { frac: number; older: number; newer: number };
     for (const { series: s } of series) {
       if (!s.split || !s.diffShade) continue;
       const mine = tracks.filter((t) => t.seriesId === s.id);
-      const early = mine.find((t) => t.half === 'early');
-      const late = mine.find((t) => t.half === 'late');
-      if (!early || !late) continue;
+      if (mine.length < 2) continue;
+      const shading = g.append('g').attr('class', 'cmp-diff-group').attr('opacity', 0.75);
 
-      const diff: Diff[] = [];
-      for (const [doy, e] of early.medianByDoy) {
-        const l = late.medianByDoy.get(doy);
-        if (l === undefined) continue;
-        diff.push({ frac: doy / DOY_COUNT, early: e, late: l });
+      // Oldest pair first, so where two ribbons do meet the most recent
+      // comparison is the one left on top.
+      for (let i = 0; i + 1 < mine.length; i++) {
+        const older = mine[i];
+        const newer = mine[i + 1];
+        const diff: Diff[] = [];
+        for (const [doy, o] of older.medianByDoy) {
+          const n = newer.medianByDoy.get(doy);
+          if (n === undefined) continue;
+          diff.push({ frac: doy / DOY_COUNT, older: o, newer: n });
+        }
+        if (diff.length <= 8) continue;
+        diff.sort((a, b) => a.frac - b.frac);
+        // Repeat the first day at frac=1 so the ribbon closes Dec 31→Jan 1.
+        diff.push({ ...diff[0], frac: 1 });
+
+        const shade = (inner: (d: Diff) => number, color: string, cls: string) =>
+          shading
+            .append('path')
+            .datum(diff)
+            .attr('class', `cmp-diff-shade ${cls}`)
+            .attr('fill', color)
+            .attr(
+              'd',
+              d3
+                .areaRadial<Diff>()
+                .angle((d) => d.frac * 2 * Math.PI)
+                .innerRadius((d) => rScale(inner(d)))
+                .outerRadius((d) => rScale(Math.max(d.older, d.newer)))
+                .curve(d3.curveLinear) as never
+            );
+
+        shade((d) => d.older, newer.color, 'cmp-diff-newer');
+        shade((d) => d.newer, older.color, 'cmp-diff-older');
       }
-      if (diff.length <= 8) continue;
-      diff.sort((a, b) => a.frac - b.frac);
-      // Repeat the first day at frac=1 so the ribbon closes across Dec 31→Jan 1.
-      diff.push({ ...diff[0], frac: 1 });
-
-      const shade = (inner: (d: Diff) => number, color: string, cls: string) =>
-        g
-          .append('path')
-          .datum(diff)
-          .attr('class', `cmp-diff-shade ${cls}`)
-          .attr('fill', color)
-          .attr('opacity', 0.75)
-          .attr(
-            'd',
-            d3
-              .areaRadial<Diff>()
-              .angle((d) => d.frac * 2 * Math.PI)
-              .innerRadius((d) => rScale(inner(d)))
-              .outerRadius((d) => rScale(Math.max(d.early, d.late)))
-              .curve(d3.curveLinear) as never
-          );
-
-      shade((d) => d.early, late.color, 'cmp-diff-late');
-      shade((d) => d.late, early.color, 'cmp-diff-early');
     }
 
     // ---- median rings on top of the shading --------------------------------
@@ -322,7 +346,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
     }
-  }, [series, axisMetric, domain, bands, totalWidth, totalHeight, system]);
+  }, [series, axisMetric, domain, bands, theme, totalWidth, totalHeight, system]);
 
   return (
     <div className="cmp-radial-wrapper" style={{ width: totalWidth, height: totalHeight }}>

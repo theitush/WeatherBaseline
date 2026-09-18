@@ -5,11 +5,14 @@
 // The page loads each series' archive-only timeline from R2 and either overlays
 // every series on one dial or lays each out on its own dial.
 //
-// A series can also be SPLIT at the midpoint of its own year range into two
-// periods drawn on top of each other — 1980–2026 becomes 1980–2003 and
-// 2004–2026 — so the same cell and metric can be compared against its own past.
+// A series can also be SPLIT INTO ERAS — the very eras the main page splits its
+// histogram into (utils/eras: before the satellites, 1979–1999, and 2000 on) —
+// drawn on top of each other, so the same cell and metric can be compared
+// against its own past. The cuts come from eraSplit and nowhere else, so a ring
+// here and a bar there are always talking about the same years.
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint } from '../types';
+import { eraColor, eraSplit, type ThemeMode } from '../utils/eras.ts';
 
 /** A specific calendar date the user wants called out on a series' dial. */
 export interface DateMarker {
@@ -32,20 +35,27 @@ export interface Series {
   /** Inclusive year bounds applied to the archive timeline. */
   startYear: number;
   endYear: number;
-  /** Line/cloud color for this series — the EARLY half's color when split. */
+  /** Line/cloud color when the series is NOT split, and its identity color
+   *  either way — the card's edge and the dial's title. */
   color: string;
   /** Highlighted calendar dates (dashed value rings + legend). */
   markers: DateMarker[];
   /**
-   * Split the year range at its midpoint and draw both halves on one dial.
-   * Same cell, same metric, same axis — the period is the only difference.
+   * Draw this series as the main page's eras laid over each other rather than as
+   * one ring over the whole range. Same cell, same metric, same axis — the
+   * period is the only difference.
    */
   split: boolean;
-  /** Line/cloud color for the LATE half when split. */
-  lateColor: string;
   /**
-   * Fill the gap between the two halves' median rings with the color of
-   * whichever half is HIGHER at that day of the year. Split only.
+   * Color overrides for the split periods, keyed by ERA INDEX (0 = oldest).
+   * An era with no entry here is drawn in the color the main page paints those
+   * years, which is what its swatch shows — so a fresh split already matches the
+   * main page and every one of its rings is still the user's to change.
+   */
+  eraColors: Partial<Record<number, string>>;
+  /**
+   * Fill the gap between ADJACENT periods' median rings with the color of
+   * whichever of the two is HIGHER at that day of the year. Split only.
    */
   diffShade: boolean;
   /**
@@ -53,7 +63,7 @@ export interface Series {
    * day-of-year curve this series draws — the median ring and the percentile
    * bands alike (0 = raw daily quantiles). A single calendar day holds one
    * value per year, so raw curves are spiky and the difference shading flickers
-   * between its two colors; a split series therefore defaults to ±7 days, the
+   * between its colors; a split series therefore defaults to ±7 days, the
    * window a day-of-year climatology normally uses.
    */
   smoothDays: number;
@@ -112,59 +122,131 @@ export const SMOOTH_OPTIONS: { days: number; label: string }[] = [
 /** Half-window a series takes when its split is first switched on. */
 export const SPLIT_DEFAULT_SMOOTH = 7;
 
-/** One drawable period of a series: a year window with its own color. */
-export interface Period {
+/** One drawable period of a series, before its color is resolved. The shuffle
+ *  test and every label read only this much, and none of it depends on theme. */
+export interface PeriodRange {
   startYear: number;
   endYear: number;
-  color: string;
-  /** "1980–2003" — used for legends and the editor's split rows. */
+  /** "1979–1999" — the legend, the editor's rows and the verdict all read it. */
   label: string;
-  /** 'early' / 'late' when split, 'whole' otherwise. */
-  half: 'whole' | 'early' | 'late';
+  /**
+   * Which era this is, indexed the way utils/eras indexes them (0 = oldest),
+   * which is also what picks its default color. -1 when the period is not one
+   * era but a span of them: the whole range of an unsplit series, or the
+   * "everything before the latest era" pile the shuffle test builds.
+   */
+  era: number;
 }
 
+/** A period with its color resolved — what the dial and the legend draw. */
+export interface Period extends PeriodRange {
+  color: string;
+}
+
+const rangeLabel = (from: number, to: number): string => `${from}–${to}`;
+
 /**
- * The year the split falls on: the last year of the EARLY half. The halves are
- * disjoint — 1980–2026 splits into 1980–2003 and 2004–2026 — because a year
- * counted in both periods would be compared against itself.
+ * A series' year range cut into eras: eraSplit's cuts — 1979 and 2000, the ones
+ * the main page uses — intersected with the range, empty eras dropped.
+ *
+ * The intersection is not a second opinion about where the cuts fall; it is
+ * what the compare page needs and the main page does not. Every cell there runs
+ * 1950→now, so all three eras are always populated, while here the user picks
+ * the range: a 1990–2020 series has no pre-satellite era at all, and its
+ * satellite-era ring covers 1990–1999, not the 1979–1999 the raw split would
+ * label it. The era INDEX survives the clamp, so that ring is still painted in
+ * era 1's color and still means the same stretch of the record.
  */
-export const splitYear = (s: Pick<Series, 'startYear' | 'endYear'>): number =>
-  Math.floor((s.startYear + s.endYear) / 2);
+function eraPeriods(s: Pick<Series, 'startYear' | 'endYear'>): PeriodRange[] {
+  return eraSplit(s.startYear, s.endYear)
+    .map((era, i) => ({
+      startYear: Math.max(era.from, s.startYear),
+      endYear: Math.min(era.to, s.endYear),
+      era: i,
+    }))
+    .filter((p) => p.startYear <= p.endYear)
+    .map((p) => ({ ...p, label: rangeLabel(p.startYear, p.endYear) }));
+}
 
-/** A range needs at least two years to have two halves. */
+/** A range has to reach across a cut to have more than one era to split into. */
 export const canSplit = (s: Pick<Series, 'startYear' | 'endYear'>): boolean =>
-  s.endYear > s.startYear;
+  eraPeriods(s).length > 1;
 
-/** The periods a series draws: two when split (and splittable), else one. */
-export function seriesPeriods(s: Series): Period[] {
+/** The year windows a series draws: its eras when split, else the whole range. */
+export function seriesPeriodRanges(
+  s: Pick<Series, 'startYear' | 'endYear' | 'split'>
+): PeriodRange[] {
   if (!s.split || !canSplit(s)) {
     return [
       {
         startYear: s.startYear,
         endYear: s.endYear,
-        color: s.color,
-        label: `${s.startYear}–${s.endYear}`,
-        half: 'whole',
+        label: rangeLabel(s.startYear, s.endYear),
+        era: -1,
       },
     ];
   }
-  const mid = splitYear(s);
-  return [
-    {
-      startYear: s.startYear,
-      endYear: mid,
-      color: s.color,
-      label: `${s.startYear}–${mid}`,
-      half: 'early',
+  return eraPeriods(s);
+}
+
+/**
+ * A period's color: the user's override for that era when there is one, else
+ * the era's step on the metric's ordinal ramp — the exact color the main page's
+ * histogram paints those years in this theme.
+ *
+ * eraColor and not eraInk(...).fill, for the reason PeriodHistogramChart gives:
+ * in CONTOUR style every era's `fill` is one shared metric base, which works
+ * there because the eras are overlaid and told apart by their outlines. A
+ * dial's rings, bands and cloud have no such outline, so a shared fill would
+ * make all three periods identical. The ramp step is the era's color under
+ * either style — which is also why this page has no reason to read the eraStyle
+ * setting at all.
+ */
+export function periodColor(s: Series, era: number, theme: ThemeMode): string {
+  if (era < 0) return s.color;
+  return s.eraColors[era] ?? eraColor(s.metric, era, theme);
+}
+
+/** The periods a series draws, colors resolved for the theme being painted. */
+export function seriesPeriods(s: Series, theme: ThemeMode): Period[] {
+  return seriesPeriodRanges(s).map((p) => ({
+    ...p,
+    color: periodColor(s, p.era, theme),
+  }));
+}
+
+/**
+ * The two piles the shuffle test compares: the LATEST era against everything
+ * before it.
+ *
+ * Three rings pose three pairwise questions and the panel under the dial has
+ * room for one sentence, so it asks the one the dial exists to answer — has the
+ * present moved away from the past. Pooling the older eras also keeps that
+ * pile's sample size up, which is where a short record is thinnest. The gap
+ * SHADING still works pair by pair; the two are answering different questions
+ * and are drawn differently.
+ *
+ * Null when there is only one period, which is nothing to compare.
+ */
+export function periodTestWindows(
+  periods: PeriodRange[]
+): { early: PeriodRange; late: PeriodRange } | null {
+  if (periods.length < 2) return null;
+  const late = periods[periods.length - 1];
+  const rest = periods.slice(0, -1);
+  const startYear = rest[0].startYear;
+  const endYear = rest[rest.length - 1].endYear;
+  return {
+    early: {
+      startYear,
+      endYear,
+      label: rangeLabel(startYear, endYear),
+      // One era pooled with nothing else is still that era; two or more is a
+      // span, which has no era color of its own.
+      era: rest.length === 1 ? rest[0].era : -1,
     },
-    {
-      startYear: mid + 1,
-      endYear: s.endYear,
-      color: s.lateColor,
-      label: `${mid + 1}–${s.endYear}`,
-      half: 'late',
-    },
-  ];
+    late,
+  };
 }
 
 /** A palette of distinct, theme-agnostic series colors to cycle through. */
