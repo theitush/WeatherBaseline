@@ -19,8 +19,10 @@ export const ERA_FILL_ALPHA = 0.45;
  *
  * In contour style the histogram's bars carry NO stroke: `stroke` inks a single
  * step path along the tops of that era's bars — the silhouette of the shape —
- * rather than a box around every bin. It still inks the legend swatch, the
- * tooltip swatch and MainChart's era band, so it is always a real colour.
+ * rather than a box around every bin, and on the main chart it rings that era's
+ * daily dots and dashes its boundary line. The OLDEST era has no contour ink at
+ * all (see CONTOUR_INKS), so in this style `stroke` can be `'none'`: test it
+ * with hasOutline() before drawing anything with it.
  */
 export type EraStyle = 'shade' | 'contour';
 
@@ -87,9 +89,15 @@ export function eraColor(metric: MetricKey, era: number): string {
   return base.darker(0.35).formatHex();
 }
 
-/** Contour-mode outline inks — three hues off the metric palette so the
- *  outline, not the fill, is what says which era a bar belongs to. */
-const CONTOUR_INKS = ['#5B6470', '#1F7A8C', '#B3236B'];
+/**
+ * Contour-mode outline inks, one per era — hues off the metric palette so the
+ * outline, not the fill, is what says which era a mark belongs to.
+ *
+ * `null` means NO outline. The oldest era gets one: its former ink (#5B6470)
+ * read as black on the page (Ita, 2026-09-18), and the pre-satellite record is
+ * perfectly legible as the plain fill underneath the two contours that remain.
+ */
+const CONTOUR_INKS: (string | null)[] = [null, '#1F7A8C', '#B3236B'];
 
 export interface EraInk {
   fill: string;
@@ -98,14 +106,25 @@ export interface EraInk {
   strokeWidth: number;
 }
 
-/** What to draw an era's bars (and its band on the main chart) in, per style. */
+/**
+ * Does this ink draw an outline at all? Contour style leaves the oldest era
+ * fill-only, so every reader of `stroke` has to cope with there being none —
+ * this is the one place that test is spelled out.
+ */
+export function hasOutline(ink: EraInk): boolean {
+  return ink.strokeWidth > 0 && ink.stroke !== 'none';
+}
+
+/** What to draw an era's marks (bars, silhouette, dots, boundary) in, per style. */
 export function eraInk(metric: MetricKey, era: number, style: EraStyle): EraInk {
   if (style === 'contour') {
+    const outline =
+      era < CONTOUR_INKS.length ? CONTOUR_INKS[era] : CONTOUR_INKS[CONTOUR_INKS.length - 1];
     return {
       fill: CONFIG.metricColors[metric]?.base ?? '#888888',
       fillOpacity: ERA_FILL_ALPHA,
-      stroke: CONTOUR_INKS[era] ?? CONTOUR_INKS[CONTOUR_INKS.length - 1],
-      strokeWidth: 1.5,
+      stroke: outline ?? 'none',
+      strokeWidth: outline ? 1.5 : 0,
     };
   }
   const shade = eraColor(metric, era);

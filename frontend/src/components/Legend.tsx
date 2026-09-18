@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Selection } from 'd3';
 import CONFIG, { type MetricKey } from '../utils/config';
-import { eraInk, type Era, type EraStyle } from '../utils/eras';
+import { eraInk, hasOutline, type Era, type EraStyle } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 
 export type LegendItem =
@@ -68,13 +68,17 @@ export const getLegendData = (
   if (eras && eras.length) {
     eras.forEach((era, i) => {
       const ink = eraInk(metric, i, eraStyle);
+      // An era with no contour ink (contour style's oldest) is fill only — it
+      // must not get an outlined swatch, or the legend claims a line the chart
+      // doesn't draw. `stroke: undefined` is what suppresses the swatch rect.
+      const outlined = hasOutline(ink);
       items.push({
         type: 'rect',
         color: ink.fill,
         label: era.label,
         op: ink.fillOpacity + 0.25,
-        stroke: ink.stroke,
-        strokeWidth: ink.strokeWidth,
+        stroke: outlined ? ink.stroke : undefined,
+        strokeWidth: outlined ? ink.strokeWidth : undefined,
       });
     });
   } else {

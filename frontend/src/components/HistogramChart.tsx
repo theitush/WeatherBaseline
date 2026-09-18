@@ -14,7 +14,7 @@ import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
-import { erasForPool, eraIndex, eraInk } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, hasOutline } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import './HistogramChart.css';
 
@@ -341,9 +341,12 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .y((p) => (isVertical ? height - countLen(p[1]) : tempScale(p[0])));
 
       eraBins.forEach((eb, i) => {
+        const ink = eraInk(currentMetric, i, eraStyle);
+        // The oldest era carries no contour ink (its old one read as black), so
+        // it is fill only — no silhouette for it.
+        if (!hasOutline(ink)) return;
         const pts = silhouettePoints(eb);
         if (pts.length < 2) return;
-        const ink = eraInk(currentMetric, i, eraStyle);
         g.append('path')
           .attr('class', `era-outline era-${i}`)
           .attr('fill', 'none')
@@ -368,7 +371,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
         .map((era, i) => {
           const n = eraBins[i][binIdx]?.length ?? 0;
           const ink = eraInk(currentMetric, i, eraStyle);
-          const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:1.5px solid ${ink.stroke};vertical-align:-1px`;
+          const border = hasOutline(ink)
+            ? `${ink.strokeWidth}px solid ${ink.stroke}`
+            : '1.5px solid transparent'; // keeps the rows aligned
+          const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:${border};vertical-align:-1px`;
           return `<span style="${sw}"></span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
         })
         .join('<br/>');

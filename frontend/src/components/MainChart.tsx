@@ -7,7 +7,7 @@ import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor'
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
-import { erasForPool, eraInk } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk, hasOutline, type EraInk } from '../utils/eras';
 import { useEraStyle } from '../hooks/useEraStyle';
 import './MainChart.css';
 
@@ -205,35 +205,44 @@ const MainChart: React.FC<MainChartProps> = ({
         .text(tempAxisLabel);
     }
 
-    // The histogram's three eras, carried onto the time axis (#62): each era
-    // gets a faint wash of its own ink across the plot and a dashed boundary
-    // line at its start in that ink, so the shades / contours on the side
-    // histogram can be read back to the years they cover. Same cuts as the
-    // histogram and legend (erasForPool). The 1979 line keeps its label below.
+    // The histogram's three eras, carried onto the time axis (#62), each style
+    // in its own register. Same cuts as the histogram and legend (erasForPool);
+    // the 1979 line keeps its label below.
+    //   shade   — a faint wash of the era's shade across the plot, which is the
+    //             whole point of "shade", plus a dashed boundary at its start.
+    //   contour — NO wash. Washing the entire background in the era's ink was
+    //             the thing Ita objected to (2026-09-18); this style inks the
+    //             CONTOURS instead, exactly as the histogram does: the boundary
+    //             dash, and a ring in the era's ink on each of its daily dots
+    //             (see eraDotInk, applied where the dots are drawn).
     const eras = erasForPool(filteredData, currentMetric, currentDate);
+    const isContour = eraStyle === 'contour';
     if (eras) {
       const eraG = g.append('g').attr('class', 'era-bands');
       eras.forEach((era, i) => {
         const ink = eraInk(currentMetric, i, eraStyle);
-        // Band spans [start-of-first-year, end-of-last-year], clamped to the axis.
-        const [t0, t1] = timeScale.domain();
-        const a = timeScale(d3.max([new Date(era.from, 0, 1), t0]) as Date);
-        const b = timeScale(d3.min([new Date(era.to + 1, 0, 1), t1]) as Date);
-        const lo = Math.min(a, b);
-        const hi = Math.max(a, b);
-        eraG.append('rect')
-          .attr('class', `era-band era-${i}`)
-          .attr('x', isVertical ? 0 : lo)
-          .attr('y', isVertical ? lo : 0)
-          .attr('width', isVertical ? width : Math.max(0, hi - lo))
-          .attr('height', isVertical ? Math.max(0, hi - lo) : height)
-          .attr('fill', eraStyle === 'contour' ? ink.stroke : ink.fill)
-          .attr('fill-opacity', 0.07)
-          .attr('pointer-events', 'none');
-        // Boundary at the era's first year (skip the record's own start). The
-        // 1979 cut is drawn by the satellite block below with its label; here
-        // it just gets the era's ink over the neutral dash.
-        if (i > 0) {
+        if (!isContour) {
+          // Band spans [start-of-first-year, end-of-last-year], clamped to the axis.
+          const [t0, t1] = timeScale.domain();
+          const a = timeScale(d3.max([new Date(era.from, 0, 1), t0]) as Date);
+          const b = timeScale(d3.min([new Date(era.to + 1, 0, 1), t1]) as Date);
+          const lo = Math.min(a, b);
+          const hi = Math.max(a, b);
+          eraG.append('rect')
+            .attr('class', `era-band era-${i}`)
+            .attr('x', isVertical ? 0 : lo)
+            .attr('y', isVertical ? lo : 0)
+            .attr('width', isVertical ? width : Math.max(0, hi - lo))
+            .attr('height', isVertical ? Math.max(0, hi - lo) : height)
+            .attr('fill', ink.fill)
+            .attr('fill-opacity', 0.07)
+            .attr('pointer-events', 'none');
+        }
+        // Boundary at the era's first year (skip the record's own start, and any
+        // era with no ink to draw it in). The 1979 cut is drawn by the satellite
+        // block below with its label; here it just gets the era's ink over the
+        // neutral dash.
+        if (i > 0 && hasOutline(ink)) {
           const pos = timeScale(new Date(era.from, 0, 1));
           const line = eraG.append('line')
             .attr('class', `era-boundary era-${i}`)
@@ -265,7 +274,8 @@ const MainChart: React.FC<MainChartProps> = ({
       const boundaryPos = timeScale(satelliteDate);
       // In the era-split view the 1979 cut is the second era's start, so its
       // dash takes that era's ink (#62); the neutral axis colour otherwise.
-      const satInk = eras ? eraInk(currentMetric, 1, eraStyle) : null;
+      const satEraInk = eras ? eraInk(currentMetric, 1, eraStyle) : null;
+      const satInk = satEraInk && hasOutline(satEraInk) ? satEraInk : null;
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
         g.append('line')
@@ -428,6 +438,16 @@ const MainChart: React.FC<MainChartProps> = ({
         !(d.data_type === 'forecast' && d.date > targetDay)
     );
     const dotColor = CONFIG.getColorForElement(currentMetric, 'dataPoints');
+    // Contour style's era mark on this chart: ring each day's dot in the ink of
+    // the era it falls in — the main chart's own contours, the same idea as the
+    // histogram's silhouettes. Returns null when there is nothing to ink with
+    // (shade style, or the oldest era, which has no contour ink), and the dot
+    // then keeps exactly the styling it always had.
+    const eraDotInk = (d: WeatherDataPoint): EraInk | null => {
+      if (!eras || !isContour) return null;
+      const ink = eraInk(currentMetric, eraIndex(d.year, eras), eraStyle);
+      return hasOutline(ink) ? ink : null;
+    };
     const dotSelection = g.selectAll('.data-point')
       .data(dotData)
       .enter()
@@ -437,8 +457,10 @@ const MainChart: React.FC<MainChartProps> = ({
       .attr('cy', (d) => ty(isVertical ? d.date : (d[currentMetric] as number), isVertical ? 'time' : 'temp'))
       .attr('r', (d) => (isForecastLike(d) ? 3.2 : 2.8))
       .attr('fill', (d) => (isForecastLike(d) ? 'var(--surface)' : dotColor))
-      .attr('stroke', (d) => (isForecastLike(d) ? dotColor : 'none'))
-      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : 0))
+      // A hollow dot still means "forecast" — that reads off the fill and the
+      // radius, not the ring's colour — so the era ink can take the ring over.
+      .attr('stroke', (d) => eraDotInk(d)?.stroke ?? (isForecastLike(d) ? dotColor : 'none'))
+      .attr('stroke-width', (d) => (isForecastLike(d) ? 1.3 : eraDotInk(d) ? 1 : 0))
       .style('opacity', 0);
 
     dotSelection.transition().duration(500).style('opacity', 1);
