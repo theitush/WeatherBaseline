@@ -14,6 +14,7 @@ import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
+import { eraSplit, eraIndex, eraColor, ERA_FILL_ALPHA } from '../utils/eras';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -166,12 +167,18 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // kept). The bracket PERCENTAGES deliberately run off a narrower pool —
     // histRowsNative below, which is observation-only — because a bar is a day
     // shown, while a percentage is a day counted.
-    const values = comparablePool(filteredData, currentDate)
-      .map((d) => d[currentMetric])
-      .filter((v): v is number => v !== undefined)
-      .map((v) => convert(v, currentMetric, system));
+    const valueRows = comparablePool(filteredData, currentDate)
+      .filter((d) => d[currentMetric] !== undefined)
+      .map((d) => ({ v: convert(d[currentMetric] as number, currentMetric, system), year: d.year }));
+    const values = valueRows.map((r) => r.v);
 
     if (values.length === 0) return;
+
+    // Three eras, drawn as three OVERLAID histograms on the same bins: the
+    // pre-satellite record, then the satellite era split evenly-ish in two.
+    // Same fill alpha for all three; shade + outline tell them apart.
+    const [firstYear, lastYear] = d3.extent(valueRows, (r) => r.year) as [number, number];
+    const eras = eraSplit(firstYear, lastYear);
 
     // Axis domain must match MainChart's tempScale EXACTLY so the shared
     // current-temp line lands at the same pixel in both charts. That means:
@@ -210,21 +217,29 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     const BIN = binWidth(currentMetric, system, domainHi - domainLo);
     const binLo = Math.floor(domainLo / BIN) * BIN;
     const binHi = Math.ceil(domainHi / BIN) * BIN;
-    const bins = d3
+    const binner = d3
       .bin()
       .domain([binLo, binHi])
-      .thresholds(d3.range(binLo, binHi + BIN, BIN))(values);
+      .thresholds(d3.range(binLo, binHi + BIN, BIN));
+    // All-era bins: the bracket clamps and the dry-spike fallbacks below read
+    // the data extent off these, exactly as before the split.
+    const bins = binner(values);
+    // Per-era bins on the SAME edges, one histogram each.
+    const eraBins = eras.map((_, i) =>
+      binner(valueRows.filter((r) => eraIndex(r.year, eras) === i).map((r) => r.v))
+    );
+    const maxEraCount = d3.max(eraBins, (eb) => d3.max(eb, (d) => d.length) as number) as number;
 
     // Count scale: horizontal mode → X (0→width); vertical mode → Y (0 at top → max at bottom, bars hang down)
     const countScale = d3
       .scaleLinear()
-      .domain([0, d3.max(bins, (d) => d.length) as number])
+      .domain([0, maxEraCount])
       .range(isVertical ? [height, 0] : [0, width])
       .clamp(true);
     // Linear length used for bar sizing (always 0 → size).
     const countLen = d3
       .scaleLinear()
-      .domain([0, d3.max(bins, (d) => d.length) as number])
+      .domain([0, maxEraCount])
       .range([0, isVertical ? height : width]);
 
     const unit = unitLabel(currentMetric, system);
@@ -239,45 +254,59 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     // Bars (animate count dimension from 0 on enter). The 1px gap on the temp
     // axis leaves thin white separators between bins, matching the period hists.
-    const barSel = g.selectAll('.bar')
-      .data(bins)
-      .enter()
-      .append('rect')
-      .attr('class', 'bar')
-      .attr('fill', CONFIG.getColorForElement(currentMetric, 'histogramBars'));
+    // One overlaid set per era, oldest first so the most recent sits on top;
+    // every set shares ERA_FILL_ALPHA and carries its own shade as fill + outline.
+    eraBins.forEach((eb, i) => {
+      const ink = eraColor(currentMetric, i);
+      const barSel = g.selectAll(`.bar.era-${i}`)
+        .data(eb.filter((d) => d.length > 0))
+        .enter()
+        .append('rect')
+        .attr('class', `bar era-${i}`)
+        .attr('fill', ink)
+        .attr('fill-opacity', ERA_FILL_ALPHA)
+        .attr('stroke', ink)
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.9);
 
-    if (isVertical) {
-      // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
-      barSel
-        .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
-        .attr('y', height)
-        .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
-        .attr('height', 0)
-        .transition()
-        .duration(500)
-        .attr('y', (d) => height - countLen(d.length))
-        .attr('height', (d) => countLen(d.length));
-    } else {
-      barSel
-        .attr('x', 0)
-        .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
-        .attr('width', 0)
-        .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1))
-        .transition()
-        .duration(500)
-        .attr('width', (d) => countLen(d.length));
-    }
+      if (isVertical) {
+        // Bars grow upward from the bottom baseline: x is the temp bin span, y is baseline minus bar height.
+        barSel
+          .attr('x', (d) => tempScale(d.x0 as number) + 0.5)
+          .attr('y', height)
+          .attr('width', (d) => Math.max(0, tempScale(d.x1 as number) - tempScale(d.x0 as number) - 1))
+          .attr('height', 0)
+          .transition()
+          .duration(500)
+          .attr('y', (d) => height - countLen(d.length))
+          .attr('height', (d) => countLen(d.length));
+      } else {
+        barSel
+          .attr('x', 0)
+          .attr('y', (d) => tempScale(d.x1 as number) + 0.5)
+          .attr('width', 0)
+          .attr('height', (d) => Math.max(0, tempScale(d.x0 as number) - tempScale(d.x1 as number) - 1))
+          .transition()
+          .duration(500)
+          .attr('width', (d) => countLen(d.length));
+      }
+    });
 
     // Transparent full-extent hit areas, one per non-empty bin, so the tooltip
     // triggers anywhere in the bin's row/column — a 1-day bar is only a sliver
     // and near-impossible to point at directly. Appended after the bars so they
     // capture the mouse (same approach as PeriodHistogramChart).
     const showTip = (event: MouseEvent, d: d3.Bin<number, number>) => {
+      const binIdx = bins.indexOf(d);
+      const perEra = eras
+        .map((era, i) => {
+          const n = eraBins[i][binIdx]?.length ?? 0;
+          return `<span style="color:${eraColor(currentMetric, i)}">■</span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
+        })
+        .join('<br/>');
       tooltip
         .style('opacity', 1)
-        .html(
-          `${(d.x0 as number).toFixed(dp)}–${(d.x1 as number).toFixed(dp)}${unit}<br/>${d.length} day${d.length === 1 ? '' : 's'}`
-        );
+        .html(`${(d.x0 as number).toFixed(dp)}–${(d.x1 as number).toFixed(dp)}${unit}<br/>${perEra}`);
       placeTooltip(tooltipRef.current, event);
     };
     const hitSel = g.selectAll('rect.bar-hit')

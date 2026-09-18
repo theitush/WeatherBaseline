@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Selection } from 'd3';
 import CONFIG, { type MetricKey } from '../utils/config';
+import { eraColor, ERA_FILL_ALPHA, type Era } from '../utils/eras';
 
 export type LegendItem =
   | { type: 'rect'; color: string; label: string; op: number }
@@ -54,17 +55,26 @@ export const getLegendData = (
   metric: MetricKey,
   currentDate?: string,
   isForecast?: boolean,
+  eras?: Era[],
 ): LegendItem[] => {
   const items: LegendItem[] = [];
 
   // First (top on mobile): the histogram bars — the settled climatological
-  // distribution the whole chart is built on.
-  items.push({
-    type: 'rect',
-    color: CONFIG.getColorForElement(metric, 'histogramBars'),
-    label: 'Binned historical data',
-    op: 1,
-  });
+  // distribution the whole chart is built on. One swatch per era when the
+  // histogram is era-split (pre-satellite / two satellite-era halves), each in
+  // the shade its bars are drawn in.
+  if (eras && eras.length) {
+    eras.forEach((era, i) => {
+      items.push({ type: 'rect', color: eraColor(metric, i), label: era.label, op: ERA_FILL_ALPHA + 0.25 });
+    });
+  } else {
+    items.push({
+      type: 'rect',
+      color: CONFIG.getColorForElement(metric, 'histogramBars'),
+      label: 'Binned historical data',
+      op: 1,
+    });
+  }
 
   // Second: the target-day marker. A forecast day is drawn as a predictive-density
   // bell (the histogram's forecast KDE); a settled past day is the straight dashed
@@ -176,8 +186,12 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
   </svg>
 );
 
-export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForecast?: boolean }> = ({ metric, currentDate, isForecast }) => {
-  const items = getLegendData(metric, currentDate, isForecast);
+export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForecast?: boolean; eras?: Era[] }> = ({ metric, currentDate, isForecast, eras }) => {
+  const items = getLegendData(metric, currentDate, isForecast, eras);
+  // The binned-data swatch(es) + the target-day marker form the first row on
+  // mobile; the break sits after the marker (or after the last swatch when no
+  // date is selected).
+  const breakAfter = (eras?.length ?? 1) + (currentDate ? 1 : 0) - 1;
   return (
     <div className="chart-legend">
       {items.map((item, i) => (
@@ -186,9 +200,9 @@ export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForec
             <Swatch item={item} />
             <span>{item.label}</span>
           </div>
-          {/* Force the binned-data + target-day pair onto their own row on mobile;
+          {/* Force the binned-data + target-day group onto their own row on mobile;
               the break collapses (display:none) on desktop, keeping one flow row. */}
-          {i === 1 && <div className="legend-break" aria-hidden="true" />}
+          {i === breakAfter && <div className="legend-break" aria-hidden="true" />}
         </React.Fragment>
       ))}
     </div>
