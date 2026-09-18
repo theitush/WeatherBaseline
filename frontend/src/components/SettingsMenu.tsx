@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { useUnits } from '../hooks/useUnits';
+import { useEraStyle } from '../hooks/useEraStyle';
 import './SettingsMenu.css';
 
 // Gear button in the header that opens a small popover with two single toggle
@@ -9,6 +10,7 @@ import './SettingsMenu.css';
 const SettingsMenu: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { system, toggleUnits } = useUnits();
+  const { eraStyle, toggleEraStyle } = useEraStyle();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +104,36 @@ const SettingsMenu: React.FC = () => {
             title={isImperial ? 'Switch to metric (°C, km)' : 'Switch to imperial (°F, mi)'}
           >
             {isImperial ? '°F' : '°C'}
+          </button>
+
+          {/* Era-style toggle (local test, #62) — how the histogram's three eras
+              are told apart: three shades of the metric hue, or one fill with
+              the outline colour changing per era. Shows the current style. */}
+          <button
+            type="button"
+            className="settings-toggle"
+            onClick={toggleEraStyle}
+            aria-label={eraStyle === 'shade' ? 'Switch eras to contour style' : 'Switch eras to shade style'}
+            title={eraStyle === 'shade' ? 'Eras: shades → switch to contours' : 'Eras: contours → switch to shades'}
+          >
+            {eraStyle === 'shade' ? (
+              // Three filled swatches, light → dark
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="5" fill="currentColor" opacity="0.3" />
+                <rect x="3" y="10" width="18" height="5" fill="currentColor" opacity="0.6" />
+                <rect x="3" y="16" width="18" height="5" fill="currentColor" opacity="1" />
+              </svg>
+            ) : (
+              // Three same-fill swatches, outlined
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="5" fill="currentColor" opacity="0.35" />
+                <rect x="3" y="10" width="18" height="5" fill="currentColor" opacity="0.35" />
+                <rect x="3" y="16" width="18" height="5" fill="currentColor" opacity="0.35" />
+                <rect x="3.75" y="4.75" width="16.5" height="3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2,1.5" />
+                <rect x="3.75" y="10.75" width="16.5" height="3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="3.75" y="16.75" width="16.5" height="3.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+              </svg>
+            )}
           </button>
         </div>
       )}

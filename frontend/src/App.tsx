@@ -20,8 +20,9 @@ import SettingsMenu from './components/SettingsMenu';
 import ShareButton from './components/ShareButton';
 import { UnitsContext, useUnits, useUnitsState } from './hooks/useUnits';
 import { usePermutationTest } from './hooks/usePermutationTest';
-import { comparablePool, observedPool } from './utils/dataProcessor';
-import { eraSplit } from './utils/eras';
+import { observedPool } from './utils/dataProcessor';
+import { erasForPool } from './utils/eras';
+import { EraStyleContext, useEraStyleState } from './hooks/useEraStyle';
 import { resolveVerdictProse } from './utils/verdictProse';
 import type { MetricKey } from './utils/config';
 import './App.css';
@@ -191,13 +192,7 @@ const AppContent: React.FC = () => {
   // The era boundaries the side histogram splits its bars on, computed off the
   // SAME pool it bins (comparable rows carrying the metric) so the legend's
   // year ranges match the bars exactly.
-  const histogramEras = (() => {
-    const years = comparablePool(filteredData, currentDate)
-      .filter((d) => d[currentMetric] !== undefined)
-      .map((d) => d.year);
-    if (years.length === 0) return undefined;
-    return eraSplit(Math.min(...years), Math.max(...years));
-  })();
+  const histogramEras = erasForPool(filteredData, currentMetric, currentDate);
 
   // days a year are top-5% days, so "WTF." would fire every summer here.
   const yearVerdict = (() => {
@@ -910,11 +905,14 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   const units = useUnitsState();
+  const eraStyle = useEraStyleState();
   return (
     <UnitsContext.Provider value={units}>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <EraStyleContext.Provider value={eraStyle}>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </EraStyleContext.Provider>
     </UnitsContext.Provider>
   );
 };

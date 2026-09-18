@@ -7,6 +7,8 @@ import { comparablePool, findRecords, isModelRow } from '../utils/dataProcessor'
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, axisLabel, axisPad, tickCount, valueDecimals } from '../utils/units';
+import { erasForPool, eraInk } from '../utils/eras';
+import { useEraStyle } from '../hooks/useEraStyle';
 import './MainChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -52,6 +54,7 @@ const MainChart: React.FC<MainChartProps> = ({
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const { system } = useUnits();
+  const { eraStyle } = useEraStyle();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -202,18 +205,75 @@ const MainChart: React.FC<MainChartProps> = ({
         .text(tempAxisLabel);
     }
 
+    // The histogram's three eras, carried onto the time axis (#62): each era
+    // gets a faint wash of its own ink across the plot and a dashed boundary
+    // line at its start in that ink, so the shades / contours on the side
+    // histogram can be read back to the years they cover. Same cuts as the
+    // histogram and legend (erasForPool). The 1979 line keeps its label below.
+    const eras = erasForPool(filteredData, currentMetric, currentDate);
+    if (eras) {
+      const eraG = g.append('g').attr('class', 'era-bands');
+      eras.forEach((era, i) => {
+        const ink = eraInk(currentMetric, i, eraStyle);
+        // Band spans [start-of-first-year, end-of-last-year], clamped to the axis.
+        const [t0, t1] = timeScale.domain();
+        const a = timeScale(d3.max([new Date(era.from, 0, 1), t0]) as Date);
+        const b = timeScale(d3.min([new Date(era.to + 1, 0, 1), t1]) as Date);
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        eraG.append('rect')
+          .attr('class', `era-band era-${i}`)
+          .attr('x', isVertical ? 0 : lo)
+          .attr('y', isVertical ? lo : 0)
+          .attr('width', isVertical ? width : Math.max(0, hi - lo))
+          .attr('height', isVertical ? Math.max(0, hi - lo) : height)
+          .attr('fill', eraStyle === 'contour' ? ink.stroke : ink.fill)
+          .attr('fill-opacity', 0.07)
+          .attr('pointer-events', 'none');
+        // Boundary at the era's first year (skip the record's own start). The
+        // 1979 cut is drawn by the satellite block below with its label; here
+        // it just gets the era's ink over the neutral dash.
+        if (i > 0) {
+          const pos = timeScale(new Date(era.from, 0, 1));
+          const line = eraG.append('line')
+            .attr('class', `era-boundary era-${i}`)
+            .attr('stroke', ink.stroke)
+            .attr('stroke-width', ink.strokeWidth)
+            .attr('stroke-dasharray', '3,4')
+            .attr('stroke-opacity', 0.8);
+          if (isVertical) line.attr('x1', 0).attr('x2', width).attr('y1', pos).attr('y2', pos);
+          else line.attr('x1', pos).attr('x2', pos).attr('y1', 0).attr('y2', height);
+          // Label the midpoint cut with its year, the way 1979 gets "Satellites!".
+          if (i === eras.length - 1) {
+            eraG.append('text')
+              .attr('class', 'era-boundary-label')
+              .attr('x', isVertical ? width - 5 : pos)
+              .attr('y', isVertical ? pos - 5 : -5)
+              .style('text-anchor', isVertical ? 'end' : 'middle')
+              .style('font-size', '11px')
+              .style('font-style', 'italic')
+              .style('fill', ink.stroke)
+              .text(String(era.from));
+          }
+        }
+      });
+    }
+
     // Pre-satellite era: dashed boundary at 1979 with a label.
     const satelliteDate = new Date(1979, 0, 1);
     if (satelliteDate > dateExtent[0]) {
       const boundaryPos = timeScale(satelliteDate);
+      // In the era-split view the 1979 cut is the second era's start, so its
+      // dash takes that era's ink (#62); the neutral axis colour otherwise.
+      const satInk = eras ? eraInk(currentMetric, 1, eraStyle) : null;
       if (isVertical) {
         // Time runs along y (top = latest). Pre-1979 is the bottom band.
         g.append('line')
           .attr('class', 'satellite-era-line')
           .attr('x1', 0).attr('x2', width)
           .attr('y1', boundaryPos).attr('y2', boundaryPos)
-          .attr('stroke', 'var(--chart-axis)')
-          .attr('stroke-width', 0.75)
+          .attr('stroke', satInk ? satInk.stroke : 'var(--chart-axis)')
+          .attr('stroke-width', satInk ? satInk.strokeWidth : 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
           .attr('class', 'satellite-era-label')
@@ -230,8 +290,8 @@ const MainChart: React.FC<MainChartProps> = ({
           .attr('class', 'satellite-era-line')
           .attr('x1', boundaryPos).attr('x2', boundaryPos)
           .attr('y1', 0).attr('y2', height)
-          .attr('stroke', 'var(--chart-axis)')
-          .attr('stroke-width', 0.75)
+          .attr('stroke', satInk ? satInk.stroke : 'var(--chart-axis)')
+          .attr('stroke-width', satInk ? satInk.strokeWidth : 0.75)
           .attr('stroke-dasharray', '3,4');
         g.append('text')
           .attr('class', 'satellite-era-label')
@@ -589,7 +649,7 @@ const MainChart: React.FC<MainChartProps> = ({
           .style('text-anchor', 'end');
       }
     }
-  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system]);
+  }, [filteredData, yearlyAggregates, currentMetric, currentDate, fullData, width, height, isVertical, system, eraStyle]);
 
   return (
     <div className="main-chart-wrapper">

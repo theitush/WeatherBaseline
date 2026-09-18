@@ -14,7 +14,8 @@ import { resolveForecastMarker } from '../utils/forecastReference';
 import { placeTooltip } from '../utils/tooltip';
 import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, binWidth, axisPad } from '../utils/units';
-import { eraSplit, eraIndex, eraColor, ERA_FILL_ALPHA } from '../utils/eras';
+import { erasForPool, eraIndex, eraInk } from '../utils/eras';
+import { useEraStyle } from '../hooks/useEraStyle';
 import './HistogramChart.css';
 
 export type Orientation = 'horizontal' | 'vertical';
@@ -137,6 +138,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const { system } = useUnits();
+  const { eraStyle } = useEraStyle();
 
   const isVertical = orientation === 'vertical';
   const MARGIN = isVertical ? MARGIN_V : MARGIN_H;
@@ -176,9 +178,10 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
 
     // Three eras, drawn as three OVERLAID histograms on the same bins: the
     // pre-satellite record, then the satellite era split evenly-ish in two.
-    // Same fill alpha for all three; shade + outline tell them apart.
-    const [firstYear, lastYear] = d3.extent(valueRows, (r) => r.year) as [number, number];
-    const eras = eraSplit(firstYear, lastYear);
+    // Same fill alpha for all three; shade or outline (eraStyle) tells them
+    // apart. erasForPool reads the same rows valueRows holds, so the cuts match
+    // MainChart's bands and the legend's labels.
+    const eras = erasForPool(filteredData, currentMetric, currentDate)!;
 
     // Axis domain must match MainChart's tempScale EXACTLY so the shared
     // current-temp line lands at the same pixel in both charts. That means:
@@ -257,16 +260,16 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // One overlaid set per era, oldest first so the most recent sits on top;
     // every set shares ERA_FILL_ALPHA and carries its own shade as fill + outline.
     eraBins.forEach((eb, i) => {
-      const ink = eraColor(currentMetric, i);
+      const ink = eraInk(currentMetric, i, eraStyle);
       const barSel = g.selectAll(`.bar.era-${i}`)
         .data(eb.filter((d) => d.length > 0))
         .enter()
         .append('rect')
         .attr('class', `bar era-${i}`)
-        .attr('fill', ink)
-        .attr('fill-opacity', ERA_FILL_ALPHA)
-        .attr('stroke', ink)
-        .attr('stroke-width', 1)
+        .attr('fill', ink.fill)
+        .attr('fill-opacity', ink.fillOpacity)
+        .attr('stroke', ink.stroke)
+        .attr('stroke-width', ink.strokeWidth)
         .attr('stroke-opacity', 0.9);
 
       if (isVertical) {
@@ -301,7 +304,9 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
       const perEra = eras
         .map((era, i) => {
           const n = eraBins[i][binIdx]?.length ?? 0;
-          return `<span style="color:${eraColor(currentMetric, i)}">■</span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
+          const ink = eraInk(currentMetric, i, eraStyle);
+          const sw = `display:inline-block;width:9px;height:9px;background:${ink.fill};opacity:${ink.fillOpacity + 0.3};border:1.5px solid ${ink.stroke};vertical-align:-1px`;
+          return `<span style="${sw}"></span> ${era.label}: ${n} day${n === 1 ? '' : 's'}`;
         })
         .join('<br/>');
       tooltip
@@ -946,7 +951,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
     // Legend is rendered as an HTML element above the charts for both
     // mobile and desktop (see App.tsx).
 
-  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system]);
+  }, [filteredData, currentMetric, currentDate, fullData, yearTimeline, width, height, isVertical, system, eraStyle]);
 
   return (
     <div className="histogram-chart-wrapper">

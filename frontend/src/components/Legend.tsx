@@ -1,10 +1,11 @@
 import React from 'react';
 import type { Selection } from 'd3';
 import CONFIG, { type MetricKey } from '../utils/config';
-import { eraColor, ERA_FILL_ALPHA, type Era } from '../utils/eras';
+import { eraInk, type Era, type EraStyle } from '../utils/eras';
+import { useEraStyle } from '../hooks/useEraStyle';
 
 export type LegendItem =
-  | { type: 'rect'; color: string; label: string; op: number }
+  | { type: 'rect'; color: string; label: string; op: number; stroke?: string; strokeWidth?: number }
   | { type: 'wave'; color: string; label: string; op: number; w?: number }
   | { type: 'line'; color: string; label: string }
   | { type: 'dashed'; color: string; label: string }
@@ -56,6 +57,7 @@ export const getLegendData = (
   currentDate?: string,
   isForecast?: boolean,
   eras?: Era[],
+  eraStyle: EraStyle = 'shade',
 ): LegendItem[] => {
   const items: LegendItem[] = [];
 
@@ -65,7 +67,15 @@ export const getLegendData = (
   // the shade its bars are drawn in.
   if (eras && eras.length) {
     eras.forEach((era, i) => {
-      items.push({ type: 'rect', color: eraColor(metric, i), label: era.label, op: ERA_FILL_ALPHA + 0.25 });
+      const ink = eraInk(metric, i, eraStyle);
+      items.push({
+        type: 'rect',
+        color: ink.fill,
+        label: era.label,
+        op: ink.fillOpacity + 0.25,
+        stroke: ink.stroke,
+        strokeWidth: ink.strokeWidth,
+      });
     });
   } else {
     items.push({
@@ -115,6 +125,9 @@ export const drawLegendSwatch = (
 ) => {
   if (item.type === 'rect') {
     sel.append('rect').attr('width', 12).attr('height', 12).attr('y', -6).attr('fill', item.color).attr('opacity', item.op);
+    if (item.stroke) {
+      sel.append('rect').attr('width', 12).attr('height', 12).attr('y', -6).attr('fill', 'none').attr('stroke', item.stroke).attr('stroke-width', item.strokeWidth ?? 1);
+    }
   } else if (item.type === 'line') {
     sel.append('line').attr('x1', 0).attr('x2', 12).attr('y1', 0).attr('y2', 0).attr('stroke', item.color).attr('stroke-width', 2.5);
   } else if (item.type === 'dashed') {
@@ -134,7 +147,12 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
   <svg width={16} height={16} style={{ flex: '0 0 auto' }}>
     <g transform="translate(2, 8)">
       {item.type === 'rect' && (
-        <rect width={12} height={12} y={-6} fill={item.color} opacity={item.op} />
+        <>
+          <rect width={12} height={12} y={-6} fill={item.color} opacity={item.op} />
+          {item.stroke && (
+            <rect width={12} height={12} y={-6} fill="none" stroke={item.stroke} strokeWidth={item.strokeWidth ?? 1} />
+          )}
+        </>
       )}
       {item.type === 'wave' && (
         <path
@@ -187,7 +205,8 @@ const Swatch: React.FC<{ item: LegendItem }> = ({ item }) => (
 );
 
 export const Legend: React.FC<{ metric: MetricKey; currentDate?: string; isForecast?: boolean; eras?: Era[] }> = ({ metric, currentDate, isForecast, eras }) => {
-  const items = getLegendData(metric, currentDate, isForecast, eras);
+  const { eraStyle } = useEraStyle();
+  const items = getLegendData(metric, currentDate, isForecast, eras, eraStyle);
   // The binned-data swatch(es) + the target-day marker form the first row on
   // mobile; the break sits after the marker (or after the last swatch when no
   // date is selected).
