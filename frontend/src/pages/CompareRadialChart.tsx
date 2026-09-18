@@ -5,7 +5,7 @@ import { useUnits } from '../hooks/useUnits';
 import { convert, unitLabel, tickCount, valueDecimals } from '../utils/units';
 import type { BandKey, Series, SeriesData } from './compareTypes';
 import { DOY_COUNT, buildDialTracks, dayFraction } from './compareStats';
-import type { BandPath, Pt } from './compareStats';
+import type { BandPath } from './compareStats';
 import { placeTooltip } from '../utils/tooltip';
 import './CompareRadialChart.css';
 
@@ -23,17 +23,15 @@ interface CompareRadialChartProps {
   /**
    * Shared value domain [min, max] in DISPLAY units for the radius scale. Pooled
    * across every series on this dial so they're directly comparable, and taken
-   * from the layers actually drawn. When omitted the dial auto-scales to its own
-   * series.
+   * from the full day cloud so nothing is clipped. When omitted the dial
+   * auto-scales to its own series.
    */
   domain?: [number, number];
   /**
-   * 'all' draws every day as a faint dot. 'percentile' replaces the cloud with
-   * per-track quantile bands around the day of the year, plus the days falling
-   * outside the 1–99 band drawn faintly as outliers.
+   * Which layers to draw over the cloud — the percentile envelopes and the
+   * median ring. Anything absent is simply not drawn; the day cloud itself is
+   * always there.
    */
-  pointMode?: 'all' | 'percentile';
-  /** Which percentile layers to draw. Anything absent is simply not drawn. */
   bands: BandKey[];
   width?: number;
   height?: number;
@@ -46,7 +44,6 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
   series,
   axisMetric,
   domain,
-  pointMode = 'all',
   bands,
   width: propWidth,
   height: propHeight,
@@ -84,7 +81,6 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
     const tracks = buildDialTracks(
       series.map(({ series: s, data }) => ({ series: s, rows: data.rows })),
       (raw, metric) => convert(raw, metric, system),
-      pointMode,
       bands
     );
     const allPts = tracks.flatMap((t) => t.pts);
@@ -166,7 +162,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
         .text(MONTHS[m]);
     }
 
-    // ---- per-track percentile bands (percentile mode only) -----------------
+    // ---- per-track percentile bands ----------------------------------------
     // Widest first, so the palest sits underneath the tighter ones.
     const radialArea = d3
       .areaRadial<BandPath['points'][number]>()
@@ -187,7 +183,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
     }
 
     // ---- per-track day cloud on CANVAS --------------------------------------
-    // In 'all' mode this is every day; in 'percentile' mode just the outliers.
+    // Every archive day in every period, always — the bands lie over it.
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = totalWidth * dpr;
@@ -197,13 +193,10 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, totalWidth, totalHeight);
       ctx.translate(cx, cy);
-      const cloudPts: Pt[] =
-        pointMode === 'percentile' ? tracks.flatMap((t) => t.outliers) : allPts;
       // Lighter cloud when overlaying several tracks so they don't muddy
-      // together. Outliers (beyond 1–99) get a fixed 10% alpha.
-      const cloudAlpha =
-        pointMode === 'percentile' ? 0.1 : tracks.length > 1 ? 0.06 : 0.1;
-      for (const p of cloudPts) {
+      // together.
+      const cloudAlpha = tracks.length > 1 ? 0.06 : 0.1;
+      for (const p of allPts) {
         const [x, y] = polar(dayFraction(p.date), rScale(p.val));
         ctx.fillStyle = p.color;
         ctx.globalAlpha = cloudAlpha;
@@ -329,7 +322,7 @@ const CompareRadialChart: React.FC<CompareRadialChartProps> = ({
           .on('mouseout', () => tooltip.style('opacity', 0));
       }
     }
-  }, [series, axisMetric, domain, pointMode, bands, totalWidth, totalHeight, system]);
+  }, [series, axisMetric, domain, bands, totalWidth, totalHeight, system]);
 
   return (
     <div className="cmp-radial-wrapper" style={{ width: totalWidth, height: totalHeight }}>

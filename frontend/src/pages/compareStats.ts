@@ -2,8 +2,8 @@
 //
 // One implementation, used twice: CompareRadialChart draws from these tracks,
 // and ComparePage measures them to pick the dial's shared radius domain. Both
-// must agree about what is on the dial — the domain is derived from what is
-// actually DRAWN, so turning a layer off zooms the dial in on what is left.
+// must agree about what is on the dial — the domain covers the full day cloud,
+// which is always drawn, so no layer can ever be clipped by the scale.
 import * as d3 from 'd3';
 import type { MetricKey } from '../utils/config';
 import type { WeatherDataPoint } from '../types';
@@ -48,7 +48,7 @@ export interface DialTrack {
   half: Period['half'];
   color: string;
   label: string;
-  /** Every day in the period. Drawn as the cloud in 'all' mode. */
+  /** Every day in the period. Always drawn as the cloud. */
   pts: Pt[];
   /** Enabled envelopes, widest first — which is also the draw order. */
   bands: BandPath[];
@@ -57,8 +57,6 @@ export interface DialTrack {
   median: { frac: number; val: number }[] | null;
   /** Same medians keyed by day, for the difference shading. */
   medianByDoy: Map<number, number>;
-  /** Days beyond the 1–99 envelope. Empty unless the outlier layer is on. */
-  outliers: Pt[];
 }
 
 /**
@@ -113,7 +111,6 @@ const MIN_DOYS = 8;
 export function buildDialTracks(
   inputs: TrackInput[],
   toDisplay: (raw: number, metric: MetricKey) => number,
-  pointMode: 'all' | 'percentile',
   bands: BandKey[]
 ): DialTrack[] {
   const tracks: DialTrack[] = [];
@@ -142,7 +139,6 @@ export function buildDialTracks(
         bands: [],
         median: null,
         medianByDoy: new Map(),
-        outliers: [],
       };
       tracks.push(track);
       if (pts.length === 0) continue;
@@ -169,8 +165,6 @@ export function buildDialTracks(
       track.medianByDoy = median;
       track.median = toPath(median);
 
-      if (pointMode !== 'percentile') continue;
-
       for (const spec of BAND_SPECS) {
         if (!bands.includes(spec.key)) continue;
         const lo = quantileByDoy(spec.lo);
@@ -184,34 +178,18 @@ export function buildDialTracks(
         points.sort((a, b) => a.frac - b.frac);
         track.bands.push({ key: spec.key, opacity: spec.opacity, points });
       }
-
-      // Outliers are tested against the SAME smoothed 1–99 envelope the band
-      // draws, so a dot never sits inside a band it is supposed to be outside.
-      if (bands.includes('outliers')) {
-        const p1 = quantileByDoy(0.01);
-        const p99 = quantileByDoy(0.99);
-        for (const p of pts) {
-          const lo = p1.get(p.doy);
-          const hi = p99.get(p.doy);
-          if (lo === undefined || hi === undefined) continue;
-          if (p.val < lo || p.val > hi) track.outliers.push(p);
-        }
-      }
     }
   }
   return tracks;
 }
 
 /**
- * The value extent of everything these tracks will actually draw. This is what
- * sets the dial's radius domain, so switching a layer off tightens the scale
- * onto what remains — which is how a half-degree difference between two periods
- * becomes visible on a dial whose daily cloud spans fifty.
+ * The value extent of everything these tracks draw. Every day is on the dial,
+ * so the domain is the extent of the FULL cloud — ticking a band off never
+ * rescales the dial, and nothing a band or a median ring covers can fall
+ * outside it (a quantile of a day's values, smoothed, stays within them).
  */
-export function drawnExtent(
-  tracks: DialTrack[],
-  pointMode: 'all' | 'percentile'
-): [number, number] | null {
+export function drawnExtent(tracks: DialTrack[]): [number, number] | null {
   let min = Infinity;
   let max = -Infinity;
   const see = (v: number) => {
@@ -219,16 +197,7 @@ export function drawnExtent(
     if (v > max) max = v;
   };
   for (const t of tracks) {
-    if (pointMode === 'all') for (const p of t.pts) see(p.val);
-    else {
-      for (const band of t.bands) {
-        for (const pt of band.points) {
-          see(pt.lo);
-          see(pt.hi);
-        }
-      }
-      for (const p of t.outliers) see(p.val);
-    }
+    for (const p of t.pts) see(p.val);
     if (t.median) for (const pt of t.median) see(pt.val);
   }
   return min <= max ? [min, max] : null;

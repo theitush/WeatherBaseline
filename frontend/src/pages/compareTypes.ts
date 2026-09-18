@@ -74,35 +74,32 @@ export interface SeriesData {
 
 export type LayoutMode = 'overlay' | 'separate';
 
-/** Which percentile layers a dial draws. Every one is independently togglable. */
-export type BandKey = 'p1_99' | 'p5_95' | 'p25_75' | 'median' | 'outliers';
+/**
+ * Which layers a dial draws on top of the day cloud. Every one is an
+ * independent tick box — there is no mode switch, because every day is always
+ * drawn and the envelopes are simply laid over it.
+ */
+export type BandKey = 'p10_90' | 'p25_75' | 'median';
 
 /**
  * The percentile envelopes, widest first — which is also the draw order, so the
  * palest band sits underneath the tighter ones.
  */
 export const BAND_SPECS = [
-  { key: 'p1_99' as const, lo: 0.01, hi: 0.99, opacity: 0.08, label: '1–99 percentile' },
-  { key: 'p5_95' as const, lo: 0.05, hi: 0.95, opacity: 0.15, label: '5–95 percentile' },
+  { key: 'p10_90' as const, lo: 0.1, hi: 0.9, opacity: 0.18, label: '10–90 percentile' },
   { key: 'p25_75' as const, lo: 0.25, hi: 0.75, opacity: 0.32, label: '25–75 percentile' },
 ];
 
 export const BAND_LABEL: Record<BandKey, string> = {
-  p1_99: '1–99 percentile',
-  p5_95: '5–95 percentile',
+  p10_90: '10–90 percentile',
   p25_75: '25–75 percentile',
   median: 'median (50th)',
-  outliers: 'outliers (<1 / >99)',
 };
 
-/** Toggles offered in each point mode. 'all' already draws every day, so only
- *  the median ring is a choice there. */
-export const BANDS_FOR_MODE: Record<'all' | 'percentile', BandKey[]> = {
-  all: ['median'],
-  percentile: ['p1_99', 'p5_95', 'p25_75', 'median', 'outliers'],
-};
+/** Every toggle the Layers group offers, in the order it lists them. */
+export const BAND_TOGGLES: BandKey[] = ['p10_90', 'p25_75', 'median'];
 
-export const DEFAULT_BANDS: BandKey[] = ['p1_99', 'p5_95', 'p25_75', 'median', 'outliers'];
+export const DEFAULT_BANDS: BandKey[] = ['p10_90', 'p25_75', 'median'];
 
 /** Smoothing choices for the median ring, as (label, half-window in days). */
 export const SMOOTH_OPTIONS: { days: number; label: string }[] = [
