@@ -23,5 +23,10 @@
         ]
       }
     ]
+  },
+  "statusLine": {
+    "command": "/home/ita/coo/tools/orchestrate-status statusline",
+    "type": "command",
+    "refreshInterval": 5
   }
 }
