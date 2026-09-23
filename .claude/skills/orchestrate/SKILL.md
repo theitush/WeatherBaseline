@@ -112,7 +112,7 @@ When a worker reports, before starting anything else in its lane:
    /home/ita/coo/tools/orchestrate-status land WeatherBaseline#$n Blocked --note "inbar#40"
    ```
 
-   Exactly the three ways a task is allowed to finish. `--at HH:MM` is for when you notice a few minutes late; without it the clock is now.
+   Exactly the three ways a task is allowed to finish. `--at HH:MM` is for when you notice a few minutes late; without it the clock is now. `land` also writes the timing to the task itself — its `--eta` and the measured span into the board's `Estimate` and `Actual` columns (minutes), and one `**Timing:** est ~20m · took 25:00 (+5m) · 124.8k tokens` line into the issue body, replaced on a re-land — so estimates can be tuned later against what tasks really took (coo#163). It never fails `land`; a board write the budget refuses is queued for `tools/board flush`.
 3. Commit **by path** the paths its report names, and nothing else. Never `-A`: the tree is shared.
 4. Start the next task in that lane.
 5. Send a message saying what landed and what you started behind it — a line or two, no footer. The panel at the bottom of the terminal is carrying the lists, live and recomputed, and it is the only place they go (§4).
