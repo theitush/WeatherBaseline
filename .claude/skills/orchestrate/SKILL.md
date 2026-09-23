@@ -15,6 +15,8 @@ description: Work this repo's queue (WeatherBaseline) as a dispatcher — one su
 
 You are the dispatcher. You do not work an item yourself down one long thread; you read the board, split it into lanes, spawn a worker per task, watch them, and verify and commit what comes back.
 
+**Stay reachable.** A foreground command leaves you deaf until it returns, and Ita waiting on you (Ita, 2026-09-23, coo#195: *"they should be dispatching tasks not taking them on. if its a small thing they should send it to run in the bg and not just fuck leave me hanging while they wait for some goddamn python script or whatever the fuck to run"*). Only the instant commands run in the foreground — `board`, `orchestrate-status`, `machine-budget`, `git`, a read. Anything of yours that takes more than a few seconds — a suite, a self-test, a build, a scan, a script — goes to `run_in_background`, and you keep answering while it runs. Anything that is work rather than a check is a task, and goes to a worker.
+
 ## 1. Take your slice of the board
 
 The queue's order, Status and Priority live on the project, not in the issues, so one read gets them:
@@ -113,9 +115,11 @@ That is optional, and it is the one way to read a brief before it is sent: nothi
 
 **The worker re-estimates its own row; the brief tells it to.** Your `--eta` is a guess from outside; the worker knows when it is sitting behind a `machine-budget` slot or a suite crawling on a loaded box. So the brief (below) has it run `/home/ita/coo/tools/orchestrate-status eta WeatherBaseline#n <minutes left> --why wait|load|scope|blocked|ready --note "…"` — `+N` adds to what is left — and the row's countdown re-bases from now, the lane behind it moving with it. The revision never touches the row's `eta`, so the `(+5m)` still measures your estimate; what it adds is *why*: the Done row reads `Done · wait +15m`, and the `**Timing:**` line `land` writes lists every revision with its time, reason and note, so a later look can tell a task that was late because the box was busy from one that was estimated wrong (Ita, 2026-09-23, coo#178: *"they do know when they are just waiting for a slot to free up"*). A worker with no pass behind it is told so and nothing fails. **The clock reminds it, too:** a PostToolUse hook (`/home/ita/coo/tools/eta-ping`, installed by `orchestrate-status install`) puts a one-line note in the worker's context with its next tool result, once at 5 minutes left and once at 0, and a fresh `eta` re-arms both (Ita, 2026-09-23, coo#193: *"like at 5min and again at 0min"*). It finds the worker by the `description` §3 has you spawn it with, or by `start --agent`, so a worker spawned under some other description hears nothing. A worker that goes quiet past its estimate is not re-estimated for it — ask it.
 
+**Watching is waiting, not polling.** Workers run in the background and their reports arrive on their own; between them you are free, so answer Ita. Never `sleep`, tail a log or loop on a check in the foreground to see how a worker is doing — its row on the panel already says.
+
 When a worker reports, before starting anything else in its lane:
 
-1. Read its result against the issue — you are the one who verifies before anything reads Done; what you cannot verify by looking goes to `Review` with what and who in the body.
+1. Read its result against the issue — you are the one who verifies before anything reads Done; what you cannot verify by looking goes to `Review` with what and who in the body. A re-run of its suite or self-test goes to `run_in_background` (see the top of this file), and you land it when that returns.
 2. Stamp the finish, which measures the duration for you:
 
    ```bash
