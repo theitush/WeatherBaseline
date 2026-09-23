@@ -25,6 +25,28 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ita/coo/tools/eta-ping 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ita/coo/tools/eta-ping 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
