@@ -50,12 +50,12 @@
     ]
   },
   "statusLine": {
-    "command": "/home/ita/coo/tools/orchestrate-status statusline",
+    "command": "/home/ita/coo/tools/orchestrate-statusline statusline",
     "type": "command",
     "refreshInterval": 5
   },
   "subagentStatusLine": {
-    "command": "/home/ita/coo/tools/orchestrate-status subagent-statusline",
+    "command": "/home/ita/coo/tools/orchestrate-statusline subagent-statusline",
     "type": "command"
   }
 }
