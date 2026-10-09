@@ -167,6 +167,25 @@ def test_merge_keeps_history_and_lets_the_new_span_win_shared_dates(tmp_path):
     assert out.loc[out["date"] == "1950-01-01", "tmax_C"].iloc[0] == 10.0
 
 
+def test_a_top_up_keeps_columns_it_does_not_fetch(tmp_path):
+    # R2 archives carry dewpt_mean_C (the dew-point backfill) that main's 4-var
+    # top-up doesn't produce. Rewriting a shared date must not blank it.
+    base = frame(HISTORY, tmax_start=10.0)
+    base["dewpt_mean_C"] = [1.0, 2.0, 3.0]
+    up = FakeUploader([gz(base)])
+    write_archive(LAT, LON, frame(NEW_SPAN, tmax_start=30.0), uploader=up,
+                  require_base=True)
+    out = read_written(tmp_path)
+    assert list(out.columns) == ["date", "tmax_C", "tmin_C", "precip_mm",
+                                 "wind_max_ms", "dewpt_mean_C"]
+    shared = out.loc[out["date"] == "2026-05-31"].iloc[0]
+    assert shared["tmax_C"] == 30.0        # the fetched column still wins
+    assert shared["dewpt_mean_C"] == 3.0   # the unfetched one is carried over
+    assert out.loc[out["date"] == "1950-01-01", "dewpt_mean_C"].iloc[0] == 1.0
+    # A date only the top-up has gets no dew point — blank, not invented.
+    assert out.loc[out["date"] == "2026-06-02", "dewpt_mean_C"].isna().all()
+
+
 def test_the_r2_base_is_read_once_per_cell_per_run(tmp_path):
     """Second span of the same cell merges onto the local file, not a new GET."""
     up = FakeUploader([gz(frame(HISTORY))])

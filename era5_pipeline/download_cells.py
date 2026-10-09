@@ -82,6 +82,13 @@ ZARR_URL = "https://data.earthdatahub.destine.eu/era5/era5-land-v0.zarr"
 # u10+v10) cost nothing extra — the cost is per stored variable fetched.
 ZARR_VARS = ["t2m", "tp", "u10", "v10"]
 
+# Archive column order on disk. dewpt_mean_C isn't produced here (it comes from
+# the dew-point backfill on feat/dew-point) but R2 archives already carry it,
+# and a merge must keep it — see merge_archive_frames.
+ARCHIVE_COLUMNS = [
+    "date", "tmax_C", "tmin_C", "precip_mm", "wind_max_ms", "dewpt_mean_C",
+]
+
 # The store chunks 50 (lat) x 100 (lon) cells per spatial chunk. tile_id
 # encodes the chunk index, so one tile == one 5x10deg chunk. Must match
 # select_cells.
@@ -1070,6 +1077,33 @@ def _merge_base(path: Path, lat: float, lon: float, *, fresh: bool, uploader,
         return base
 
 
+def merge_archive_frames(base, frame):
+    """Merge a freshly-fetched frame onto a cell's existing archive, per COLUMN.
+
+    Not row-wise last-wins, which is what this used to be. R2 archives carry
+    `dewpt_mean_C` from the dew-point backfill (feat/dew-point), which this
+    downloader doesn't produce — and the top-up refetches the whole trailing
+    year, so replacing whole rows would blank dew point for every date it
+    rewrites. `combine_first` keeps every value the new frame HAS and falls back
+    to the archive for the rest: columns the frame lacks, and dates outside the
+    fetched span alike. For columns the frame does carry it is exactly the old
+    last-wins rule.
+
+    Duplicate dates on either side (legacy archives from before the merge was
+    de-duplicated) collapse last-wins first: combine_first aligns on the index
+    and would otherwise refuse to reindex.
+    """
+    left = frame.drop_duplicates(subset="date", keep="last").set_index("date")
+    right = base.drop_duplicates(subset="date", keep="last").set_index("date")
+    return left.combine_first(right).reset_index()
+
+
+def canonical_columns(frame):
+    """`frame` with ARCHIVE_COLUMNS first, in order; anything else appended."""
+    known = [c for c in ARCHIVE_COLUMNS if c in frame.columns]
+    return frame[known + [c for c in frame.columns if c not in known]]
+
+
 def write_archive(lat: float, lon: float, frame, *, ledger=None,
                   span=None, uploader=None, require_base: bool = False) -> Path:
     """Write (or merge by date) one cell's daily frame to its gzip archive.
@@ -1097,13 +1131,10 @@ def write_archive(lat: float, lon: float, frame, *, ledger=None,
         base = _merge_base(path, lat, lon, fresh=fresh, uploader=uploader,
                            require_base=require_base)
         if base is not None:
-            merged = (
-                pd.concat([base, frame])
-                .drop_duplicates(subset="date", keep="last")
-                .sort_values("date")
-            )
+            merged = merge_archive_frames(base, frame).sort_values("date")
         else:
             merged = frame.sort_values("date")
+        merged = canonical_columns(merged)
         # Atomic write: never leave a half-written .csv.gz that the next merge
         # (or the frontend) can't read if this process is killed mid-write.
         tmp = path.with_suffix(path.suffix + ".tmp")
