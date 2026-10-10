@@ -49,4 +49,4 @@ gh api repos/theitush/WeatherBaseline/issues -X POST -f title="..." -F body=@fil
 
 **The org.** Seven repos, all Ita's, one machine, one board: `WeatherBaseline` (`~/HowHotWasIt`, ERA5 baselines + public site), `inbar` (`~/Inbar`, trading research), `lead-machine` (`~/leadgen`, outreach pipeline + cockpit), `planets` (`~/planets`, astronomical poster editor), `yajna` (`~/yajna`, journal app), `giverny` (`~/giverny`, fork of the Giverny terminal), `coo` (`~/coo`). The COO owns what is shared — the board, this section, `coo/mirror/`, `coo/STATUS.md` — and is the one that dispatches work into other repos, so cross-repo work goes to it.
 
-`/orchestrate` (`.claude/skills/orchestrate/SKILL.md`) is how a queue pass runs; it is not needed to work one task.
+`giverny:manage` (the Giverny plugin's skill — what Ita means by "manage") is how a queue pass runs; it is not needed to work one task.
